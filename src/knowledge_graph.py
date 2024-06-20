@@ -11,7 +11,7 @@ def create_knowledge_graph(data, iterations = 0):
             head = triples[0]
             relation = triples[1]
             tail = triples[2]
-            G.add_edge(head.strip(), tail.strip(), relation= relation.strip())
+            G.add_edge(head, tail, relation= relation)
             if iterations > 0:
                 index += 1
             

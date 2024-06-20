@@ -1,11 +1,12 @@
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from src.datasets import SingleHopDataset
+from src.datasets import SingleHopDataset, KnowledgeIntegrationDataset, OneWikiHopDataset
 from src.config import Config
 from src.train import Trainer
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
-from src.util import create_knowledge_graph, print_graph
+from src.util import print_datapoint
+from src.knowledge_graph import create_knowledge_graph, print_graph
 import networkx as nx
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -28,15 +29,23 @@ This is the Dataset where the model was pretrained with.
 https://huggingface.co/datasets/allenai/c4
 """
 
+#I only have one more Question in the Training Data the rest is the same
+# They didnt have the 'has part' relation in their set.
 def load_dataset():
     print(f"Loading Datasets...")
-    train_dataset = pd.read_json('dataset/data_ids_april7/train.json')
-    test_dataset = pd.read_json('dataset/data_ids_april7/dev.json')
+    train_dataset = pd.read_json('dataset/data/train.json')
+    test_dataset = pd.read_json('dataset/data/dev.json')
+    
+    def contains_has_part(evidences):
+        return any(r == 'has part' for e1, r, r2 in evidences)
+    
+    train_dataset = train_dataset[~train_dataset['evidences'].apply(contains_has_part)]
+    test_dataset = test_dataset[~test_dataset['evidences'].apply(contains_has_part)]
     
     
     validation_ratio = 0.1
     train_dataset = train_dataset[(train_dataset['type'] == 'compositional') | (train_dataset['type'] == 'inference')]
-    train_dataset, dev_dataset = train_test_split(train_dataset, test_size=validation_ratio, random_state=1)
+    train_dataset, dev_dataset = train_test_split(train_dataset, test_size=validation_ratio, random_state=120)
     test_dataset = test_dataset[(test_dataset['type'] == 'compositional') | (test_dataset['type'] == 'inference')]
 
     print("Creating Knowledge Graphs...")
@@ -90,7 +99,23 @@ def test_single_hop_training():
     
     trainer.train_single_hop(optimizer, epochs=1)
 
-
 if __name__ == '__main__':
-    test_single_hop_training()
+    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset()
+    
+    print(train_dataset.head(2))
+    
+    print(f"Train: Compositional + Inference = {len(train_dataset)}")
+    print(f"Dev: Compositional + Inference = {len(dev_dataset)}")
+    print(f"Test: Compositional + Inference = {len(test_dataset)}")
+    
+    one_hop_train = OneWikiHopDataset(train_dataset, dev_dataset, test_dataset, 'train')
+    one_hop_dev = OneWikiHopDataset(train_dataset, dev_dataset, test_dataset, 'dev')
+    one_hop_test = OneWikiHopDataset(train_dataset, dev_dataset, test_dataset, 'test')
+    
+    print(len(one_hop_train))
+    print(len(one_hop_dev))
+    print(len(one_hop_test))
+    
+    
+    
 

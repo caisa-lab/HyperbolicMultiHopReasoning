@@ -30,6 +30,4 @@ def print_datapoint(dataset, idx):
     print(f"context: {dataset['context'][idx]}") # Context can be used to concatonate with question to form input sequence
     print(f"evidences: {dataset['evidences'][idx]}") # e1, r1, e2 For knowledge Graph
     print(f"answer: {dataset['answer'][idx]}") # Label / Answer
-    print(f"evidences_id: {dataset['evidences_id'][idx]}")
-    print(f"answer_id: {dataset['answer_id'][idx]}")
     
