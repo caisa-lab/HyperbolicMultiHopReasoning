@@ -1,12 +1,12 @@
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from src.datasets import SingleHopDataset, KnowledgeIntegrationDataset, OneWikiHopDataset
+from src.datasets import SingleHopDataset, KnowledgeIntegrationDataset, OneWikiHopDataset, RandomWalkDataset
 from src.config import Config
 from src.train import Trainer
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
 from src.util import print_datapoint
-from src.knowledge_graph import create_knowledge_graph, print_graph
+from src.knowledge_graph import create_knowledge_graph, print_graph, visualize_knowledge_graph
 import networkx as nx
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -33,8 +33,8 @@ https://huggingface.co/datasets/allenai/c4
 # They didnt have the 'has part' relation in their set.
 def load_dataset():
     print(f"Loading Datasets...")
-    train_dataset = pd.read_json('dataset/data/train.json')
-    test_dataset = pd.read_json('dataset/data/dev.json')
+    train_dataset = pd.read_json('dataset/data_ids_april7/train.json')
+    test_dataset = pd.read_json('dataset/data_ids_april7/dev.json')
     
     def contains_has_part(evidences):
         return any(r == 'has part' for e1, r, r2 in evidences)
@@ -47,6 +47,10 @@ def load_dataset():
     train_dataset = train_dataset[(train_dataset['type'] == 'compositional') | (train_dataset['type'] == 'inference')]
     train_dataset, dev_dataset = train_test_split(train_dataset, test_size=validation_ratio, random_state=120)
     test_dataset = test_dataset[(test_dataset['type'] == 'compositional') | (test_dataset['type'] == 'inference')]
+    
+    #correct_wrong_evidences(train_dataset)
+    #correct_wrong_evidences(dev_dataset)
+    #correct_wrong_evidences(test_dataset)
 
     print("Creating Knowledge Graphs...")
     kg_train = create_knowledge_graph(train_dataset)
@@ -102,20 +106,15 @@ def test_single_hop_training():
 if __name__ == '__main__':
     train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset()
     
-    print(train_dataset.head(2))
     
-    print(f"Train: Compositional + Inference = {len(train_dataset)}")
-    print(f"Dev: Compositional + Inference = {len(dev_dataset)}")
-    print(f"Test: Compositional + Inference = {len(test_dataset)}")
+    all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
+    all_kg = create_knowledge_graph(all_data)
     
-    one_hop_train = OneWikiHopDataset(train_dataset, dev_dataset, test_dataset, 'train')
-    one_hop_dev = OneWikiHopDataset(train_dataset, dev_dataset, test_dataset, 'dev')
-    one_hop_test = OneWikiHopDataset(train_dataset, dev_dataset, test_dataset, 'test')
+    random_walk_dataset = RandomWalkDataset(all_kg, 3)
     
-    print(len(one_hop_train))
-    print(len(one_hop_dev))
-    print(len(one_hop_test))
+    print(len(random_walk_dataset))
     
+
     
     
 

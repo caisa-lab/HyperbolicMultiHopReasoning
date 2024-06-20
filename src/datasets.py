@@ -6,42 +6,46 @@ from tqdm import tqdm
 import pandas as pd
 
 class RandomWalkDataset(Dataset):
-    """Gets the Knowledge Graph as an input and should create Random Walks.
+    """Gets the Knowledge Graph as an input and should create Random Walks. For each node sample up to 20 random walks of length 3, do this 5 times with different seeds.
+    Hold out the random walks which are triples in the validation and test set.
 
     Returns: Random Walk dataset should output an incomplete sequence like "e1 ; r1 ; r2 ; ... ; rn-1;" and a complete sequence "e1 ; r1 ; e2 ; ... ; rn-1 ; en"
     """
     def __init__(self, kg, steps):
         self.kg = kg
         self.steps = steps
+
+        self.data = list(self._generate_random_walks())
         
-        random_paths = []
-        index = 1
-        for _ in range(5):
-            random.seed(index)
-            for start_node in list(self.kg.nodes()):
-                random_paths += self._create_random_walks(self.kg, start_node, self.steps, tries=20) 
-            index += 1
-            
-        self.data = list(set(random_paths))
-        
+    def _random_walk(self, start_node, hops=2):
+        path = [start_node]
+        current_node = start_node
+        for _ in range(hops):
+            neighbors = list(self.kg.successors(current_node))
+            if not neighbors:
+                break  # Restart the walk if dead-end is reached
+            next_node = random.choice(neighbors)
+            edge = self.kg.get_edge_data(current_node, next_node)['relation']
+            path.append(edge)
+            path.append(next_node)
+            current_node = next_node
+        return path
     
-    def _create_random_walks(self, graph, start_node, number_of_steps, tries = 30):
-        random_paths = []
-        for _ in range(tries):
-            current_node = start_node
-            walk = [current_node]
-            for _ in range(number_of_steps):
-                neighbors = list(graph.successors(current_node))
-                if not neighbors:
-                    break  # Restart the walk if dead-end is reached
-                next_node = random.choice(neighbors)
-                edge = graph.get_edge_data(current_node, next_node)['relation']
-                walk.append(edge)
-                walk.append(next_node)
-                current_node = next_node
-            if len(walk) == 2 * self.steps - 1:
-                random_paths.append(tuple(walk))
-        return random_paths
+    def _generate_random_walks(self, num_walks_per_node=30, walk_length=3, num_iterations=10):
+        all_paths = set()
+        nodes = list(self.kg.nodes())
+        for _ in tqdm(range(num_iterations)):
+            random.seed()  # Change seed for each iteration
+            for idx, node in enumerate(nodes):
+                walks = set()
+                for _ in range(num_walks_per_node):
+                    path = self._random_walk(node, walk_length-1)
+                    if path and len(path) == 2*walk_length - 1:  # Ensure path is exactly of the required length
+                        walks.add(tuple(path))
+                all_paths.update(walks)
+            #print(len(list(all_paths)))
+        return all_paths
+    
     
     def __len__(self):
         return len(self.data)
@@ -62,7 +66,7 @@ class RandomWalkDataset(Dataset):
 
 
 class SingleHopDataset(Dataset):
-    """Single Hop Dataset gets a knowledge graph
+    """Single Hop Dataset gets a dataset
 
     Returns:
         Returns a random single hop containing input_str = "e1 ; relation" and label "e2"
@@ -143,12 +147,7 @@ class SingleHopDataset(Dataset):
         return len(self.data)
     
     def __getitem__(self, idx):
-        e1, r, e2 = self.data['evidences'][idx]
-            
-        input_str = f"{e1} ; {r}"
-        label = f"{e2}"
-        
-        return input_str, label
+        return self.data.iloc[idx]
 
 class OneWikiHopDataset(Dataset):
     """

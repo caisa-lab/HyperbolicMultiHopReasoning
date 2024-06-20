@@ -9,8 +9,26 @@ import matplotlib.pyplot as plt
 from src.knowledge_graph import create_knowledge_graph, print_graph
 import numpy as np
 
-#This Code are just some ideas of how it could work
-
+#There are over 1000 rows where the last entity of evidence 0 is not equal to the first of evidence 1 leading to no 2 hop in the knowledge Graph. Do we fix this?
+def correct_wrong_evidences(df):
+    wrong = {}
+    for _, entry in df.iterrows():
+        index = entry['_id']
+        evidences = entry['evidences']
+        
+        # Ensure there are at least two evidence triples
+        if len(evidences) >= 2:
+            triple1 = evidences[0]
+            triple2 = evidences[1]
+        if triple1[2] != triple2[0]:
+            wrong[index]=(triple1[2], triple2[0])
+    #print(len(wrong))
+    
+    def update_evidences(evidences):
+        if len(evidences) >= 2:
+            evidences[0][-1] = evidences[1][0]
+        return evidences
+    df.loc[df['_id'].isin(list(wrong.keys())), 'evidences'] = df.loc[df['_id'].isin(list(wrong.keys())), 'evidences'].apply(update_evidences)
 
 def project_to_hyperbolic(x, c):
     norm_x = np.linalg.norm(x)

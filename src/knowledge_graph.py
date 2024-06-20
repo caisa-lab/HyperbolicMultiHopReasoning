@@ -5,15 +5,15 @@ def create_knowledge_graph(data, iterations = 0):
     index = 0
     G = nx.DiGraph()
     for entry in data['evidences']:
-        for triples in entry:
-            if index > iterations:
+        if index > iterations:
                 return G
+        for triples in entry:
             head = triples[0]
             relation = triples[1]
             tail = triples[2]
             G.add_edge(head, tail, relation= relation)
-            if iterations > 0:
-                index += 1
+        if iterations > 0:
+            index += 1
             
     return G
 def visualize_knowledge_graph(kg):
@@ -31,7 +31,7 @@ def visualize_knowledge_graph(kg):
     plt.show()
     
 def print_graph(kg):
-    #print("Nodes:", kg.nodes())
-    #print("Edges:", kg.edges(data=True))
+    print("Nodes:", kg.nodes())
+    print("Edges:", kg.edges(data=True))
     print(f"#Nodes: {len(kg.nodes())}")
     print(f"#Edges: {len(kg.edges(data=True))}")
