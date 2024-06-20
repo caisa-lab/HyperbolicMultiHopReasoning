@@ -31,7 +31,7 @@ def visualize_knowledge_graph(kg):
     plt.show()
     
 def print_graph(kg):
-    print("Nodes:", kg.nodes())
+    #print("Nodes:", kg.nodes())
     #print("Edges:", kg.edges(data=True))
     print(f"#Nodes: {len(kg.nodes())}")
     print(f"#Edges: {len(kg.edges(data=True))}")

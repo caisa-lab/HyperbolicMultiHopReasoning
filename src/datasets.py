@@ -2,6 +2,7 @@ from torch.utils.data import Dataset
 import random
 import networkx as nx 
 import time
+from tqdm import tqdm
 
 class RandomWalkDataset(Dataset):
     """Gets the Knowledge Graph as an input and should create Random Walks.
@@ -71,7 +72,7 @@ class SingleHopDataset(Dataset):
         
     def _create_single_hop_dataset(self, graph):
         data = []
-        for start_node in list(graph.nodes()):
+        for start_node in tqdm(list(graph.nodes()), desc=f"Creating Single Hop Dataset"):
             neighbors = list(self.kg.successors(start_node))
             if len(neighbors) == 0:
                 continue
@@ -90,7 +91,7 @@ class SingleHopDataset(Dataset):
         return len(self.data)
     
     def __getitem__(self, idx):
-        (e1, r, e2) = self.data[idx]
+        e1, r, e2 = self.data[idx]
             
         input_str = f"{e1} ; {r}"
         label = f"{e2}"
