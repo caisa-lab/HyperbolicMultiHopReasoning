@@ -15,11 +15,11 @@ in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/23
 
 
 class Trainer:
-    def __init__(self, model, tokenizer, train_dataset, val_dataset, config, device='cpu', checkpoint_path = None):
+    def __init__(self, model, tokenizer, train_dataloader, val_dataloader, config, device='cpu', checkpoint_path = None):
         self.model = model.to(device)
         self.tokenizer = tokenizer
-        self.train_dataset = train_dataset
-        self.val_dataset = val_dataset
+        self.train_dataloader = train_dataloader
+        self.val_dataloader = val_dataloader
         self.device = device
         self.config = config
         self.checkpoint_path = checkpoint_path
@@ -59,17 +59,17 @@ class Trainer:
             In this part the Model will be Finetuned.
         Tracks only the Loss for now.
         """
-    
+        self.model.to(self.device)
         self.model.train()
         
         for epoch in range(epochs):
-            progress_bar = tqdm(self.train_dataset, leave=True, desc=f"Epoch {epoch} - Training")
+            progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training")
             total_loss = 0
-            for batch_idx, (input_str, label) in enumerate(progress_bar):
-                input_str, label = input_str.to(self.device), label.to(self.device)
-                input_ids = self.tokenizer(input_str, return_tensors='pt')['input_ids']
-                attention_mask = self.tokenizer(input_str, return_tensors='pt')['attention_mask']
-                labels = self.tokenizer(label, return_tensor='pt')['input_ids']
+            for batch_idx, batch in enumerate(progress_bar):
+                input_str, label = batch[0], batch[1]
+                input_ids = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt')['input_ids'].to(self.device)
+                attention_mask = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt')['attention_mask'].to(self.device)
+                labels = self.tokenizer(label, padding=True, truncation=True, return_tensors='pt')['input_ids'].to(self.device)
                 
                 optimizer.zero_grad()
                 outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
@@ -78,10 +78,10 @@ class Trainer:
                 optimizer.step()
 
                 total_loss += loss.item()
-                progress_bar.set_description(f"Epoch {epoch} - Validation - Loss: {loss.item():.4f}")
+                progress_bar.set_description(f"Epoch {epoch} - Training - Loss: {loss.item():.4f}")
 
-            avg_loss = total_loss / len(self.train_dataset)
-            self.log_tensorboard(avg_loss, epoch*len(self.train_dataset) + batch_idx, 'Training', 'Knowledge_Integration')
+            avg_loss = total_loss / len(self.train_dataloader)
+            self.log_tensorboard(avg_loss, epoch*len(self.train_dataloader) + batch_idx, 'Training', 'Knowledge_Integration')
             print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")
             
             self.evaluate_single_hop(epoch)
@@ -89,13 +89,12 @@ class Trainer:
     def evaluate_single_hop(self, epoch):
         self.model.eval()
         total_loss = 0
-        progress_bar = tqdm(self.val_dataset, leave=True, desc=f"Epoch {epoch} - Validation")
+        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation")
         with torch.no_grad():
             for batch_idx, (input_str, label) in enumerate(progress_bar):
-                input_str, label = input_str.to(self.device), label.to(self.device)
-                input_ids = self.tokenizer(input_str, return_tensors='pt')['input_ids']
-                attention_mask = self.tokenizer(input_str, return_tensors='pt')['attention_mask']
-                labels = self.tokenizer(label, return_tensor='pt')['input_ids']
+                input_ids = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt')['input_ids'].to(self.device)
+                attention_mask = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt')['attention_mask'].to(self.device)
+                labels = self.tokenizer(label, padding=True, truncation=True, return_tensors='pt')['input_ids'].to(self.device)
                 
                 
                 outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
@@ -103,8 +102,8 @@ class Trainer:
                 
                 total_loss += loss.item()
                 progress_bar.set_description(f"Epoch {epoch} - Validation - Loss: {loss.item():.4f}")
-            avg_loss = total_loss / len(self.val_dataset)
-            self.log_tensorboard(avg_loss, epoch * len(self.val_dataset) + batch_idx, 'Validation', 'Knowledge_Integration')
+            avg_loss = total_loss / len(self.val_dataloader)
+            self.log_tensorboard(avg_loss, epoch * len(self.val_dataloader) + batch_idx, 'Validation', 'Knowledge_Integration')
         model_path = f"{self.model_dir}/model_epoch_{epoch+1}_val_loss_{avg_loss:.4f}.pth"
         
     
@@ -126,8 +125,8 @@ class Trainer:
         for epoch in range(epochs):
             total_loss = 0
             for incomplete_sequence, complete_sequence in dataloader:
-                inputs = tokenizer(incomplete_sequence, return_tensors = 'pt')
-                labels = tokenizer(complete_sequence, return_tensors = 'pt')['input_ids']
+                inputs = tokenizer(incomplete_sequence, padding=True, truncation=True, return_tensors = 'pt')
+                labels = tokenizer(complete_sequence, padding=True, truncation=True, return_tensors = 'pt')['input_ids']
                 
                 #Generate HP Embedding and concatenate with input IDs
                 hp_input = hp_embeddings.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1)
@@ -177,8 +176,8 @@ class Trainer:
                 
                 #Parsing Step
                 
-                inputs = tokenizer(question, return_tensors = 'pt')
-                labels = tokenizer(incomplete_sequence, return_tensors = 'pt')['input_ids']
+                inputs = tokenizer(question, padding=True, truncation=True, return_tensors = 'pt')
+                labels = tokenizer(incomplete_sequence, padding=True, truncation=True, return_tensors = 'pt')['input_ids']
                 
                 #Generate HP Embedding and concatenate with input IDs
                 pp_input = pp_embeddings.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1)
@@ -203,7 +202,7 @@ class Trainer:
                 #Hopping Step
                 incomplete_paths = outputs.logits.argmax(dim=-1)
                 
-                labels = tokenizer(complete_sequence, return_tensors = 'pt')['input_ids']
+                labels = tokenizer(complete_sequence, padding=True, truncation=True, return_tensors = 'pt')['input_ids']
                 
                 hp_input = hp_embeddings.unsqueeze(0).expand(incomplete_paths.size(0), -1, -1)
                 concatenated_input_hp = torch.cat([hp_input, incomplete_paths], dim=1)

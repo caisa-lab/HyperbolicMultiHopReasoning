@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from src.util import create_knowledge_graph, print_graph
 import networkx as nx
 from tqdm import tqdm
+from torch.utils.data import DataLoader
 """ 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
@@ -66,6 +67,11 @@ def test_single_hop_training():
     single_hop_dataset_dev = SingleHopDataset(kg_dev)
     #single_hop_dataset_test = SingleHopDataset(kg_test)
 
+    #Specify Hyperparameters via config file
+    config = Config()
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f'Training on device: {device}')
+    
     #Define Tokenizer and Model
     #google/t5-large-lm-adapt
     model_name = "google/t5-large-lm-adapt"
@@ -73,39 +79,18 @@ def test_single_hop_training():
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-
-    #Specify Hyperparameters via config file
-    config = Config()
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f'Training on device: {device}')
     
-    trainer = Trainer(model, tokenizer, single_hop_dataset_train, single_hop_dataset_dev, config)
+    
+    single_hop_dataloader_train = DataLoader(single_hop_dataset_train, batch_size=config.t5_large_model.batch_size, shuffle=True)
+    single_hop_dataloader_dev = DataLoader(single_hop_dataset_dev,  batch_size=config.t5_large_model.batch_size, shuffle=False)
+    
+    trainer = Trainer(model, tokenizer, single_hop_dataloader_train, single_hop_dataloader_dev, config, device=device)
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     
-    trainer.train_single_hop(optimizer, epochs=100)
+    trainer.train_single_hop(optimizer, epochs=1)
 
 
 if __name__ == '__main__':
-    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset()
-    
-    print(train_dataset.shape)
-    print(dev_dataset.shape)
-    print(test_dataset.shape)
-    entities = []
-    for entry in tqdm(train_dataset['evidences']):
-        for triples in entry:
-            #print(triples)
-            e1 = triples[0]
-            e2 = triples[2]
-            entities.append(e1)
-            entities.append(e2)
-    print(len(list(set(entities))))
-    
-    print_graph(kg_train)
-    
-    entities = kg_train.nodes()
-    print(f'Number of entities: {len(entities)}')
-    print_graph(kg_test)
-    print_graph(kg_dev)
+    test_single_hop_training()
 
