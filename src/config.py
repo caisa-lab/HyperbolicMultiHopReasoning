@@ -25,7 +25,7 @@ class Config:
             
     class T5_Large_Model:
         def __init__(self):
-            self.batch_size = 128 # From the Paper
+            self.batch_size = 16#128 # From the Paper
             
             
     class T5_XXL_Model:

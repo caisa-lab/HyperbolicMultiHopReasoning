@@ -40,7 +40,7 @@ if __name__ == '__main__':
     single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_large_model.batch_size, shuffle=True)
     single_hop_dataloader_dev = DataLoader(ki_val,  batch_size=config.t5_large_model.batch_size, shuffle=False)
     
-    trainer = Trainer(model, tokenizer, single_hop_dataloader_train, single_hop_dataloader_dev, config, device=device)
+    trainer = Trainer(model, tokenizer, single_hop_dataloader_train, single_hop_dataloader_dev, config, device=device, validation_step=1)
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     
