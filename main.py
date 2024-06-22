@@ -5,11 +5,11 @@ from src.train import Trainer
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
-from src.util import print_datapoint
 from src.knowledge_graph import create_knowledge_graph, print_graph, visualize_knowledge_graph
 import networkx as nx
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+from src.util import load_dataset, print_datapoint, correct_wrong_evidences
 """ 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
@@ -28,91 +28,69 @@ Could also use this model might have better perfomance since its updated
 This is the Dataset where the model was pretrained with.
 https://huggingface.co/datasets/allenai/c4
 """
-
-#I only have one more Question in the Training Data the rest is the same
-# They didnt have the 'has part' relation in their set.
-def load_dataset():
-    print(f"Loading Datasets...")
-    train_dataset = pd.read_json('dataset/data_ids_april7/train.json')
-    test_dataset = pd.read_json('dataset/data_ids_april7/dev.json')
+def count_all_two_hops():
+    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset()
+        
+    all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
+    all_kg = create_knowledge_graph(all_data)
     
-    def contains_has_part(evidences):
-        return any(r == 'has part' for e1, r, r2 in evidences)
+    print(f"Lenght Train Data: {len(train_dataset)}")
+    print(f"Lenght Dev Data: {len(dev_dataset)}")
+    print(f"Lenght Test Data: {len(test_dataset)}")
     
-    train_dataset = train_dataset[~train_dataset['evidences'].apply(contains_has_part)]
-    test_dataset = test_dataset[~test_dataset['evidences'].apply(contains_has_part)]
+    one_hop_wiki_train = OneWikiHopDataset(train_dataset, dev_dataset, test_dataset, 'train')
+    one_hop_wiki_dev = OneWikiHopDataset(train_dataset, dev_dataset, test_dataset, 'dev')
+    one_hop_wiki_test = OneWikiHopDataset(train_dataset, dev_dataset, test_dataset, 'test')
     
+    print(f"Lenght Train Data One Hop Wiki: {len(one_hop_wiki_train)}")
+    print(f"Lenght Dev Data One Hop Wiki: {len(one_hop_wiki_dev)}")
+    print(f"Lenght Test Data One Hop Wiki: {len(one_hop_wiki_test)}")
     
-    validation_ratio = 0.1
-    train_dataset = train_dataset[(train_dataset['type'] == 'compositional') | (train_dataset['type'] == 'inference')]
-    train_dataset, dev_dataset = train_test_split(train_dataset, test_size=validation_ratio, random_state=120)
-    test_dataset = test_dataset[(test_dataset['type'] == 'compositional') | (test_dataset['type'] == 'inference')]
+    ki_data = KnowledgeIntegrationDataset(all_data)
     
-    #correct_wrong_evidences(train_dataset)
-    #correct_wrong_evidences(dev_dataset)
-    #correct_wrong_evidences(test_dataset)
-
-    print("Creating Knowledge Graphs...")
-    kg_train = create_knowledge_graph(train_dataset)
-    kg_dev = create_knowledge_graph(dev_dataset)
-    kg_test = create_knowledge_graph(test_dataset)
+    print(f"Lenght Test Data Knowledge Integration: {len(ki_data)}")
     
-    return train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test
-    
-def test_single_hop_training():
-    #print(torch.__version__)
-    #Create Datasets
-    print(f"Loading Datasets...")
-    train_dataset = pd.read_json('dataset/data_ids_april7/train.json')
-    dev_dataset = pd.read_json('dataset/data_ids_april7/dev.json')
-    #test_dataset = pd.read_json('dataset/data_ids_april7/test.json')
-
-    print(train_dataset.head(2))
-
-    print("Creating Knowledge Graphs...")
-    kg_train = create_knowledge_graph(train_dataset)
-    kg_dev = create_knowledge_graph(dev_dataset)
-    #kg_test = create_knowledge_graph(test_dataset)
-
-    
-    print("Creating Single Hop Datasets...")
-    single_hop_dataset_train = SingleHopDataset(kg_train)
-    single_hop_dataset_dev = SingleHopDataset(kg_dev)
-    #single_hop_dataset_test = SingleHopDataset(kg_test)
-
-    #Specify Hyperparameters via config file
-    config = Config()
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f'Training on device: {device}')
-    
-    #Define Tokenizer and Model
-    #google/t5-large-lm-adapt
-    model_name = "google/t5-large-lm-adapt"
-    print("Loading Tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    print("Loading Model...")
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    
-    
-    single_hop_dataloader_train = DataLoader(single_hop_dataset_train, batch_size=config.t5_large_model.batch_size, shuffle=True)
-    single_hop_dataloader_dev = DataLoader(single_hop_dataset_dev,  batch_size=config.t5_large_model.batch_size, shuffle=False)
-    
-    trainer = Trainer(model, tokenizer, single_hop_dataloader_train, single_hop_dataloader_dev, config, device=device)
-    
-    optimizer = trainer.get_optimizer(model.parameters(), config)
-    
-    trainer.train_single_hop(optimizer, epochs=1)
+    #Count all two hops
+    all_two_hops = set()
+    for e1 in all_kg.nodes():
+        neighbors1 = all_kg.successors(e1)
+        for e2 in neighbors1:
+            if all_kg.has_edge(e1, e2):
+                relation1 = all_kg.get_edge_data(e1, e2).get('relation', None)
+                if relation1 is not None:
+                    neighbors2 = all_kg.successors(e2)
+                    for e3 in neighbors2:
+                        if all_kg.has_edge(e2, e3):
+                            relation2 = all_kg.get_edge_data(e2, e3).get('relation', None)
+                            if relation2 is not None:
+                                all_two_hops.add((e1, relation1, e2, relation2, e3))
+    print(len(all_two_hops))    
 
 if __name__ == '__main__':
     train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset()
     
+    #correct_wrong_evidences(train_dataset)
+    #correct_wrong_evidences(dev_dataset)
+    #correct_wrong_evidences(test_dataset)
     
     all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
     all_kg = create_knowledge_graph(all_data)
     
-    random_walk_dataset = RandomWalkDataset(all_kg, 3)
+    print(f"Nodes in Data: {len(list(all_kg.nodes()))}")
     
-    print(len(random_walk_dataset))
+    print(f"Lenght Train Data: {len(train_dataset)}")
+    print(f"Lenght Dev Data: {len(dev_dataset)}")
+    print(f"Lenght Test Data: {len(test_dataset)}")
+    
+    random_walk_train = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='train')
+    random_walk_dev = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='dev')
+    random_walk_test = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='test')
+    
+    print(f"Number of Random Walks Train: {len(random_walk_train)}")
+    print(f"Number of Random Walk Dev: {len(random_walk_dev)}")
+    print(f"Number of Random Walk Test: {len(random_walk_test)}")
+    
+    
     
 
     

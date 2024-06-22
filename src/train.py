@@ -24,23 +24,25 @@ class Trainer:
         self.config = config
         self.checkpoint_path = checkpoint_path
         
+        self.grad_scaler = GradScaler()
+        
         self.setup_directories()
         self.writer = SummaryWriter(log_dir=self.log_dir)
         if self.checkpoint_path is not None:
             self.load_checkpoint(checkpoint_path)
         
     def get_optimizer(self, parameters, config):
-        if config.training.optimizer == 'Adam':
-            return optim.Adam(parameters, lr=config.training.learning_rate)
-        elif config.training.optimizer == 'AdamW':
-            return optim.AdamW(parameters, lr=config.training.learning_rate, weight_decay=config.training.optimizer_param)
+        if config.single_hop_training.optimizer == 'Adam':
+            return optim.Adam(parameters, lr=config.single_hop_training.learning_rate)
+        elif config.single_hop_training.optimizer == 'AdamW':
+            return optim.AdamW(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param)
         else:
-            raise ValueError(f"Unsupported optimizer: {config.training.optimizer}")
+            raise ValueError(f"Unsupported optimizer: {config.single_hop_training.optimizer}")
         
     def setup_directories(self):
         current_time = datetime.now().strftime('%b%d_%H-%M-%S')
-        self.log_dir = os.path.join(self.config.training.log_dir, current_time)
-        self.model_dir = os.path.join(self.config.training.model_save_path, current_time)
+        self.log_dir = os.path.join(self.config.single_hop_training.log_dir, current_time)
+        self.model_dir = os.path.join(self.config.single_hop_training.model_save_path, current_time)
         os.makedirs(self.log_dir, exist_ok=True)
         os.makedirs(self.model_dir, exist_ok=True)   
     
@@ -72,19 +74,33 @@ class Trainer:
                 labels = self.tokenizer(label, padding=True, truncation=True, return_tensors='pt')['input_ids'].to(self.device)
                 
                 optimizer.zero_grad()
+                #with autocast():
                 outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
                 loss = outputs.loss
+                
+                    
+                #if torch.isnan(loss):
+                 #   print(f"NaN loss detected at epoch {epoch}, batch {batch_idx}")
+                 #   continue
                 loss.backward()
                 optimizer.step()
-
+                #self.grad_scaler.scale(loss).backward()
+                
+                #torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                
+                #self.grad_scaler.step(optimizer)
+                #self.grad_scaler.update()
+                
                 total_loss += loss.item()
                 progress_bar.set_description(f"Epoch {epoch} - Training - Loss: {loss.item():.4f}")
+                
 
             avg_loss = total_loss / len(self.train_dataloader)
             self.log_tensorboard(avg_loss, epoch*len(self.train_dataloader) + batch_idx, 'Training', 'Knowledge_Integration')
             print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")
             
-            self.evaluate_single_hop(epoch)
+            if self.val_dataloader is not None:
+                self.evaluate_single_hop(epoch)
             
     def evaluate_single_hop(self, epoch):
         self.model.eval()

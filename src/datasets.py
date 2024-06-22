@@ -7,15 +7,44 @@ import pandas as pd
 
 class RandomWalkDataset(Dataset):
     """Gets the Knowledge Graph as an input and should create Random Walks. For each node sample up to 20 random walks of length 3, do this 5 times with different seeds.
-    Hold out the random walks which are triples in the validation and test set.
+    #Hold out the random walks which are triples in the validation and test set.
 
     Returns: Random Walk dataset should output an incomplete sequence like "e1 ; r1 ; r2 ; ... ; rn-1;" and a complete sequence "e1 ; r1 ; e2 ; ... ; rn-1 ; en"
     """
-    def __init__(self, kg, steps):
-        self.kg = kg
+    def __init__(self, all_kg, validation_dataset, test_dataset, steps, type = 'train'):
+        self.kg = all_kg
         self.steps = steps
-
-        self.data = list(self._generate_random_walks())
+        
+        if type not in ['train', 'test', 'dev']:
+            raise ValueError(f"Unknown type: {type}. Supported Types are ['train', 'test', 'dev']") 
+        
+        walks_val = self._get_walks(validation_dataset)
+        walks_test = self._get_walks(test_dataset)
+        if type == 'train':
+            self.data = list(self._generate_random_walks())
+            
+            print(f"Number of Random Walks without removing test & val: {len(self.data)}")
+            
+            walks_val_test = set(walks_val + walks_test)
+        
+            #Hold out the ones from the validaiton and test set
+            self.data = [walk for walk in self.data if walk not in walks_val_test]
+        elif type == 'test':
+            self.data = walks_test
+        elif type == 'dev':
+            self.data = walks_val
+        
+        #TODO: Now how does he split train, dev, test ?
+            
+    def _get_walks(self, dataset):
+        walks = set() 
+        for entry in dataset['evidences']:
+            triple1 = entry[0]
+            triple2 = entry[1]
+            walk = (triple1[0], triple1[1], triple1[2], triple2[1], triple2[2])
+            walks.add(walk)
+        return list(walks)
+    
         
     def _random_walk(self, start_node, hops=2):
         path = [start_node]
@@ -31,7 +60,7 @@ class RandomWalkDataset(Dataset):
             current_node = next_node
         return path
     
-    def _generate_random_walks(self, num_walks_per_node=30, walk_length=3, num_iterations=10):
+    def _generate_random_walks(self, num_walks_per_node=20, walk_length=3, num_iterations=5):
         all_paths = set()
         nodes = list(self.kg.nodes())
         for _ in tqdm(range(num_iterations)):
@@ -197,7 +226,7 @@ class OneWikiHopDataset(Dataset):
            
 class KnowledgeIntegrationDataset(Dataset):
     """
-    Needs a dataset that has all entries so train + dev + test
+    Needs a dataset that has all entries so train + dev + test. Should mix that with the pretraining dataset of the T5 model in 50:50 manner.
     """
     def __init__(self, dataset_with_all_entries):
         self.dataset = dataset_with_all_entries

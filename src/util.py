@@ -8,8 +8,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from src.knowledge_graph import create_knowledge_graph, print_graph
 import numpy as np
+from sklearn.model_selection import train_test_split
 
-#There are over 1000 rows where the last entity of evidence 0 is not equal to the first of evidence 1 leading to no 2 hop in the knowledge Graph. Do we fix this?
+#TODO: There are over 1000 rows where the last entity of evidence 0 is not equal to the first of evidence 1 leading to no 2 hop in the knowledge Graph. Do we fix this?
 def correct_wrong_evidences(df):
     wrong = {}
     for _, entry in df.iterrows():
@@ -48,4 +49,33 @@ def print_datapoint(dataset, idx):
     print(f"context: {dataset['context'][idx]}") # Context can be used to concatonate with question to form input sequence
     print(f"evidences: {dataset['evidences'][idx]}") # e1, r1, e2 For knowledge Graph
     print(f"answer: {dataset['answer'][idx]}") # Label / Answer
+
+#I only have one more Question in the Training Data the rest is the same
+# They didnt have the 'has part' relation in their set.
+def load_dataset():
+    print(f"Loading Datasets...")
+    train_dataset = pd.read_json('dataset/data_ids_april7/train.json')
+    test_dataset = pd.read_json('dataset/data_ids_april7/dev.json')
     
+    def contains_has_part(evidences):
+        return any(r == 'has part' for e1, r, r2 in evidences)
+    
+    train_dataset = train_dataset[~train_dataset['evidences'].apply(contains_has_part)]
+    test_dataset = test_dataset[~test_dataset['evidences'].apply(contains_has_part)]
+    
+    
+    validation_ratio = 0.1
+    train_dataset = train_dataset[(train_dataset['type'] == 'compositional') | (train_dataset['type'] == 'inference')]
+    train_dataset, dev_dataset = train_test_split(train_dataset, test_size=validation_ratio, random_state=120)
+    test_dataset = test_dataset[(test_dataset['type'] == 'compositional') | (test_dataset['type'] == 'inference')]
+    
+    #correct_wrong_evidences(train_dataset)
+    #correct_wrong_evidences(dev_dataset)
+    #correct_wrong_evidences(test_dataset)
+
+    print("Creating Knowledge Graphs...")
+    kg_train = create_knowledge_graph(train_dataset)
+    kg_dev = create_knowledge_graph(dev_dataset)
+    kg_test = create_knowledge_graph(test_dataset)
+    
+    return train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test
