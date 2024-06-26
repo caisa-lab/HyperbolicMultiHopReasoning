@@ -1,12 +1,19 @@
 from transformers import T5Tokenizer, T5ForConditionalGeneration
-from datasets import load_dataset
 import networkx as nx
 import torch
 from torch.optim import Adam
 import random
 import pandas as pd
 import matplotlib.pyplot as plt
-from src.knowledge_graph import create_knowledge_graph, print_graph
+import sys
+import os
+# Get the directory of the current file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Add the parent directory to the system path
+sys.path.append(current_dir)
+
+from knowledge_graph import create_knowledge_graph
 import numpy as np
 from sklearn.model_selection import train_test_split
 

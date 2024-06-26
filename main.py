@@ -96,10 +96,8 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Training on device: {device}')
     
-    #Define Tokenizer and Model
     #google/t5-large-lm-adapt
-    model_name = "google/t5-large-lm-adapt"
-    #model_name="bert-base-uncased"
+    model_name = "google/t5-v1_1-base"
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")

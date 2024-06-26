@@ -30,11 +30,13 @@ if __name__ == '__main__':
     
     #Define Tokenizer and Model
     #google/t5-large-lm-adapt
-    model_name = "google/t5-large-lm-adapt"
+    model_name = "google/t5-v1_1-base"
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    #TODO: Mixed Precision Using O1 Apex     https://nvidia.github.io/apex/amp.html#o1-mixed-precision-recommended-for-typical-use
+    #TODO: model = amp.initialize(model, opt_level="O1")
     
     
     single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_large_model.batch_size, shuffle=True)
@@ -44,4 +46,4 @@ if __name__ == '__main__':
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     
-    trainer.train_single_hop(optimizer, epochs=1)
+    trainer.train_single_hop(optimizer, epochs=3)
