@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sys
 import os
+from tqdm import tqdm
 # Get the directory of the current file
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -59,10 +60,10 @@ def print_datapoint(dataset, idx):
 
 #I only have one more Question in the Training Data the rest is the same
 # They didnt have the 'has part' relation in their set.
-def load_dataset():
+def load_dataset(path: str):
     print(f"Loading Datasets...")
-    train_dataset = pd.read_json('dataset/data_ids_april7/train.json')
-    test_dataset = pd.read_json('dataset/data_ids_april7/dev.json')
+    train_dataset = pd.read_json(f"{path}/train.json")
+    test_dataset = pd.read_json(f"{path}/test.json")
     
     def contains_has_part(evidences):
         return any(r == 'has part' for e1, r, r2 in evidences)
@@ -86,3 +87,10 @@ def load_dataset():
     kg_test = create_knowledge_graph(test_dataset)
     
     return train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test
+
+def load_c4_dataset(base_path: str, number_of_files, chunk_size = 100_000):
+    list_of_texts = []
+    for i in tqdm(range(number_of_files), desc='Loading Dataframe with c4 Data...'):
+        for chunk in pd.read_json(base_path.format(i), lines=True, chunksize=chunk_size):
+            list_of_texts.extend(chunk['text'])
+    return list_of_texts

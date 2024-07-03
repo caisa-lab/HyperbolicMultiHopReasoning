@@ -4,6 +4,8 @@ import networkx as nx
 import time
 from tqdm import tqdm
 import pandas as pd
+from transformers import AutoTokenizer
+import numpy as np
 
 class RandomWalkDataset(Dataset):
     """Gets the Knowledge Graph as an input and should create Random Walks. For each node sample up to 20 random walks of length 3, do this 5 times with different seeds.
@@ -223,10 +225,12 @@ class OneWikiHopDataset(Dataset):
             'evidences': evidences,
             'answer': answer
         }
-           
+
+
+      
 class KnowledgeIntegrationDataset(Dataset):
     """
-    Needs a dataset that has all entries so train + dev + test. Should mix that with the pretraining dataset of the T5 model in 50:50 manner.
+    Needs a dataset that has all entries so train + dev + test. 
     """
     def __init__(self, dataset_with_all_entries):
         self.dataset = dataset_with_all_entries
@@ -244,3 +248,100 @@ class KnowledgeIntegrationDataset(Dataset):
         label = f"{e2}"
         
         return input_str, label
+    
+class C4Dataset(Dataset):
+    """
+    Gets the list of texts. 
+    """
+    def __init__(self, list_of_texts, tokenizer):
+        self.dataset = list_of_texts
+        self.tokenizer = tokenizer
+        
+        
+        
+        
+    def _span_corruption(self, text, corruption_rate=0.15, average_length_of_spans=3):
+        input_ids = self.tokenizer(text, truncation=True, padding=True, max_length=512)['input_ids']
+        
+        total_tokens = len(input_ids)
+        print(f"Length of Total tokens: {total_tokens}")
+        total_corrupted_tokens = int(total_tokens * corruption_rate)
+        
+        total_spans = total_corrupted_tokens // average_length_of_spans
+        span_lengths = np.random.poisson(average_length_of_spans, total_spans)
+        span_lengths = np.clip(span_lengths, 1, total_tokens // total_spans)
+        
+        total_corrupted_tokens = span_lengths.sum()
+        if total_corrupted_tokens != int(total_tokens * corruption_rate):
+            difference = int(total_tokens * corruption_rate) - total_corrupted_tokens
+            if difference > 0:
+                for i, current_length in enumerate(span_lengths):
+                    if current_length < (total_tokens // total_spans):
+                        span_lengths[i] += 1
+                        total_corrupted_tokens += 1
+                        if total_corrupted_tokens == int(total_tokens * corruption_rate):
+                            break
+            else:
+                for i, current_length in enumerate(span_lengths):
+                    if current_length > 1:
+                        span_lengths[i] -= 1
+                        total_corrupted_tokens -= 1
+                        if total_corrupted_tokens == int(total_tokens * corruption_rate):
+                            break          
+                    
+        print(total_corrupted_tokens)
+        print(f" Span Lengths: {span_lengths}")
+        
+        span_starts = []
+        current_position = 0
+    
+        for idx, length in enumerate(span_lengths):
+            if current_position >= total_tokens:
+                break
+            # Ensure the span length does not exceed the remaining tokens
+            length = min(length, total_tokens - current_position)
+            start = np.random.randint(current_position, total_tokens - sum(span_lengths[idx:]) * 2 + 1)
+            span_starts.append(start)
+            current_position = start + length
+        span_starts.sort()
+        
+        print(f"Span Starts: {span_starts}")
+        
+        output_ids = input_ids.copy()
+        corrupted_tokens = []
+        sentinel_counter = 0
+        sum_lengths = 0
+        for start, length in zip(span_starts, span_lengths):
+            #print(f'Input Sequence: {input_ids}')
+            end = min(start + length, total_tokens)
+            #print(f'(start, end): ({start}, {end})')
+            sentinel_token = self.tokenizer.convert_tokens_to_ids([f'<extra_id_{sentinel_counter}>'])[0]
+            #print(f'Sentinel Token ID: {sentinel_token}')
+            corrupted_tokens.append(sentinel_token)
+            corrupted_tokens.extend(input_ids[start:end])
+            #print(f'Corrupted Tokens: {corrupted_tokens}')
+            output_ids[start-sum_lengths:end-sum_lengths] = [sentinel_token]
+            #print(f'Output IDs: {output_ids}')
+            sentinel_counter += 1
+            sum_lengths += length-1
+        input_ids = output_ids
+        target_ids = corrupted_tokens
+        print(f"Length of Target IDs: {len(target_ids)}")
+        print(f"Length of Input ids: {len(input_ids)}")
+        
+        input_tokens = self.tokenizer.convert_ids_to_tokens(input_ids)
+        target_tokens = self.tokenizer.convert_ids_to_tokens(target_ids)
+        
+        input_sequence = self.tokenizer.convert_tokens_to_string(input_tokens)
+        target_sequence = self.tokenizer.convert_tokens_to_string(target_tokens)
+        
+        return input_sequence, target_sequence, input_tokens, target_tokens
+        
+    def __len__(self):
+        return len(self.dataset)
+    
+    def __getitem__(self, idx):
+        text = self.dataset[idx]
+        input_sequence, target_sequence, _, _ = self._span_corruption(text, corruption_rate=0.15, average_length_of_spans=3)
+        return input_sequence, target_sequence
+        

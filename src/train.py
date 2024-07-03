@@ -7,6 +7,7 @@ import os
 import torchvision
 from datetime import datetime
 from torch.cuda.amp import GradScaler, autocast
+from torch.utils.data import DataLoader
 import numpy as np
 
 """Triggering Multi-Hop Reasoning for Question Answering
@@ -14,16 +15,27 @@ in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/23
 """
 #TODO: Mixed Precision Using O1 Apex     https://nvidia.github.io/apex/amp.html#o1-mixed-precision-recommended-for-typical-use
 class Trainer:
-    def __init__(self, model, tokenizer, train_dataloader, val_dataloader, config, device='cpu', checkpoint_path = None, validation_step=1):
+    def __init__(self, model, tokenizer, list_train_dataloader, val_dataloader, config, device='cpu', checkpoint_path = None, validation_step=1):
         self.model = model.to(device)
         self.tokenizer = tokenizer
-        self.tokenizer.model_max_length = 512
-        self.train_dataloader = train_dataloader
+        self.tokenizer.model_max_length = 1024
+        
+        if len(list_train_dataloader) == 1:
+            self.train_dataloader = list_train_dataloader[0]
+        elif len(list_train_dataloader) > 1:
+            self.single_hop_train_dataloader = list_train_dataloader[0]
+            self.c4_train_dataloader = list_train_dataloader[1]
+        else:
+            raise ValueError('Length of List for Train Dataloaders must be >= 1')
         self.val_dataloader = val_dataloader
         self.device = device
         self.config = config
         self.checkpoint_path = checkpoint_path
         self.validation_step = validation_step
+        
+        self.patience = 3
+        self.best_loss = float('inf')
+        self.early_stop_counter=0
         
         self.grad_scaler = GradScaler()
         
@@ -80,13 +92,34 @@ class Trainer:
         """
         self.model.to(self.device)
         self.model.train()
-        
+        c4_iter = iter(self.c4_train_dataloader)
         for epoch in range(epochs):
-            progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration")
+            single_hop_iter = iter(self.single_hop_train_dataloader)
+            #c4_iter = iter(self.c4_train_dataloader)
+            progress_bar = tqdm(range(min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration")
             total_loss = 0
-            for batch_idx, batch in enumerate(progress_bar):
+            for batch_idx in progress_bar:
+                #Train in 50:50 Mixture
+                if batch_idx % 2 == 0:
+                    print(f"Single Hop Batch")
+                    try:
+                        batch = next(single_hop_iter)
+                    except StopIteration:
+                        single_hop_iter = iter(self.single_hop_train_dataloader)
+                        batch = next(single_hop_iter)
+                else:
+                    print(f"C4 Batch")
+                    try:
+                        batch = next(c4_iter)
+                    except StopIteration:
+                        c4_iter = iter(self.c4_train_dataloader)
+                        batch = next(c4_iter)
+                        
                 input_str, label = batch[0], batch[1]
                 
+                print(input_str)
+                
+                        
                 tokenized_inputs = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt').to(self.device)
                 tokenized_labels = self.tokenizer(label, padding=True, truncation=True, return_tensors='pt').to(self.device)
                 input_ids = tokenized_inputs['input_ids']
@@ -107,14 +140,16 @@ class Trainer:
                 
                 total_loss += loss.item()
                 progress_bar.set_description(f"Epoch {epoch} - Training - Knowledge Integration - Loss: {loss.item():.4f}")
+                if batch_idx >= 2:
+                    return
                 
-
             avg_loss = total_loss / len(self.train_dataloader)
             self.log_tensorboard(avg_loss, epoch*len(self.train_dataloader) + batch_idx, 'Training', 'Knowledge_Integration')
             #print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")
             
             if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
-                self.evaluate_single_hop(epoch=epoch)
+                if self.evaluate_single_hop(epoch=epoch):
+                    break #Early Stopping
             
     def evaluate_single_hop(self, epoch):
         self.model.eval()
@@ -136,7 +171,18 @@ class Trainer:
             self.log_tensorboard(avg_loss, epoch * len(self.val_dataloader) + batch_idx, 'Validation', 'Knowledge_Integration')
         print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f}")
         model_path = f"knowledge_integration/{self.model_dir}/model_epoch_{epoch+1}_val_loss_{avg_loss:.4f}.pth"
-        #TODO: SAVE MODEL AND IMPLEMENT EARLY STOP
+        
+        if avg_loss < self.best_loss:
+            self.best_loss = avg_loss
+            self.early_stop_counter = 0
+            torch.save(self.model.state_dict(), model_path)
+        else:
+            self.early_stop_counter += 1
+            print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
+            if self.early_stop_counter >= self.patience:
+                print("Early stopping trigered. Stopping training")
+                return True
+        return False
         
     
     def train_random_walk(self, hopping_soft_prompt, optimizer, epochs):
