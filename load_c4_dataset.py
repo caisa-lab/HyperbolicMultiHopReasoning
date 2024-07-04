@@ -2,11 +2,12 @@ import os
 import subprocess
 import gzip
 import shutil
+import argparse
 
-def load_c4_subset(iterations: int = 5):
-    directory = 'dataset/c4/en/'
+def load_c4_subset(files: int = 5):
+    directory = 'en/'
     base_command = 'git lfs pull --include "en/c4-train.{:05d}-of-01024.json.gz"'
-    for i in range(0, iterations):
+    for i in range(0, files):       
         command = base_command.format(i)
         # Print the command for debugging purposes
         print(f"Executing: {command}")
@@ -50,5 +51,10 @@ if __name__ == '__main__':
     #Imagine we have 100 GB of Storage so we can do 100 * 1000 / 309 = 323 Files 
     storage = 100_000 #MB
     number_of_files = int(storage / 309)
-    load_c4_subset(5)
+    
+    parser = argparse.ArgumentParser(description='Download and unpack C4 dataset files.')
+    parser.add_argument('--files', type=int, default=5, help='Number of files to download.')
+    args = parser.parse_args()
+    
+    load_c4_subset(args.files)
     
