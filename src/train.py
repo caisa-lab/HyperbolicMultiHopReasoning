@@ -86,8 +86,6 @@ class Trainer:
     def log_tensorboard(self, loss, idx, phase, method, eval_metric = 'loss'):
         if eval_metric == 'loss':
             self.writer.add_scalar(f'{method}/{phase}/loss', loss, idx)
-            allocated = torch.cuda.memory_allocated()
-            self.writer.add_scalar(f'{method}/{phase}/Allocated_VRAM', allocated, idx)
         elif eval_metric == 'em':
             self.writer.add_scalar(f'{method}/{phase}/em', loss, idx)
         else:
@@ -148,11 +146,18 @@ class Trainer:
                 
                 total_loss += loss.item()
                 progress_bar.set_description(f"Epoch {epoch+1} - Training - Knowledge Integration - AvgLoss: {loss.item():.4f}")
-                if batch_idx >= 2:
-                    return
+                
+                
+                
             
                 len_trainloader = min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))    
                 self.log_tensorboard(loss.item(), epoch*len_trainloader + batch_idx, 'Training', 'Knowledge_Integration')
+                
+                vram_allocated = torch.cuda.memory_allocated(self.device) / (1024 ** 2)  # Convert to MB
+                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
+                self.writer.add_scalar('Knowledge_Integration/Training/VRAM/Allocated', vram_allocated, epoch*len_trainloader + batch_idx)
+                self.writer.add_scalar('Knowledge_Integration/Training/VRAM/Reserved', vram_reserved, epoch*len_trainloader + batch_idx)
+
             avg_loss = total_loss / len_trainloader
             print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")
             
@@ -194,7 +199,7 @@ class Trainer:
                 
                 total_em += em_score
                 
-                progress_bar.set_description(f"Epoch {epoch+1} - Validation - Knowledge Integration - Loss: {loss.item():.4f} | EM: {em_score:.4f}")
+                progress_bar.set_description(f"Epoch {epoch+1} - Validation - Knowledge Integration - Loss: {loss.item():.4f}")
                 self.log_tensorboard(loss.item(), epoch * len(self.val_dataloader) + batch_idx, 'Validation', 'Knowledge_Integration')
                 if batch_idx <= 5: 
                     self.log_tensorboard(em_score, epoch, 'Validation', 'Knowledge_Integration', eval_metric='em')

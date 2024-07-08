@@ -2,7 +2,7 @@ class Config:
     
     class SingleHopTraining:
         def __init__(self):
-            self.optimizer = 'AdamW' #[Adam, AdamW, AdaFactor]
+            self.optimizer = 'AdaFactor' #[Adam, AdamW, AdaFactor]
             self.learning_rate = 0.001 #Same as in the paper
             self.optimizer_param = 0.01 #weight_decay for AdamW Check which Optimizer
             self.epochs = 100 # 100K steps with early Stopping needs to be implemented
@@ -25,7 +25,7 @@ class Config:
             
     class T5_Large_Model:
         def __init__(self):
-            self.batch_size = 12#128 # From the Paper
+            self.batch_size = 128#128 # From the Paper
             
             
     class T5_XXL_Model:
