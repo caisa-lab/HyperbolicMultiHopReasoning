@@ -18,7 +18,7 @@ if __name__ == '__main__':
     dataset_with_all_entries = pd.concat([train_dataset, dev_dataset, test_dataset])
     ki_dataset = KnowledgeIntegrationDataset(dataset_with_all_entries)
     
-    ki_train, ki_val = train_test_split(ki_dataset, test_size=0.1, random_state=42)
+    ki_train = ki_dataset
     
 
     #Specify Hyperparameters via config file
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     
     #Define Tokenizer and Model
     #google/t5-large-lm-adapt
-    model_name = "google/t5-v1_1-base"
+    model_name = "google/t5-v1_1-small"
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")
@@ -37,16 +37,16 @@ if __name__ == '__main__':
     #TODO: model = amp.initialize(model, opt_level="O1")
     #TODO: Look PERT to reduce VRAM
     
-    base_path = 'dataset/c4/en/c4-train.{:05d}-of-01024.json'
+    base_path = 'c4/en/c4-train.{:05d}-of-01024.json'
     c4_dataset = load_c4_dataset(base_path, number_of_files=5)
     
     C4_train = C4Dataset(c4_dataset ,tokenizer=tokenizer)
     
     c4_dataloader_train = DataLoader(C4_train, batch_size = config.t5_large_model.batch_size, shuffle=True)
     single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_large_model.batch_size, shuffle=True)
-    single_hop_dataloader_dev = DataLoader(ki_val,  batch_size=config.t5_large_model.batch_size, shuffle=False)
+    #single_hop_dataloader_dev = DataLoader(ki_val,  batch_size=config.t5_large_model.batch_size, shuffle=False)
     
-    trainer = Trainer(model, tokenizer, [single_hop_dataloader_train, c4_dataloader_train], single_hop_dataloader_dev, config, device=device, validation_step=1)
+    trainer = Trainer(model, tokenizer, [single_hop_dataloader_train, c4_dataloader_train], None, config, device=device, validation_step=1)
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     
