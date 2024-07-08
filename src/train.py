@@ -73,9 +73,9 @@ class Trainer:
         self.model_dir = os.path.join(self.config.single_hop_training.model_save_path, current_time)
         os.makedirs(self.log_dir, exist_ok=True)
         os.makedirs(self.model_dir, exist_ok=True)   
-        os.makedirs(f"{self.model_dir}/knowledge_integration", exist_ok=True)   
-        os.makedirs(f"{self.model_dir}/random_walk_training", exist_ok=True)  
-        os.makedirs(f"{self.model_dir}/parse_then_hop", exist_ok=True)    
+        os.makedirs(f"knowledge_integration/{self.model_dir}", exist_ok=True)   
+        #os.makedirs(f"random_walk_training/{self.model_dir}/", exist_ok=True)  
+        #os.makedirs(f"{self.model_dir}/parse_then_hop", exist_ok=True)    
     
     def load_checkpoint(self, checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
