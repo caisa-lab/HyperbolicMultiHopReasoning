@@ -73,9 +73,9 @@ class Trainer:
         self.model_dir = os.path.join(self.config.single_hop_training.model_save_path, current_time)
         os.makedirs(self.log_dir, exist_ok=True)
         os.makedirs(self.model_dir, exist_ok=True)   
-        os.makedirs(f"knowledge_integration/{self.model_dir}", exist_ok=True)   
-        os.makedirs(f"random_walk_training/{self.model_dir}", exist_ok=True)  
-        os.makedirs(f"parse_then_hop/{self.model_dir}", exist_ok=True)    
+        os.makedirs(f"{self.model_dir}/knowledge_integration", exist_ok=True)   
+        os.makedirs(f"{self.model_dir}/random_walk_training", exist_ok=True)  
+        os.makedirs(f"{self.model_dir}/parse_then_hop", exist_ok=True)    
     
     def load_checkpoint(self, checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
@@ -104,9 +104,6 @@ class Trainer:
         self.model.train()
         c4_iter = iter(self.c4_train_dataloader)
         for epoch in range(epochs):
-            if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
-                if self.evaluate_single_hop(epoch=epoch):
-                    break #Early Stopping
             single_hop_iter = iter(self.single_hop_train_dataloader)
             #c4_iter = iter(self.c4_train_dataloader)
             progress_bar = tqdm(range(min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration")
@@ -151,8 +148,8 @@ class Trainer:
                 
                 total_loss += loss.item()
                 progress_bar.set_description(f"Epoch {epoch+1} - Training - Knowledge Integration - AvgLoss: {loss.item():.4f}")
-                #if batch_idx >= 2:
-                 #   return
+                if batch_idx >= 2:
+                    return
             
                 len_trainloader = min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))    
                 self.log_tensorboard(loss.item(), epoch*len_trainloader + batch_idx, 'Training', 'Knowledge_Integration')
