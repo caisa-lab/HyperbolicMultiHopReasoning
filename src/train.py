@@ -81,6 +81,10 @@ class Trainer:
         
     def log_tensorboard(self, loss, idx, phase, method):
         self.writer.add_scalar(f'{method}/{phase}/loss', loss, idx)
+        allocated = torch.cuda.memory_allocated()
+        reserved = torch.cuda.memory_reserved()
+        self.writer.add_scalar(f'{method}/{phase}/GPU/Allocated_VRAM', allocated, idx)
+        self.writer.add_scalar(f'{method}/{phase}/GPU/Reserved_VRAM', reserved, idx)
     
     #TODO: Add C4 50:50 Mixture Training
     def train_single_hop(self, optimizer, epochs):
