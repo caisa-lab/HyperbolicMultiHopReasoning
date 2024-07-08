@@ -264,7 +264,7 @@ class C4Dataset(Dataset):
         input_ids = self.tokenizer(text, truncation=True, padding=True, max_length=512)['input_ids']
         
         total_tokens = len(input_ids)
-        print(f"Length of Total tokens: {total_tokens}")
+        #print(f"Length of Total tokens: {total_tokens}")
         total_corrupted_tokens = int(total_tokens * corruption_rate)
         
         total_spans = total_corrupted_tokens // average_length_of_spans
@@ -289,8 +289,8 @@ class C4Dataset(Dataset):
                         if total_corrupted_tokens == int(total_tokens * corruption_rate):
                             break          
                     
-        print(total_corrupted_tokens)
-        print(f" Span Lengths: {span_lengths}")
+        #print(total_corrupted_tokens)
+        #print(f" Span Lengths: {span_lengths}")
         
         span_starts = []
         current_position = 0
@@ -305,7 +305,7 @@ class C4Dataset(Dataset):
             current_position = start + length
         span_starts.sort()
         
-        print(f"Span Starts: {span_starts}")
+        #print(f"Span Starts: {span_starts}")
         
         output_ids = input_ids.copy()
         corrupted_tokens = []
@@ -326,8 +326,8 @@ class C4Dataset(Dataset):
             sum_lengths += length-1
         input_ids = output_ids
         target_ids = corrupted_tokens
-        print(f"Length of Target IDs: {len(target_ids)}")
-        print(f"Length of Input ids: {len(input_ids)}")
+        #print(f"Length of Target IDs: {len(target_ids)}")
+        #print(f"Length of Input ids: {len(input_ids)}")
         
         input_tokens = self.tokenizer.convert_ids_to_tokens(input_ids)
         target_tokens = self.tokenizer.convert_ids_to_tokens(target_ids)
