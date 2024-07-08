@@ -33,6 +33,13 @@ if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    #Adjust Dropout
+    model.config.dropout_rate = 0.1
+    model.config.hidden_dropout_prob = 0.1
+    model.config.attention_probs_dropout_prob = 0.1
+    
+    print(model.config)
+    
     #TODO: Mixed Precision Using O1 Apex     https://nvidia.github.io/apex/amp.html#o1-mixed-precision-recommended-for-typical-use
     #TODO: model = amp.initialize(model, opt_level="O1")
     #TODO: Look PERT to reduce VRAM
@@ -44,10 +51,10 @@ if __name__ == '__main__':
     
     c4_dataloader_train = DataLoader(C4_train, batch_size = config.t5_large_model.batch_size, shuffle=True)
     single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_large_model.batch_size, shuffle=True)
-    #single_hop_dataloader_dev = DataLoader(ki_val,  batch_size=config.t5_large_model.batch_size, shuffle=False)
+    single_hop_dataloader_dev = DataLoader(ki_train,  batch_size=config.t5_large_model.batch_size, shuffle=False)
     
-    trainer = Trainer(model, tokenizer, [single_hop_dataloader_train, c4_dataloader_train], None, config, device=device, validation_step=1)
+    trainer = Trainer(model, tokenizer, [single_hop_dataloader_train, c4_dataloader_train], single_hop_dataloader_dev, config, device=device, validation_step=1)
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     
-    trainer.train_single_hop(optimizer, epochs=50)
+    trainer.train_single_hop(optimizer, epochs=2)

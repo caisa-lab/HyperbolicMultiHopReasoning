@@ -253,40 +253,54 @@ class C4Dataset(Dataset):
     """
     Gets the list of texts. 
     """
-    def __init__(self, list_of_texts, tokenizer):
-        self.dataset = list_of_texts
+    def __init__(self, list_of_texts, tokenizer, corruption_rate=0.15, average_length_of_spans=3):
         self.tokenizer = tokenizer
+        self.corruption_rate = corruption_rate
+        self.average_length_of_spans = average_length_of_spans
+        self.dataset = self._cleanup_dataset(list_of_texts)
         
         
         
+    def _cleanup_dataset(self, dataset):
+        cleaned_dataset = []
+        count_removed = 0
+        for text in tqdm(dataset, desc=f'Cleanup Dataset: Remove texts with < {self.average_length_of_spans} corrupted tokens'):
         
-    def _span_corruption(self, text, corruption_rate=0.15, average_length_of_spans=3):
+            if len(text.split()) * self.corruption_rate < self.average_length_of_spans:
+                count_removed += 1
+                continue
+            cleaned_dataset.append(text)
+        print(f'Cleaned {count_removed} Datapoints remaining {len(cleaned_dataset)} Datapoints')
+        return cleaned_dataset
+            
+    def _span_corruption(self, text):
         input_ids = self.tokenizer(text, truncation=True, padding=True, max_length=512)['input_ids']
         
         total_tokens = len(input_ids)
         #print(f"Length of Total tokens: {total_tokens}")
-        total_corrupted_tokens = int(total_tokens * corruption_rate)
+        total_corrupted_tokens = int(total_tokens * self.corruption_rate)
         
-        total_spans = total_corrupted_tokens // average_length_of_spans
-        span_lengths = np.random.poisson(average_length_of_spans, total_spans)
+        total_spans = total_corrupted_tokens // self.average_length_of_spans
+        
+        span_lengths = np.random.poisson(self.average_length_of_spans, total_spans)
         span_lengths = np.clip(span_lengths, 1, total_tokens // total_spans)
         
         total_corrupted_tokens = span_lengths.sum()
-        if total_corrupted_tokens != int(total_tokens * corruption_rate):
-            difference = int(total_tokens * corruption_rate) - total_corrupted_tokens
+        if total_corrupted_tokens != int(total_tokens * self.corruption_rate):
+            difference = int(total_tokens * self.corruption_rate) - total_corrupted_tokens
             if difference > 0:
                 for i, current_length in enumerate(span_lengths):
                     if current_length < (total_tokens // total_spans):
                         span_lengths[i] += 1
                         total_corrupted_tokens += 1
-                        if total_corrupted_tokens == int(total_tokens * corruption_rate):
+                        if total_corrupted_tokens == int(total_tokens * self.corruption_rate):
                             break
             else:
                 for i, current_length in enumerate(span_lengths):
                     if current_length > 1:
                         span_lengths[i] -= 1
                         total_corrupted_tokens -= 1
-                        if total_corrupted_tokens == int(total_tokens * corruption_rate):
+                        if total_corrupted_tokens == int(total_tokens * self.corruption_rate):
                             break          
                     
         #print(total_corrupted_tokens)
@@ -342,6 +356,6 @@ class C4Dataset(Dataset):
     
     def __getitem__(self, idx):
         text = self.dataset[idx]
-        input_sequence, target_sequence, _, _ = self._span_corruption(text, corruption_rate=0.15, average_length_of_spans=3)
+        input_sequence, target_sequence, _, _ = self._span_corruption(text)
         return input_sequence, target_sequence
         

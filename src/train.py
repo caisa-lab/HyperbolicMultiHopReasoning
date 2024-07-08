@@ -9,16 +9,16 @@ from datetime import datetime
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 import numpy as np
+from transformers import Adafactor
 
 """Triggering Multi-Hop Reasoning for Question Answering
 in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/2306.04009
 """
-#TODO: Mixed Precision Using O1 Apex     https://nvidia.github.io/apex/amp.html#o1-mixed-precision-recommended-for-typical-use
 class Trainer:
     def __init__(self, model, tokenizer, list_train_dataloader, val_dataloader, config, device='cpu', checkpoint_path = None, validation_step=1):
         self.model = model.to(device)
         self.tokenizer = tokenizer
-        self.tokenizer.model_max_length = 1024
+        self.tokenizer.model_max_length = 512
         
         if len(list_train_dataloader) == 1:
             self.train_dataloader = list_train_dataloader[0]
@@ -53,6 +53,8 @@ class Trainer:
                 return optim.Adam(parameters, lr=config.single_hop_training.learning_rate)
             elif config.single_hop_training.optimizer == 'AdamW':
                 return optim.AdamW(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param)
+            elif config.single_hop_training.optimizer == 'AdaFactor':
+                return Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False)
             else:
                 raise ValueError(f"Unsupported optimizer: {config.single_hop_training.optimizer}")
         elif phase == 'random_walk_training':
@@ -60,6 +62,8 @@ class Trainer:
                 return optim.Adam(parameters, lr=config.prompt_training.learning_rate)
             elif config.prompt_training.optimizer == 'AdamW':
                 return optim.AdamW(parameters, lr=config.prompt_training.learning_rate, weight_decay=config.prompt_training.optimizer_param)
+            elif config.single_hop_training.optimizer == 'AdaFactor':
+                return Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False)
             else:
                 raise ValueError(f"Unsupported optimizer: {config.prompt_training.optimizer}")
         
@@ -69,9 +73,9 @@ class Trainer:
         self.model_dir = os.path.join(self.config.single_hop_training.model_save_path, current_time)
         os.makedirs(self.log_dir, exist_ok=True)
         os.makedirs(self.model_dir, exist_ok=True)   
-        #os.makedirs(f"knowledge_integration/{self.model_dir}", exist_ok=True)   
-        #os.makedirs(f"random_walk_training/{self.model_dir}", exist_ok=True)  
-        #os.makedirs(f"parse_then_hop/{self.model_dir}", exist_ok=True)    
+        os.makedirs(f"knowledge_integration/{self.model_dir}", exist_ok=True)   
+        os.makedirs(f"random_walk_training/{self.model_dir}", exist_ok=True)  
+        os.makedirs(f"parse_then_hop/{self.model_dir}", exist_ok=True)    
     
     def load_checkpoint(self, checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
@@ -79,14 +83,16 @@ class Trainer:
         print(f"Loaded checkpoint from {checkpoint_path}")
         
         
-    def log_tensorboard(self, loss, idx, phase, method):
-        self.writer.add_scalar(f'{method}/{phase}/loss', loss, idx)
-        allocated = torch.cuda.memory_allocated()
-        reserved = torch.cuda.memory_reserved()
-        self.writer.add_scalar(f'{method}/{phase}/GPU/Allocated_VRAM', allocated, idx)
-        self.writer.add_scalar(f'{method}/{phase}/GPU/Reserved_VRAM', reserved, idx)
+    def log_tensorboard(self, loss, idx, phase, method, eval_metric = 'loss'):
+        if eval_metric == 'loss':
+            self.writer.add_scalar(f'{method}/{phase}/loss', loss, idx)
+            allocated = torch.cuda.memory_allocated()
+            self.writer.add_scalar(f'{method}/{phase}/Allocated_VRAM', allocated, idx)
+        elif eval_metric == 'em':
+            self.writer.add_scalar(f'{method}/{phase}/em', loss, idx)
+        else:
+            raise ValueError(f'Unsupported eval_metric: {eval_metric}')
     
-    #TODO: Add C4 50:50 Mixture Training
     def train_single_hop(self, optimizer, epochs):
         """Trains the Knowledge Integration. The model becomes e1 ; r1 as an input and tries to predict e2.
             For the Dataset we will use the SingleHopDataset which gets a list of [e1, r1, e2] an turns it into input_ids and attention mask for "e1 ; r1" and the label input_ids for "e2"
@@ -98,6 +104,9 @@ class Trainer:
         self.model.train()
         c4_iter = iter(self.c4_train_dataloader)
         for epoch in range(epochs):
+            if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
+                if self.evaluate_single_hop(epoch=epoch):
+                    break #Early Stopping
             single_hop_iter = iter(self.single_hop_train_dataloader)
             #c4_iter = iter(self.c4_train_dataloader)
             progress_bar = tqdm(range(min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration")
@@ -105,14 +114,14 @@ class Trainer:
             for batch_idx in progress_bar:
                 #Train in 50:50 Mixture
                 if batch_idx % 2 == 0:
-                    print(f"Single Hop Batch")
+                    #print(f"Single Hop Batch")
                     try:
                         batch = next(single_hop_iter)
                     except StopIteration:
                         single_hop_iter = iter(self.single_hop_train_dataloader)
                         batch = next(single_hop_iter)
                 else:
-                    print(f"C4 Batch")
+                    #print(f"C4 Batch")
                     try:
                         batch = next(c4_iter)
                     except StopIteration:
@@ -120,8 +129,6 @@ class Trainer:
                         batch = next(c4_iter)
                         
                 input_str, label = batch[0], batch[1]
-                
-                print(input_str)
                 
                         
                 tokenized_inputs = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt').to(self.device)
@@ -143,13 +150,14 @@ class Trainer:
                 optimizer.step()
                 
                 total_loss += loss.item()
-                progress_bar.set_description(f"Epoch {epoch} - Training - Knowledge Integration - Loss: {loss.item():.4f}")
-                if batch_idx >= 2:
-                    return
-                
-            avg_loss = total_loss / len(self.train_dataloader)
-            self.log_tensorboard(avg_loss, epoch*len(self.train_dataloader) + batch_idx, 'Training', 'Knowledge_Integration')
-            #print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")
+                progress_bar.set_description(f"Epoch {epoch+1} - Training - Knowledge Integration - AvgLoss: {loss.item():.4f}")
+                #if batch_idx >= 2:
+                 #   return
+            
+                len_trainloader = min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))    
+                self.log_tensorboard(loss.item(), epoch*len_trainloader + batch_idx, 'Training', 'Knowledge_Integration')
+            avg_loss = total_loss / len_trainloader
+            print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")
             
             if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
                 if self.evaluate_single_hop(epoch=epoch):
@@ -158,6 +166,7 @@ class Trainer:
     def evaluate_single_hop(self, epoch):
         self.model.eval()
         total_loss = 0
+        total_em = 0
         progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - Knowledge Integration")
         with torch.no_grad():
             for batch_idx, (input_str, label) in enumerate(progress_bar):
@@ -170,10 +179,33 @@ class Trainer:
                 loss = outputs.loss
                 
                 total_loss += loss.item()
-                progress_bar.set_description(f"Epoch {epoch} - Validation - Knowledge Integration - Loss: {loss.item():.4f}")
+                
+                predictions = torch.argmax(outputs.logits, dim=-1)
+                decoded_predictions = [self.tokenizer.decode(pred, skip_special_tokens=True) for pred in predictions]
+                #print(f'Prediction: {decoded_predictions}')
+                #print(f'Labels: {label}')
+                em_score = sum([1 if pred.strip() == truth.strip() else 0 for pred, truth in zip(decoded_predictions, label)])
+                
+                #em_score = int(torch.equal(predictions, labels))
+                
+                #print(f'Shapes:')
+                #print(f'Prediction Shape: {predictions.shape}')
+                #print(f'Labels Shape: {labels.shape}')
+                
+                #print(f'Prediction: {predictions}')
+                #print(f'Labels: {labels}')
+                
+                total_em += em_score
+                
+                progress_bar.set_description(f"Epoch {epoch+1} - Validation - Knowledge Integration - Loss: {loss.item():.4f} | EM: {em_score:.4f}")
+                self.log_tensorboard(loss.item(), epoch * len(self.val_dataloader) + batch_idx, 'Validation', 'Knowledge_Integration')
+                if batch_idx <= 5: 
+                    self.log_tensorboard(em_score, epoch, 'Validation', 'Knowledge_Integration', eval_metric='em')
+                    self.writer.add_text(f'Validation/Prediction_{epoch}', f'Prediction: {decoded_predictions[0]}', epoch)
+                    self.writer.add_text(f'Validation/Label_{epoch}', f'Label: {label[0]}', epoch)
             avg_loss = total_loss / len(self.val_dataloader)
-            self.log_tensorboard(avg_loss, epoch * len(self.val_dataloader) + batch_idx, 'Validation', 'Knowledge_Integration')
-        print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f}")
+            avg_em = total_em / len(self.val_dataloader)
+        print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em:.4f}")
         model_path = f"knowledge_integration/{self.model_dir}/model_epoch_{epoch+1}_val_loss_{avg_loss:.4f}.pth"
         
         if avg_loss < self.best_loss:
