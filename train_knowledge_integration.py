@@ -57,4 +57,4 @@ if __name__ == '__main__':
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     
-    trainer.train_single_hop(optimizer, epochs=2)
+    trainer.train_single_hop(optimizer, epochs=20)

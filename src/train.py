@@ -18,7 +18,7 @@ class Trainer:
     def __init__(self, model, tokenizer, list_train_dataloader, val_dataloader, config, device='cpu', checkpoint_path = None, validation_step=1):
         self.model = model.to(device)
         self.tokenizer = tokenizer
-        self.tokenizer.model_max_length = 512
+        self.tokenizer.model_max_length = 128
         
         if len(list_train_dataloader) == 1:
             self.train_dataloader = list_train_dataloader[0]
@@ -100,10 +100,10 @@ class Trainer:
         """
         self.model.to(self.device)
         self.model.train()
-        c4_iter = iter(self.c4_train_dataloader)
+        #c4_iter = iter(self.c4_train_dataloader)
         for epoch in range(epochs):
             single_hop_iter = iter(self.single_hop_train_dataloader)
-            #c4_iter = iter(self.c4_train_dataloader)
+            c4_iter = iter(self.c4_train_dataloader)
             progress_bar = tqdm(range(min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration")
             total_loss = 0
             for batch_idx in progress_bar:
