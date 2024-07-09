@@ -31,7 +31,7 @@ def _knowledge_integration_with_c4():
     model_name = "google/t5-v1_1-base"
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    print("Loading Model...")
+    print(f"Loading Model {model_name}...")
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     #Adjust Dropout
     model.config.dropout_rate = 0.1
@@ -81,7 +81,7 @@ def _knowledge_integration_without_c4():
     model_name = "google/t5-v1_1-small"
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    print("Loading Model...")
+    print(f"Loading Model {model_name}...")
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     #Adjust Dropout
     model.config.dropout_rate = 0.1
