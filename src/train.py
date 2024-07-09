@@ -19,7 +19,7 @@ class Trainer:
         self.model = model.to(device)
         self.tokenizer = tokenizer
         self.tokenizer.model_max_length = 128
-        
+        self.train_dataloader = None
         if len(list_train_dataloader) == 1:
             self.train_dataloader = list_train_dataloader[0]
         elif len(list_train_dataloader) > 1:
@@ -102,26 +102,37 @@ class Trainer:
         self.model.train()
         #c4_iter = iter(self.c4_train_dataloader)
         for epoch in range(epochs):
-            single_hop_iter = iter(self.single_hop_train_dataloader)
-            c4_iter = iter(self.c4_train_dataloader)
-            progress_bar = tqdm(range(min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration")
             total_loss = 0
+            if self.train_dataloader is None:
+                single_hop_iter = iter(self.single_hop_train_dataloader)
+                c4_iter = iter(self.c4_train_dataloader)
+                progress_bar = tqdm(range(min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration")
+            else:
+                train_iter = iter(self.train_dataloader)
+                progress_bar = tqdm(range(len(self.train_dataloader)), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration")
             for batch_idx in progress_bar:
-                #Train in 50:50 Mixture
-                if batch_idx % 2 == 0:
-                    #print(f"Single Hop Batch")
-                    try:
-                        batch = next(single_hop_iter)
-                    except StopIteration:
-                        single_hop_iter = iter(self.single_hop_train_dataloader)
-                        batch = next(single_hop_iter)
+                if self.train_dataloader is None:
+                    #Train in 50:50 Mixture
+                    if batch_idx % 2 == 0:
+                        #print(f"Single Hop Batch")
+                        try:
+                            batch = next(single_hop_iter)
+                        except StopIteration:
+                            single_hop_iter = iter(self.single_hop_train_dataloader)
+                            batch = next(single_hop_iter)
+                    else:
+                        #print(f"C4 Batch")
+                        try:
+                            batch = next(c4_iter)
+                        except StopIteration:
+                            c4_iter = iter(self.c4_train_dataloader)
+                            batch = next(c4_iter)
                 else:
-                    #print(f"C4 Batch")
                     try:
-                        batch = next(c4_iter)
+                        batch = next(train_iter)
                     except StopIteration:
-                        c4_iter = iter(self.c4_train_dataloader)
-                        batch = next(c4_iter)
+                        train_iter = iter(self.train_dataloader)
+                        batch = next(train_iter)
                         
                 input_str, label = batch[0], batch[1]
                 
@@ -133,15 +144,12 @@ class Trainer:
                 labels = tokenized_labels['input_ids']
                 
                 optimizer.zero_grad()
-                #with autocast(enabled=False):
                 outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
                 loss = outputs.loss   
 
                 
                 
                 loss.backward()
-                
-                #loss.backward()
                 optimizer.step()
                 
                 total_loss += loss.item()
@@ -149,8 +157,10 @@ class Trainer:
                 
                 
                 
-            
-                len_trainloader = min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))    
+                if self.train_dataloader is None:
+                    len_trainloader = min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))
+                else:
+                    len_trainloader = len(self.train_dataloader)
                 self.log_tensorboard(loss.item(), epoch*len_trainloader + batch_idx, 'Training', 'Knowledge_Integration')
                 
                 vram_allocated = torch.cuda.memory_allocated(self.device) / (1024 ** 2)  # Convert to MB
@@ -200,13 +210,13 @@ class Trainer:
                 total_em += em_score
                 
                 progress_bar.set_description(f"Epoch {epoch+1} - Validation - Knowledge Integration - Loss: {loss.item():.4f}")
-                self.log_tensorboard(loss.item(), epoch * len(self.val_dataloader) + batch_idx, 'Validation', 'Knowledge_Integration')
                 if batch_idx <= 5: 
-                    self.log_tensorboard(em_score, epoch, 'Validation', 'Knowledge_Integration', eval_metric='em')
                     self.writer.add_text(f'Validation/Prediction_{epoch}', f'Prediction: {decoded_predictions[0]}', epoch)
                     self.writer.add_text(f'Validation/Label_{epoch}', f'Label: {label[0]}', epoch)
             avg_loss = total_loss / len(self.val_dataloader)
             avg_em = total_em / len(self.val_dataloader)
+            self.log_tensorboard(avg_loss, epoch, 'Validation', 'Knowledge_Integration')
+            self.log_tensorboard(avg_em, epoch, 'Validation', 'Knowledge_Integration', eval_metric='em')
         print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em:.4f}")
         model_path = f"knowledge_integration/{self.model_dir}/model_epoch_{epoch+1}_val_loss_{avg_loss:.4f}.pth"
         
