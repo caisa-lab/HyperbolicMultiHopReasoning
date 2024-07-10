@@ -19,7 +19,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 #TODO: There are over 1000 rows where the last entity of evidence 0 is not equal to the first of evidence 1 leading to no 2 hop in the knowledge Graph. Do we fix this?
-def correct_wrong_evidences(df):
+def correct_wrong_evidences(df : pd.DataFrame):
     wrong = {}
     for _, entry in df.iterrows():
         index = entry['_id']
@@ -88,7 +88,9 @@ def load_dataset(path: str):
     
     return train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test
 
-def load_c4_dataset(base_path: str, number_of_files, chunk_size = 100_000):
+def load_c4_dataset(base_path: str,
+                    number_of_files : int,
+                    chunk_size : int = 100_000):
     list_of_texts = []
     for i in tqdm(range(number_of_files), desc='Loading Dataframe with c4 Data...', file = sys.stdout):
         for chunk in pd.read_json(base_path.format(i), lines=True, chunksize=chunk_size):

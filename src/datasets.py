@@ -275,7 +275,7 @@ class C4Dataset(Dataset):
         return cleaned_dataset
             
     def _span_corruption(self, text):
-        input_ids = self.tokenizer(text, truncation=True, padding=True, max_length=512)['input_ids']
+        input_ids = self.tokenizer(text, truncation=True, padding=True)['input_ids']
         
         total_tokens = len(input_ids)
         #print(f"Length of Total tokens: {total_tokens}")

@@ -1,25 +1,33 @@
 import torch
-import torch.nn as nn
 import torch.optim as optim
+import torch.nn as nn
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import os
 import sys
-import torchvision
 from datetime import datetime
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
-import numpy as np
 from transformers import Adafactor
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from config import Config
 
 """Triggering Multi-Hop Reasoning for Question Answering
 in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/2306.04009
 """
 class Trainer:
-    def __init__(self, model, tokenizer, list_train_dataloader, val_dataloader, config, device='cpu', checkpoint_path = None, validation_step=1):
+    def __init__(self,
+                 model : nn.Module,
+                 tokenizer : AutoTokenizer,
+                 list_train_dataloader: list,
+                 val_dataloader : DataLoader,
+                 config : Config,
+                 device : str ='cpu',
+                 checkpoint_path : str = None,
+                 validation_step : int = 1):
         self.model = model.to(device)
         self.tokenizer = tokenizer
-        self.tokenizer.model_max_length = 128
+        self.tokenizer.model_max_length = config.t5_model.tokenizer_max_length
         self.train_dataloader = None
         if len(list_train_dataloader) == 1:
             self.train_dataloader = list_train_dataloader[0]
@@ -46,7 +54,10 @@ class Trainer:
         if self.checkpoint_path is not None:
             self.load_checkpoint(checkpoint_path)
         
-    def get_optimizer(self, parameters, config, phase='single_hop_training'):
+    def get_optimizer(self,
+                      parameters,
+                      config : Config,
+                      phase : str ='single_hop_training'):
         if phase not in ['single_hop_training', 'random_walk_training']:
             raise ValueError(f"Unsupported phase: {phase} Supported Phases are: ['single_hop_training', 'random_walk_training']")
         
@@ -93,7 +104,9 @@ class Trainer:
         else:
             raise ValueError(f'Unsupported eval_metric: {eval_metric}')
     
-    def train_single_hop(self, optimizer, epochs):
+    def train_single_hop(self,
+                         optimizer : optim.Optimizer,
+                         epochs : int):
         """Trains the Knowledge Integration. The model becomes e1 ; r1 as an input and tries to predict e2.
             For the Dataset we will use the SingleHopDataset which gets a list of [e1, r1, e2] an turns it into input_ids and attention mask for "e1 ; r1" and the label input_ids for "e2"
             In this part the Model will be Finetuned.
@@ -180,7 +193,8 @@ class Trainer:
                 if self.evaluate_single_hop(epoch=epoch):
                     break #Early Stopping
             
-    def evaluate_single_hop(self, epoch):
+    def evaluate_single_hop(self,
+                            epoch : int):
         self.model.eval()
         total_loss = 0
         total_em = 0
@@ -241,7 +255,10 @@ class Trainer:
         return False
         
     
-    def train_random_walk(self, hopping_soft_prompt, optimizer, epochs):
+    def train_random_walk(self,
+                          hopping_soft_prompt : nn.Parameter,
+                          optimizer : optim.Optimizer,
+                          epochs : int):
         """Trains the Random Walk Part. Random Walk takes in a sequence "e1 ; r1 ; r2" and should predict "e1 ; r1 ; e2 ; r2 ; e3"
         In this part the Soft Prompt HP will be Finetuned and the Model will be frozen.
         
@@ -290,7 +307,9 @@ class Trainer:
             if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
                 self.evaluate_random_walk(hopping_soft_prompt, epoch)
             
-    def evaluate_random_walk(self, hopping_soft_prompt, epoch):
+    def evaluate_random_walk(self,
+                             hopping_soft_prompt : nn.Parameter,
+                             epoch : int):
         self.model.eval()
         total_loss = 0
         progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - Random Walk Training", file=sys.stdout)
@@ -321,8 +340,10 @@ class Trainer:
         model_path = f"{self.model_dir}/random_walk/model_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         #TODO: SAVE SOFT PROMPT
 
-#TODO: How to do both steps parsing and hopping in one training loop or should it be in one training loop?
-def parse_then_hop(self, hp_embeddings, pp_embeddings, optimizer, epochs):
+def parse_then_hop(self, hp_embeddings : nn.Parameter,
+                   pp_embeddings : nn.Parameter,
+                   optimizer : optim.Optimizer,
+                   epochs : int):
     """
     Finetunes a Soft Prompt Parsing Prompts (PP) everything else is kept frozen. Takes in a Question and the PP gives it to the model which should output an incomplete path.
     This incomplete path should be concatenated with the Hopping Prompt (HP) and then fed into the model which should output the complete path.
