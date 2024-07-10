@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from transformers import Adafactor
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from config import Config
+from eval import exact_match_score
 
 """Triggering Multi-Hop Reasoning for Question Answering
 in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/2306.04009
@@ -215,9 +216,7 @@ class Trainer:
                 decoded_predictions = [self.tokenizer.decode(pred, skip_special_tokens=True) for pred in predictions]
                 #print(f'Prediction: {decoded_predictions}')
                 #print(f'Labels: {label}')
-                em_score = sum([1 if pred.strip() == truth.strip() else 0 for pred, truth in zip(decoded_predictions, label)])
-                
-                #em_score = int(torch.equal(predictions, labels))
+                em_score = sum([1 if exact_match_score(pred, truth) else 0 for pred, truth in zip(decoded_predictions, label)])
                 
                 #print(f'Shapes:')
                 #print(f'Prediction Shape: {predictions.shape}')

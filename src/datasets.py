@@ -98,8 +98,7 @@ class RandomWalkDataset(Dataset):
 class SingleHopDataset(Dataset):
     """Single Hop Dataset gets a dataset
 
-    Returns:
-        Returns a random single hop containing input_str = "e1 ; relation" and label "e2"
+    
     """
     def __init__(self, dataset, triples_not_to_contain = set()):
         self.dataset = dataset
@@ -213,17 +212,12 @@ class OneWikiHopDataset(Dataset):
     def __len__(self):
         return len(self.dataset)
     def __getitem__(self, idx):
-        question = self.dataset['question'][idx]
-        context = self.dataset['context'][idx]
-        evidences = self.dataset['evidences'][idx]
-        answer = self.dataset['answer'][idx]
+        question = self.dataset[idx]['question']
+        context = self.dataset[idx]['context']
+        evidences = self.dataset[idx]['evidences']
+        answer = self.dataset[idx]['answer']
         
-        return {
-            'question': question,
-            'context': context,
-            'evidences': evidences,
-            'answer': answer
-        }
+        return question, answer
 
 
       

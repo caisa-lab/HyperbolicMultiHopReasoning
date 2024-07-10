@@ -1,7 +1,7 @@
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from src.datasets import SingleHopDataset, KnowledgeIntegrationDataset, OneWikiHopDataset, RandomWalkDataset
-from src.config import Config
-from src.train import Trainer
+#from src.config import Config
+#from src.train import Trainer
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
@@ -9,7 +9,7 @@ from src.knowledge_graph import create_knowledge_graph, print_graph, visualize_k
 import networkx as nx
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from src.util import load_dataset, print_datapoint, correct_wrong_evidences
+from src.util import load_dataset, print_datapoint, correct_wrong_evidences, check_for_wrong_2_hops
 import torch.nn as nn
 """ 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -29,12 +29,22 @@ Could also use this model might have better perfomance since its updated
 This is the Dataset where the model was pretrained with.
 https://huggingface.co/datasets/allenai/c4
 """
+
+
 def count_all_two_hops():
-    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset()
-        
+    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop/")
+    
+    correct_wrong_evidences(train_dataset)
+    correct_wrong_evidences(dev_dataset)
+    correct_wrong_evidences(test_dataset)
+    
+    print(check_for_wrong_2_hops(train_dataset))
+    print(check_for_wrong_2_hops(dev_dataset))
+    print(check_for_wrong_2_hops(test_dataset))
+    
     all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
     all_kg = create_knowledge_graph(all_data)
-    
+
     print(f"Lenght Train Data: {len(train_dataset)}")
     print(f"Lenght Dev Data: {len(dev_dataset)}")
     print(f"Lenght Test Data: {len(test_dataset)}")
@@ -51,6 +61,7 @@ def count_all_two_hops():
     
     print(f"Lenght Test Data Knowledge Integration: {len(ki_data)}")
     
+    
     #Count all two hops
     all_two_hops = set()
     for e1 in all_kg.nodes():
@@ -65,61 +76,13 @@ def count_all_two_hops():
                             relation2 = all_kg.get_edge_data(e2, e3).get('relation', None)
                             if relation2 is not None:
                                 all_two_hops.add((e1, relation1, e2, relation2, e3))
-    print(len(all_two_hops))    
+    print(f'All Two Hops: {len(all_two_hops)}')    
 
 if __name__ == '__main__':
-    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset()
     
-    #correct_wrong_evidences(train_dataset)
-    #correct_wrong_evidences(dev_dataset)
-    #correct_wrong_evidences(test_dataset)
-    
-    all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
-    all_kg = create_knowledge_graph(all_data)
-    
-    print(f"Nodes in Data: {len(list(all_kg.nodes()))}")
-    
-    print(f"Lenght Train Data: {len(train_dataset)}")
-    print(f"Lenght Dev Data: {len(dev_dataset)}")
-    print(f"Lenght Test Data: {len(test_dataset)}")
-    
-    random_walk_train = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='train')
-    random_walk_dev = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='dev')
-    random_walk_test = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='test')
-    
-    print(f"Number of Random Walks Train: {len(random_walk_train)}")
-    print(f"Number of Random Walk Dev: {len(random_walk_dev)}")
-    print(f"Number of Random Walk Test: {len(random_walk_test)}")
-    
-    #Specify Hyperparameters via config file
-    config = Config()
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f'Training on device: {device}')
-    
-    #google/t5-large-lm-adapt
-    model_name = "google/t5-v1_1-base"
-    print("Loading Tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    print("Loading Model...")
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    count_all_two_hops()
     
     
-    single_hop_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_large_model.batch_size, shuffle=True)
-    single_hop_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_large_model.batch_size, shuffle=False)
-    
-    
-    trainer = Trainer(model, tokenizer, single_hop_dataloader_train, single_hop_dataloader_dev, config, device=device)
-    
-    #HP Soft Prompt will be tuned
-    hp_length = config.prompt_training.prompt_length
-    #hp_embedding_size = model.config.d_model 
-    hp_embedding_size = model.config.hidden_size 
-    hp_embeddings = nn.Parameter(torch.randn(hp_length, hp_embedding_size, requires_grad=True))
-    print(hp_embeddings.shape)
-    
-    optimizer = trainer.get_optimizer([hp_embeddings], config, phase='random_walk_training')
-    
-    trainer.train_random_walk(hopping_soft_prompt= hp_embeddings, optimizer=optimizer, epochs=1)
     
     
     
