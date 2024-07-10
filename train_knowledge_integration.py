@@ -84,7 +84,7 @@ def _knowledge_integration_without_c4():
     
     #Define Tokenizer and Model
     #google/t5-large-lm-adapt
-    model_name = "google/t5-v1_1-xxl"
+    model_name = "google/t5-v1_1-xl"
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print(f"Loading Model...")
