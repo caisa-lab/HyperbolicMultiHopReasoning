@@ -8,6 +8,8 @@
 #SBATCH --job-name=knowledge_integration_training
 #SBATCH --output=outputs/output_large_c4_%j.txt
 #SBATCH --error=outputs/error_large_c4_%j.txt
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=welz.simon@outlook.de
 
 module load CUDA/11.8.0
 module load Anaconda3/2022.10
