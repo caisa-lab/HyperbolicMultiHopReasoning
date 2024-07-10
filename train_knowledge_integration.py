@@ -12,15 +12,11 @@ import argparse
 
 def _knowledge_integration_with_c4():
     #Create Datasets
-    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop")
+    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=True)
 
     
     print("Creating Single Hop Datasets...")
     dataset_with_all_entries = pd.concat([train_dataset, dev_dataset, test_dataset])
-    
-    #Fix entries
-    correct_wrong_evidences(dataset_with_all_entries)
-    
     
     ki_dataset = KnowledgeIntegrationDataset(dataset_with_all_entries)
     
@@ -49,7 +45,7 @@ def _knowledge_integration_with_c4():
     #TODO: Look PERT to reduce VRAM
     
     base_path = 'c4/en/c4-train.{:05d}-of-01024.json'
-    c4_dataset = load_c4_dataset(base_path, number_of_files=10)
+    c4_dataset = load_c4_dataset(base_path, number_of_files=15)
     
     C4_train = C4Dataset(c4_dataset ,tokenizer=tokenizer)
     
@@ -72,7 +68,7 @@ def _knowledge_integration_with_c4():
     
 def _knowledge_integration_without_c4():
     #Create Datasets
-    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop")
+    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=True)
 
     
     print("Creating Single Hop Datasets...")
