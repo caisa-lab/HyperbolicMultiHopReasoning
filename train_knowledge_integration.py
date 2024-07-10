@@ -57,7 +57,7 @@ def _knowledge_integration_with_c4():
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     
-    trainer.train_single_hop(optimizer, epochs=20)
+    trainer.train_single_hop(optimizer, epochs=config.single_hop_training.epochs)
     
 def _knowledge_integration_without_c4():
     #Create Datasets
@@ -78,7 +78,7 @@ def _knowledge_integration_without_c4():
     
     #Define Tokenizer and Model
     #google/t5-large-lm-adapt
-    model_name = "google/t5-v1_1-small"
+    model_name = "google/t5-v1_1-xxl"
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print(f"Loading Model {model_name}...")
@@ -103,7 +103,7 @@ def _knowledge_integration_without_c4():
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     
-    trainer.train_single_hop(optimizer, epochs=20)
+    trainer.train_single_hop(optimizer, epochs=config.single_hop_training.epochs)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Knowledge Integration Training')
