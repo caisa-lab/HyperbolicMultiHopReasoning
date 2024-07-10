@@ -216,13 +216,13 @@ class Trainer:
                 
                 progress_bar.set_description(f"Epoch {epoch} - Validation - Knowledge Integration - Loss: {loss.item():.4f}")
                 if batch_idx <= 5: 
-                    self.writer.add_text(f'Validation/Prediction_{epoch}', f'Prediction: {decoded_predictions[0]}', epoch)
-                    self.writer.add_text(f'Validation/Label_{epoch}', f'Label: {label[0]}', epoch)
+                    self.writer.add_text(f'Validation/Prediction_vs_Label_{epoch}', 
+                                     f'Prediction: {decoded_predictions[0]}\nLabel: {label[0]}', epoch)
             avg_loss = total_loss / len(self.val_dataloader)
-            avg_em = total_em / len(self.val_dataloader)
+            avg_em_perc = (total_em / len(self.val_dataloader.dataset)) * 100
             self.log_tensorboard(avg_loss, epoch, 'Validation', 'Knowledge_Integration')
-            self.log_tensorboard(avg_em, epoch, 'Validation', 'Knowledge_Integration', eval_metric='em')
-        print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em:.4f}")
+            self.log_tensorboard(avg_em_perc, epoch, 'Validation', 'Knowledge_Integration', eval_metric='em')
+        print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f}")
         model_path = f"knowledge_integration/{self.model_dir}/model_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         
         if avg_loss < self.best_loss:
