@@ -106,7 +106,6 @@ class Trainer:
             print('Training without C4')
         self.model.to(self.device)
         self.model.train()
-        #c4_iter = iter(self.c4_train_dataloader)
         for epoch in range(epochs):
             total_loss = 0
             if self.train_dataloader is None:
@@ -159,7 +158,7 @@ class Trainer:
                 optimizer.step()
                 
                 total_loss += loss.item()
-                progress_bar.set_description(f"Epoch {epoch+1} - Training - Knowledge Integration - AvgLoss: {loss.item():.4f}")
+                progress_bar.set_description(f"Epoch {epoch} - Training - Knowledge Integration - AvgLoss: {loss.item():.4f}")
                 
                 
                 
@@ -215,7 +214,7 @@ class Trainer:
                 
                 total_em += em_score
                 
-                progress_bar.set_description(f"Epoch {epoch+1} - Validation - Knowledge Integration - Loss: {loss.item():.4f}")
+                progress_bar.set_description(f"Epoch {epoch} - Validation - Knowledge Integration - Loss: {loss.item():.4f}")
                 if batch_idx <= 5: 
                     self.writer.add_text(f'Validation/Prediction_{epoch}', f'Prediction: {decoded_predictions[0]}', epoch)
                     self.writer.add_text(f'Validation/Label_{epoch}', f'Label: {label[0]}', epoch)
@@ -224,7 +223,7 @@ class Trainer:
             self.log_tensorboard(avg_loss, epoch, 'Validation', 'Knowledge_Integration')
             self.log_tensorboard(avg_em, epoch, 'Validation', 'Knowledge_Integration', eval_metric='em')
         print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em:.4f}")
-        model_path = f"knowledge_integration/{self.model_dir}/model_epoch_{epoch+1}_val_loss_{avg_loss:.4f}.pth"
+        model_path = f"knowledge_integration/{self.model_dir}/model_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         
         if avg_loss < self.best_loss:
             if self.best_model_path:
@@ -319,7 +318,7 @@ class Trainer:
                 progress_bar.set_description(f"Epoch {epoch} - Validation - Random Walk Training - Loss: {loss.item():.4f}")
             avg_loss = total_loss / len(self.val_dataloader)
             self.log_tensorboard(avg_loss, epoch * len(self.val_dataloader) + batch_idx, 'Validation', 'Random_Walk_Training')
-        model_path = f"{self.model_dir}/random_walk/model_epoch_{epoch+1}_val_loss_{avg_loss:.4f}.pth"
+        model_path = f"{self.model_dir}/random_walk/model_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         #TODO: SAVE SOFT PROMPT
 
 #TODO: How to do both steps parsing and hopping in one training loop or should it be in one training loop?

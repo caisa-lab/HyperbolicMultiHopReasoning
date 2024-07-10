@@ -28,11 +28,10 @@ def _knowledge_integration_with_c4():
     
     #Define Tokenizer and Model
     #google/t5-large-lm-adapt
-    model_name = "google/t5-v1_1-base"
     print("Loading Tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    print(f"Loading Model {model_name}...")
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(config.t5_model.model_name)
+    print(f"Loading Model {config.t5_model.model_name}...")
+    model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
     #Adjust Dropout
     model.config.dropout_rate = 0.1
     model.config.hidden_dropout_prob = 0.1
@@ -44,7 +43,7 @@ def _knowledge_integration_with_c4():
     #TODO: Look PERT to reduce VRAM
     
     base_path = 'c4/en/c4-train.{:05d}-of-01024.json'
-    c4_dataset = load_c4_dataset(base_path, number_of_files=5)
+    c4_dataset = load_c4_dataset(base_path, number_of_files=10)
     
     C4_train = C4Dataset(c4_dataset ,tokenizer=tokenizer)
     
@@ -56,7 +55,7 @@ def _knowledge_integration_with_c4():
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     
-    print(f'with model: {model_name}')
+    print(f'with model: {config.t5_model.model_name}')
     print(f'Model Config: {model.config}')
     print(f'for: {config.single_hop_training.epochs} epochs')
     print(f'with batch size: {config.t5_model.batch_size}')
@@ -84,22 +83,15 @@ def _knowledge_integration_without_c4():
     
     #Define Tokenizer and Model
     #google/t5-large-lm-adapt
-    model_name = "google/t5-v1_1-xl"
     print("Loading Tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(config.t5_model.model_name)
     print(f"Loading Model...")
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
     #Adjust Dropout
     model.config.dropout_rate = 0.1
     model.config.hidden_dropout_prob = 0.1
     model.config.attention_probs_dropout_prob = 0.1
     
-    #base_path = 'c4/en/c4-train.{:05d}-of-01024.json'
-    #c4_dataset = load_c4_dataset(base_path, number_of_files=5)
-    
-    #C4_train = C4Dataset(c4_dataset ,tokenizer=tokenizer)
-    
-    #c4_dataloader_train = DataLoader(C4_train, batch_size = config.t5_large_model.batch_size, shuffle=True)
     single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_model.batch_size, shuffle=True)
     single_hop_dataloader_dev = DataLoader(ki_train,  batch_size=config.t5_model.batch_size, shuffle=False)
     
@@ -107,7 +99,7 @@ def _knowledge_integration_without_c4():
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     
-    print(f'with model: {model_name}')
+    print(f'with model: {config.t5_model.model_name}')
     print(f'Model Config: {model.config}')
     print(f'for: {config.single_hop_training.epochs} epochs')
     print(f'with batch size: {config.t5_model.batch_size}')
