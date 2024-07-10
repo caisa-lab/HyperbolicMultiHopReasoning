@@ -18,4 +18,4 @@ pip install transformers --quiet
 pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu118 --quiet
 pip install sentencepiece
 
-python train_knowledge_integration.py
+python -u train_knowledge_integration.py

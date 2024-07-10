@@ -1,5 +1,6 @@
 import torch
 from tqdm import tqdm
+import sys
 
 def compute_exact_match(pred, truth):
     return int(pred.strip() == truth.strip())
@@ -8,7 +9,7 @@ def evaluate_single_hop(one_hop_wiki_test_dataloader, model, tokenizer, device):
     model.eval()
     total_em = 0
     total_count = 0
-    progress_bar = tqdm(one_hop_wiki_test_dataloader, leave=True, desc=f"Evaluation - One Hop Wiki")
+    progress_bar = tqdm(one_hop_wiki_test_dataloader, leave=True, desc=f"Evaluation - One Hop Wiki", file=sys.stdout)
     with torch.no_grad():
         for (questions, answers) in progress_bar:
             inputs = tokenizer(questions, padding=True, truncation=True, return_tensors='pt').to(device)

@@ -4,6 +4,7 @@ import torch.optim as optim
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import os
+import sys
 import torchvision
 from datetime import datetime
 from torch.cuda.amp import GradScaler, autocast
@@ -111,7 +112,7 @@ class Trainer:
             if self.train_dataloader is None:
                 single_hop_iter = iter(self.single_hop_train_dataloader)
                 c4_iter = iter(self.c4_train_dataloader)
-                progress_bar = tqdm(range(min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration")
+                progress_bar = tqdm(range(min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration", file=sys.stdout)
             else:
                 train_iter = iter(self.train_dataloader)
                 progress_bar = tqdm(range(len(self.train_dataloader)), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration")
@@ -184,7 +185,7 @@ class Trainer:
         self.model.eval()
         total_loss = 0
         total_em = 0
-        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - Knowledge Integration")
+        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - Knowledge Integration", file = sys.stdout)
         with torch.no_grad():
             for batch_idx, (input_str, label) in enumerate(progress_bar):
                 input_ids = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt')['input_ids'].to(self.device)
@@ -253,7 +254,7 @@ class Trainer:
             param.required_grad = False
         
         for epoch in range(epochs):
-            progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - Random Walk Training")
+            progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - Random Walk Training", file=sys.stdout)
             total_loss = 0
             for batch_idx, batch in enumerate(progress_bar):
                 optimizer.zero_grad()
@@ -293,7 +294,7 @@ class Trainer:
     def evaluate_random_walk(self, hopping_soft_prompt, epoch):
         self.model.eval()
         total_loss = 0
-        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - Random Walk Training")
+        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - Random Walk Training", file=sys.stdout)
         with torch.no_grad():
             for batch_idx, batch in enumerate(progress_bar):
                 incomplete_sequence, complete_sequence = batch
@@ -336,7 +337,7 @@ def parse_then_hop(self, hp_embeddings, pp_embeddings, optimizer, epochs):
     pp_embeddings.requires_grad = True
     
     for epoch in range(epochs):
-        progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - Random Walk Training")
+        progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - Random Walk Training", file=sys.stdout)
         total_loss = 0
         for batch_idx, batch in enumerate(progress_bar):
             

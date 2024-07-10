@@ -6,6 +6,7 @@ from tqdm import tqdm
 import pandas as pd
 from transformers import AutoTokenizer
 import numpy as np
+import sys
 
 class RandomWalkDataset(Dataset):
     """Gets the Knowledge Graph as an input and should create Random Walks. For each node sample up to 20 random walks of length 3, do this 5 times with different seeds.
@@ -65,7 +66,7 @@ class RandomWalkDataset(Dataset):
     def _generate_random_walks(self, num_walks_per_node=20, walk_length=3, num_iterations=5):
         all_paths = set()
         nodes = list(self.kg.nodes())
-        for _ in tqdm(range(num_iterations)):
+        for _ in tqdm(range(num_iterations), file=sys.stdout):
             random.seed()  # Change seed for each iteration
             for idx, node in enumerate(nodes):
                 walks = set()
@@ -264,7 +265,7 @@ class C4Dataset(Dataset):
     def _cleanup_dataset(self, dataset):
         cleaned_dataset = []
         count_removed = 0
-        for text in tqdm(dataset, desc=f'Cleanup Dataset: Remove texts with < {self.average_length_of_spans} corrupted tokens'):
+        for text in tqdm(dataset, desc=f'Cleanup Dataset: Remove texts with < {self.average_length_of_spans} corrupted tokens', file=sys.stdout):
         
             if len(text.split()) * self.corruption_rate < self.average_length_of_spans:
                 count_removed += 1
