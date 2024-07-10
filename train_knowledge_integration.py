@@ -94,8 +94,6 @@ def _knowledge_integration_without_c4():
     model.config.hidden_dropout_prob = 0.1
     model.config.attention_probs_dropout_prob = 0.1
     
-    print(model.config)
-    
     #base_path = 'c4/en/c4-train.{:05d}-of-01024.json'
     #c4_dataset = load_c4_dataset(base_path, number_of_files=5)
     

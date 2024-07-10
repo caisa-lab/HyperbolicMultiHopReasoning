@@ -115,7 +115,7 @@ class Trainer:
                 progress_bar = tqdm(range(min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration", file=sys.stdout)
             else:
                 train_iter = iter(self.train_dataloader)
-                progress_bar = tqdm(range(len(self.train_dataloader)), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration")
+                progress_bar = tqdm(range(len(self.train_dataloader)), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration", file=sys.stdout)
             for batch_idx in progress_bar:
                 if self.train_dataloader is None:
                     #Train in 50:50 Mixture
