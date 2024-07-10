@@ -64,6 +64,8 @@ def _knowledge_integration_with_c4():
     print(f'with optimizer: {config.single_hop_training.optimizer}')
     print(f'With C4')
     
+    print(f'Training with {len(ki_train)} Triples for Knowledge Integration.')
+    
     trainer.train_single_hop(optimizer, epochs=config.single_hop_training.epochs)
     
 def _knowledge_integration_without_c4():
