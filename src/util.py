@@ -87,6 +87,7 @@ def load_dataset(path: str,
     test_dataset = test_dataset[(test_dataset['type'] == 'compositional') | (test_dataset['type'] == 'inference')]
     
     if do_correct_wrong_evidences:
+        print(f'Correct Wrong 2 Hops...')
         correct_wrong_evidences(train_dataset)
         correct_wrong_evidences(dev_dataset)
         correct_wrong_evidences(test_dataset)
