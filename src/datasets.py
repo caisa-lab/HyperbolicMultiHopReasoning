@@ -36,8 +36,6 @@ class RandomWalkDataset(Dataset):
             self.data = walks_test
         elif type == 'dev':
             self.data = walks_val
-        
-        #TODO: Now how does he split train, dev, test ?
             
     def _get_walks(self, dataset):
         walks = set() 
@@ -243,6 +241,7 @@ class KnowledgeIntegrationDataset(Dataset):
         self.data = list(unique_triples)
     def __len__(self):
         return len(self.data)
+    
     def __getitem__ (self, idx):
         e1, relation, e2 = self.data[idx]
         input_str = f"{e1} ; {relation}"

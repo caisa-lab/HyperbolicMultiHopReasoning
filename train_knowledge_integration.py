@@ -7,6 +7,7 @@ import torch
 from src.config import Config
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
+from src.util import correct_wrong_evidences
 import argparse
 
 def _knowledge_integration_with_c4():
@@ -16,6 +17,11 @@ def _knowledge_integration_with_c4():
     
     print("Creating Single Hop Datasets...")
     dataset_with_all_entries = pd.concat([train_dataset, dev_dataset, test_dataset])
+    
+    #Fix entries
+    correct_wrong_evidences(dataset_with_all_entries)
+    
+    
     ki_dataset = KnowledgeIntegrationDataset(dataset_with_all_entries)
     
     ki_train = ki_dataset

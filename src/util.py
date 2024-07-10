@@ -18,7 +18,7 @@ from knowledge_graph import create_knowledge_graph
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-#TODO: There are over 1000 rows where the last entity of evidence 0 is not equal to the first of evidence 1 leading to no 2 hop in the knowledge Graph. Do we fix this?
+#We fix it
 def correct_wrong_evidences(df : pd.DataFrame):
     wrong = {}
     for _, entry in df.iterrows():
@@ -29,6 +29,8 @@ def correct_wrong_evidences(df : pd.DataFrame):
         if len(evidences) >= 2:
             triple1 = evidences[0]
             triple2 = evidences[1]
+        else:
+            print(f'Evidences {evidences}')
         if triple1[2] != triple2[0]:
             wrong[index]=(triple1[2], triple2[0])
     #print(len(wrong))
@@ -38,7 +40,13 @@ def correct_wrong_evidences(df : pd.DataFrame):
             evidences[0][-1] = evidences[1][0]
         return evidences
     df.loc[df['_id'].isin(list(wrong.keys())), 'evidences'] = df.loc[df['_id'].isin(list(wrong.keys())), 'evidences'].apply(update_evidences)
-
+def check_for_wrong_2_hops(df : pd.DataFrame):
+    def check_e2_not_equal_e3(evidences):
+        return evidences[0][2] != evidences[1][0]
+    df['wrong_evidences'] = df['evidences'].apply(check_e2_not_equal_e3)
+    rows_with_wrong_evidences = df[df['wrong_evidences']]
+    
+    return rows_with_wrong_evidences
 def project_to_hyperbolic(x, c):
     norm_x = np.linalg.norm(x)
     sqrt_c = np.sqrt(c)
@@ -60,10 +68,11 @@ def print_datapoint(dataset, idx):
 
 #I only have one more Question in the Training Data the rest is the same
 # They didnt have the 'has part' relation in their set.
-def load_dataset(path: str):
+def load_dataset(path: str,
+                 do_correct_wrong_evidences : bool = False):
     print(f"Loading Datasets...")
-    train_dataset = pd.read_json(f"{path}/train.json")
-    test_dataset = pd.read_json(f"{path}/test.json")
+    train_dataset = pd.read_json(f"{path}/train.json").dropna(how='all')
+    test_dataset = pd.read_json(f"{path}/dev.json").dropna(how='all')
     
     def contains_has_part(evidences):
         return any(r == 'has part' for e1, r, r2 in evidences)
@@ -77,9 +86,10 @@ def load_dataset(path: str):
     train_dataset, dev_dataset = train_test_split(train_dataset, test_size=validation_ratio, random_state=120)
     test_dataset = test_dataset[(test_dataset['type'] == 'compositional') | (test_dataset['type'] == 'inference')]
     
-    #correct_wrong_evidences(train_dataset)
-    #correct_wrong_evidences(dev_dataset)
-    #correct_wrong_evidences(test_dataset)
+    if do_correct_wrong_evidences:
+        correct_wrong_evidences(train_dataset)
+        correct_wrong_evidences(dev_dataset)
+        correct_wrong_evidences(test_dataset)
 
     print("Creating Knowledge Graphs...")
     kg_train = create_knowledge_graph(train_dataset)
