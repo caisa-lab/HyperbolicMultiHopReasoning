@@ -23,17 +23,13 @@ class Config:
             self.log_dir = 'tboard_logs'
             self.model_save_path = 'checkpoints'
             
-    class T5_Large_Model:
+    class T5_Model:
         def __init__(self):
-            self.batch_size = 64#128 # From the Paper
+            self.batch_size = 64#128 # From the Paper or 32 if xxl
             
             
-    class T5_XXL_Model:
-        def __init__(self):
-            self.batch_size = 32
             
     def __init__(self):
-        self.t5_xxl_model = self.T5_XXL_Model()
-        self.t5_large_model = self.T5_Large_Model()
+        self.t5_model = self.T5_Model()
         self.single_hop_training = self.SingleHopTraining()
         self.prompt_training = self.PromptTraining()
