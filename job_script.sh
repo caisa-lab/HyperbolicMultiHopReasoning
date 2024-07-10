@@ -6,8 +6,8 @@
 
 #SBATCH --ntasks=1
 #SBATCH --job-name=knowledge_integration_training
-#SBATCH --output=output_%j.txt
-#SBATCH --error=error_%j.txt
+#SBATCH --output=outputs/output_%j.txt
+#SBATCH --error=outputs/error_%j.txt
 
 module load CUDA/11.8.0
 module load Anaconda3/2022.10
