@@ -36,6 +36,7 @@ class Trainer:
         self.patience = 3
         self.best_loss = float('inf')
         self.early_stop_counter=0
+        self.best_model_path = None
         
         self.grad_scaler = GradScaler()
         
@@ -98,6 +99,10 @@ class Trainer:
         Tracks only the Loss for now.
     
         """
+        if self.train_dataloader is None:
+            print('Training with C4')
+        else:
+            print('Training without C4')
         self.model.to(self.device)
         self.model.train()
         #c4_iter = iter(self.c4_train_dataloader)
@@ -221,8 +226,11 @@ class Trainer:
         model_path = f"knowledge_integration/{self.model_dir}/model_epoch_{epoch+1}_val_loss_{avg_loss:.4f}.pth"
         
         if avg_loss < self.best_loss:
+            if self.best_model_path:
+                os.remove(self.best_model_path)
             self.best_loss = avg_loss
             self.early_stop_counter = 0
+            self.best_model_path = model_path
             torch.save(self.model.state_dict(), model_path)
         else:
             self.early_stop_counter += 1
