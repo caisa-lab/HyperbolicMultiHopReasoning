@@ -247,11 +247,15 @@ class C4Dataset(Dataset):
     """
     Gets the list of texts. 
     """
-    def __init__(self, list_of_texts, tokenizer, corruption_rate=0.15, average_length_of_spans=3):
+    def __init__(self, list_of_texts, tokenizer, corruption_rate=0.15, average_length_of_spans=3, objective = 'span_corruption'):
+        if objective not in ['span_corruption', 'prefix_language_modeling']:
+            raise ValueError(f'Unknown objective {objective}. Supported are [span_corruption, prefix_language_modeling]')
         self.tokenizer = tokenizer
         self.corruption_rate = corruption_rate
         self.average_length_of_spans = average_length_of_spans
+        self.objective = objective
         self.dataset = self._cleanup_dataset(list_of_texts)
+
         
         
         
@@ -344,12 +348,25 @@ class C4Dataset(Dataset):
         target_sequence = self.tokenizer.convert_tokens_to_string(target_tokens)
         
         return input_sequence, target_sequence, input_tokens, target_tokens
+    def _prefix_language_modeling(self, text):
+        tokens = self.tokenizer.tokenize(text)
+        split_point = random.randint(1, len(tokens)-1)
+        input_tokens = tokens[:split_point]
+        target_tokens = tokens[split_point:]
         
+        input_sequence = self.tokenizer.convert_tokens_to_string(input_tokens)
+        target_sequence = self.tokenizer.convert_tokens_to_string(target_tokens)
+        return input_sequence, target_sequence
+            
     def __len__(self):
         return len(self.dataset)
     
     def __getitem__(self, idx):
         text = self.dataset[idx]
-        input_sequence, target_sequence, _, _ = self._span_corruption(text)
-        return input_sequence, target_sequence
+        if self.objective == 'span_corruption':
+            input_sequence, target_sequence, _, _ = self._span_corruption(text)
+            return input_sequence, target_sequence
+        elif self.objective == 'prefix_language_modeling':
+            input_sequence, decoder_sequence = self._prefix_language_modeling(text)
+            return input_sequence, decoder_sequence
         
