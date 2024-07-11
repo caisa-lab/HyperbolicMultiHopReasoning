@@ -68,7 +68,7 @@ class Trainer:
             elif config.single_hop_training.optimizer == 'AdamW':
                 return optim.AdamW(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param)
             elif config.single_hop_training.optimizer == 'AdaFactor':
-                return Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False)
+                return Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False, scale_parameter=False)
             else:
                 raise ValueError(f"Unsupported optimizer: {config.single_hop_training.optimizer}")
         elif phase == 'random_walk_training':
@@ -77,7 +77,7 @@ class Trainer:
             elif config.prompt_training.optimizer == 'AdamW':
                 return optim.AdamW(parameters, lr=config.prompt_training.learning_rate, weight_decay=config.prompt_training.optimizer_param)
             elif config.single_hop_training.optimizer == 'AdaFactor':
-                return Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False)
+                return Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False, scale_parameter=False)
             else:
                 raise ValueError(f"Unsupported optimizer: {config.prompt_training.optimizer}")
         
@@ -93,7 +93,7 @@ class Trainer:
     
     def load_checkpoint(self, checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model.load_state_dict(checkpoint)
         print(f"Loaded checkpoint from {checkpoint_path}")
         
         
@@ -155,7 +155,6 @@ class Trainer:
                         
                 input_str, label = batch[0], batch[1]
                 
-                        
                 tokenized_inputs = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt').to(self.device)
                 tokenized_labels = self.tokenizer(label, padding=True, truncation=True, return_tensors='pt').to(self.device)
                 input_ids = tokenized_inputs['input_ids']
@@ -188,7 +187,7 @@ class Trainer:
                 self.writer.add_scalar('Knowledge_Integration/Training/VRAM/Reserved', vram_reserved, epoch*len_trainloader + batch_idx)
 
             avg_loss = total_loss / len_trainloader
-            print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")
+            print(f"Epoch {epoch} - Training - AVGLoss: {avg_loss:.4f}")
             
             if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
                 if self.evaluate_single_hop(epoch=epoch):
