@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from transformers import Adafactor
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from config import Config
-from eval import exact_match_score
+from eval import exact_match_score, f1_score
 
 """Triggering Multi-Hop Reasoning for Question Answering
 in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/2306.04009
@@ -139,7 +139,7 @@ class Trainer:
             if self.train_dataloader is None:
                 single_hop_iter = iter(self.single_hop_train_dataloader)
                 c4_iter = iter(self.c4_train_dataloader)
-                progress_bar = tqdm(range(min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration", file=sys.stdout)
+                progress_bar = tqdm(range(2*min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration", file=sys.stdout)
             else:
                 train_iter = iter(self.train_dataloader)
                 progress_bar = tqdm(range(len(self.train_dataloader)), leave=True, desc=f"Epoch {epoch} - Training - Knowledge Integration", file=sys.stdout)
@@ -212,6 +212,7 @@ class Trainer:
         self.model.eval()
         total_loss = 0
         total_em = 0
+        total_f1 = 0
         progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - Knowledge Integration", file = sys.stdout)
         with torch.no_grad():
             for batch_idx, (input_str, label) in enumerate(progress_bar):
@@ -229,6 +230,7 @@ class Trainer:
                 decoded_predictions = [self.tokenizer.decode(pred, skip_special_tokens=True) for pred in predictions]
                 #print(f'Prediction: {decoded_predictions}')
                 #print(f'Labels: {label}')
+                f1_score = sum([f1_score(pred, truth)[0] for pred, truth, in zip(decoded_predictions, label)])
                 em_score = sum([1 if exact_match_score(pred, truth) else 0 for pred, truth in zip(decoded_predictions, label)])
                 
                 #print(f'Shapes:')
@@ -239,16 +241,21 @@ class Trainer:
                 #print(f'Labels: {labels}')
                 
                 total_em += em_score
-                
+                total_f1 += f1_score
                 progress_bar.set_description(f"Epoch {epoch} - Validation - Knowledge Integration - Loss: {loss.item():.4f}")
                 if batch_idx <= 5: 
                     self.writer.add_text(f'Validation/Prediction_vs_Label_{epoch}', 
                                      f'Prediction: {decoded_predictions[0]}\nLabel: {label[0]}', epoch)
             avg_loss = total_loss / len(self.val_dataloader)
-            avg_em_perc = (total_em / len(self.val_dataloader.dataset)) * 100
+            avg_em_perc = total_em / len(self.val_dataloader.dataset)
+            avg_f1_perc = f1_score / len(self.val_dataloader.dataset)
             self.log_tensorboard(avg_loss, epoch, 'Validation', 'Knowledge_Integration')
             self.log_tensorboard(avg_em_perc, epoch, 'Validation', 'Knowledge_Integration', eval_metric='em')
-        print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f}")
+            self.log_tensorboard(avg_f1_perc, epoch, 'Validation', 'Knowledge_Integration', eval_metric='f1')
+        print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
+        
+        
+        
         model_path = f"knowledge_integration/{self.model_dir}/model_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         
         if avg_loss < self.best_loss:
