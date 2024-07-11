@@ -58,11 +58,11 @@ class Trainer:
     def get_optimizer(self,
                       parameters,
                       config : Config,
-                      phase : str ='single_hop_training'):
-        if phase not in ['single_hop_training', 'random_walk_training']:
-            raise ValueError(f"Unsupported phase: {phase} Supported Phases are: ['single_hop_training', 'random_walk_training']")
+                      method : str ='single_hop_training'):
+        if method not in ['single_hop_training', 'random_walk_training']:
+            raise ValueError(f"Unsupported phase: {method} Supported Phases are: ['single_hop_training', 'random_walk_training']")
         
-        if phase == 'single_hop_training':
+        if method == 'single_hop_training':
             if config.single_hop_training.optimizer == 'Adam':
                 return optim.Adam(parameters, lr=config.single_hop_training.learning_rate)
             elif config.single_hop_training.optimizer == 'AdamW':
@@ -71,7 +71,7 @@ class Trainer:
                 return Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False, scale_parameter=False)
             else:
                 raise ValueError(f"Unsupported optimizer: {config.single_hop_training.optimizer}")
-        elif phase == 'random_walk_training':
+        elif method == 'random_walk_training':
             if config.prompt_training.optimizer == 'Adam':
                 return optim.Adam(parameters, lr=config.prompt_training.learning_rate)
             elif config.prompt_training.optimizer == 'AdamW':
@@ -81,15 +81,30 @@ class Trainer:
             else:
                 raise ValueError(f"Unsupported optimizer: {config.prompt_training.optimizer}")
         
-    def setup_directories(self):
+    def setup_directories(self, method):
         current_time = datetime.now().strftime('%b%d_%H-%M-%S')
-        self.log_dir = os.path.join(self.config.single_hop_training.log_dir, current_time)
-        self.model_dir = os.path.join(self.config.single_hop_training.model_save_path, current_time)
-        os.makedirs(self.log_dir, exist_ok=True)
-        os.makedirs(self.model_dir, exist_ok=True)   
-        os.makedirs(f"knowledge_integration/{self.model_dir}", exist_ok=True)   
-        #os.makedirs(f"random_walk_training/{self.model_dir}/", exist_ok=True)  
-        #os.makedirs(f"{self.model_dir}/parse_then_hop", exist_ok=True)    
+        if method not in ['single_hop_training', 'one_hop_wiki_training', 'random_walk_training', 'parse_then_hop_training']:
+            raise ValueError(f"Unsupported phase: {method} Supported Phases are: ['single_hop_training', 'random_walk_training']")
+        if method == 'singe_hop_training':
+            self.log_dir = os.path.join(self.config.single_hop_training.log_dir, current_time)
+            self.model_dir = os.path.join(self.config.single_hop_training.model_save_path, current_time)
+            os.makedirs(f"tboard_logs/{self.log_dir}", exist_ok=True)
+            os.makedirs(f"checkpoints/{self.model_dir}", exist_ok=True)   
+        elif method == 'one_hop_wiki_training':
+            self.log_dir = os.path.join(self.config.one_hop_wiki_training.log_dir, current_time)
+            self.model_dir = os.path.join(self.config.one_hop_wiki_training.model_save_path, current_time)
+            os.makedirs(f"tboard_logs/{self.log_dir}", exist_ok=True)
+            os.makedirs(f"checkpoints/{self.model_dir}", exist_ok=True)  
+        elif method == 'random_walk_training':
+            self.log_dir = os.path.join(self.config.random_walk_training.log_dir, current_time)
+            self.model_dir = os.path.join(self.config.random_walk_training.model_save_path, current_time)
+            os.makedirs(f"tboard_logs/{self.log_dir}", exist_ok=True)
+            os.makedirs(f"checkpoints/{self.model_dir}", exist_ok=True)  
+        elif method == 'parse_then_hop_training':
+            self.log_dir = os.path.join(self.config.parse_then_hop_training.log_dir, current_time)
+            self.model_dir = os.path.join(self.config.parse_then_hop_training.model_save_path, current_time)
+            os.makedirs(f"tboard_logs/{self.log_dir}", exist_ok=True)
+            os.makedirs(f"checkpoints/{self.model_dir}", exist_ok=True)  
     
     def load_checkpoint(self, checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
@@ -98,12 +113,11 @@ class Trainer:
         
         
     def log_tensorboard(self, loss, idx, phase, method, eval_metric = 'loss'):
-        if eval_metric == 'loss':
-            self.writer.add_scalar(f'{method}/{phase}/loss', loss, idx)
-        elif eval_metric == 'em':
-            self.writer.add_scalar(f'{method}/{phase}/em', loss, idx)
+        if eval_metric not in ['loss', 'em', 'f1']:
+            raise ValueError(f'Unsupported eval_metric: {eval_metric}. Supported are [loss, em, f1]')
         else:
-            raise ValueError(f'Unsupported eval_metric: {eval_metric}')
+            self.writer.add_scalar(f'{method}/{phase}/{eval_metric}', loss, idx)
+
     
     def train_single_hop(self,
                          optimizer : optim.Optimizer,
