@@ -43,7 +43,7 @@ class Trainer:
         self.checkpoint_path = checkpoint_path
         self.validation_step = validation_step
         
-        self.patience = 3
+        self.patience = 5
         self.best_loss = float('inf')
         self.early_stop_counter=0
         self.best_model_path = None
