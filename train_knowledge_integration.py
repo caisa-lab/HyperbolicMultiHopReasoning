@@ -54,7 +54,7 @@ def _knowledge_integration_with_c4():
     single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_model.batch_size, shuffle=True)
     single_hop_dataloader_dev = DataLoader(ki_train,  batch_size=config.t5_model.batch_size, shuffle=False)
     
-    trainer = Trainer(model, tokenizer, [single_hop_dataloader_train, c4_dataloader_train], single_hop_dataloader_dev, config, device=device, validation_step=1)
+    trainer = Trainer(model, tokenizer, [single_hop_dataloader_train, c4_dataloader_train], single_hop_dataloader_dev, config, device=device, validation_step=1, method='single_hop_training')
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     
