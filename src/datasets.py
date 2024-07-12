@@ -92,7 +92,7 @@ class RandomWalkDataset(Dataset):
                 incomplete_path += f" ; {random_walk[i]}"
 
         
-        return complete_path, incomplete_path
+        return incomplete_path, complete_path
 
 
 class SingleHopDataset(Dataset):
@@ -250,6 +250,8 @@ class C4Dataset(Dataset):
     def __init__(self, list_of_texts, tokenizer, corruption_rate=0.15, average_length_of_spans=3, objective = 'span_corruption'):
         if objective not in ['span_corruption', 'prefix_language_modeling']:
             raise ValueError(f'Unknown objective {objective}. Supported are [span_corruption, prefix_language_modeling]')
+        
+        print(f'C4 Dataset with objective: {objective}')
         self.tokenizer = tokenizer
         self.corruption_rate = corruption_rate
         self.average_length_of_spans = average_length_of_spans

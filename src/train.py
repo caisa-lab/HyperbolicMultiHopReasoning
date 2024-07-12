@@ -25,7 +25,8 @@ class Trainer:
                  config : Config,
                  device : str ='cpu',
                  checkpoint_path : str = None,
-                 validation_step : int = 1):
+                 validation_step : int = 1,
+                 method : str = 'singe_hop_training'):
         self.model = model.to(device)
         self.tokenizer = tokenizer
         self.tokenizer.model_max_length = config.t5_model.tokenizer_max_length
@@ -48,9 +49,12 @@ class Trainer:
         self.early_stop_counter=0
         self.best_model_path = None
         
-        self.grad_scaler = GradScaler()
+        if method not in ['single_hop_training', 'one_hop_wiki_training', 'random_walk_training', 'parse_then_hop_training']:
+            raise ValueError(f"Unsupported phase: {method} Supported Phases are: ['single_hop_training', 'random_walk_training']")
+        else:
+            self.method = method
         
-        self.setup_directories()
+        self.setup_directories(method)
         self.writer = SummaryWriter(log_dir=self.log_dir)
         if self.checkpoint_path is not None:
             self.load_checkpoint(checkpoint_path)
@@ -72,9 +76,9 @@ class Trainer:
             else:
                 raise ValueError(f"Unsupported optimizer: {config.single_hop_training.optimizer}")
         elif method == 'random_walk_training':
-            if config.prompt_training.optimizer == 'Adam':
+            if config.random_walk_training.optimizer == 'Adam':
                 return optim.Adam(parameters, lr=config.prompt_training.learning_rate)
-            elif config.prompt_training.optimizer == 'AdamW':
+            elif config.random_walk_training.optimizer == 'AdamW':
                 return optim.AdamW(parameters, lr=config.prompt_training.learning_rate, weight_decay=config.prompt_training.optimizer_param)
             elif config.single_hop_training.optimizer == 'AdaFactor':
                 return Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False, scale_parameter=False)
@@ -275,7 +279,7 @@ class Trainer:
         
     
     def train_random_walk(self,
-                          hopping_soft_prompt : nn.Parameter,
+                          hopping_soft_prompt : nn.Embedding,
                           optimizer : optim.Optimizer,
                           epochs : int):
         """Trains the Random Walk Part. Random Walk takes in a sequence "e1 ; r1 ; r2" and should predict "e1 ; r1 ; e2 ; r2 ; e3"
@@ -288,6 +292,9 @@ class Trainer:
         for param in self.model.parameters():
             param.required_grad = False
         
+        for param in hopping_soft_prompt.parameters():
+            param.requires_grad = True
+        
         for epoch in range(epochs):
             progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - Random Walk Training", file=sys.stdout)
             total_loss = 0
@@ -296,20 +303,36 @@ class Trainer:
                 
                 
                 incomplete_sequence, complete_sequence = batch
+                
+                print(f'Incomplete Sequence: {incomplete_sequence[0]}')
+                print(f'Complete Sequence: {complete_sequence[0]}')
+                
                 inputs = self.tokenizer(incomplete_sequence, padding=True, truncation=True, return_tensors = 'pt').to(self.device)
                 labels = self.tokenizer(complete_sequence, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
+                print(f'Labels Shape: {labels.shape}')
+                
                 #Generate HP Embedding and concatenate with input IDs
-                hp_input = hopping_soft_prompt.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+                hp_input = hopping_soft_prompt.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+                
+                print(f'Soft Prompt Shape : {hp_input.shape}')
+                
                 input_embeddings = self.model.shared(inputs['input_ids'])  # Convert input IDs to embeddings
 
+                print(f'Input Embeds shape: {input_embeddings.shape}')
+
                 concatenated_embeddings = torch.cat([hp_input, input_embeddings], dim=1)
-                
+
+                print(f'Concat Embeds Shape: {concatenated_embeddings.shape}')
                 
                 #Adjust attention mask (take all of the soft prompt tokens should be attented)
                 hp_attention_mask = torch.ones((inputs['attention_mask'].size(0), hp_input.size(1)), device=self.device)
+                
+                print(f'Soft Prompt Attention mask: {hp_attention_mask.shape}')
+                
                 concatenated_attention_mask = torch.cat((hp_attention_mask, inputs['attention_mask']), dim=1)
                              
+                print(f'Concat Attention mask: {concatenated_attention_mask.shape}')
                 
                 outputs = self.model(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, labels=labels)
                 loss = outputs.loss
@@ -319,6 +342,7 @@ class Trainer:
                 total_loss += loss.item()
                 progress_bar.set_description(f"Epoch {epoch} - Training - Random Walk Training - Loss: {loss.item():.4f}")
                 
+                return
                 
             avg_loss = total_loss / len(self.train_dataloader)
             self.log_tensorboard(avg_loss, epoch*len(self.train_dataloader) + batch_idx, 'Training', 'Random_Walk_Training')
@@ -344,7 +368,7 @@ class Trainer:
 
                 concatenated_embeddings = torch.cat([hp_input, input_embeddings], dim=1)
                 
-                
+                #TODO EM score and F1 Score
                 #Adjust attention mask (take all of the soft prompt tokens should be attented)
                 hp_attention_mask = torch.ones((inputs['attention_mask'].size(0), hp_input.size(1)), device=self.device)
                 concatenated_attention_mask = torch.cat((hp_attention_mask, inputs['attention_mask']), dim=1)
