@@ -228,7 +228,7 @@ class Trainer:
                 decoded_predictions = [self.tokenizer.decode(pred, skip_special_tokens=True) for pred in predictions]
                 #print(f'Prediction: {decoded_predictions}')
                 #print(f'Labels: {label}')
-                f1_score = sum([f1_score(pred, truth)[0] for pred, truth, in zip(decoded_predictions, label)])
+                _f1_score = sum([f1_score(pred, truth)[0] for pred, truth, in zip(decoded_predictions, label)])
                 em_score = sum([1 if exact_match_score(pred, truth) else 0 for pred, truth in zip(decoded_predictions, label)])
                 
                 #print(f'Shapes:')
@@ -239,14 +239,14 @@ class Trainer:
                 #print(f'Labels: {labels}')
                 
                 total_em += em_score
-                total_f1 += f1_score
+                total_f1 += _f1_score
                 progress_bar.set_description(f"Epoch {epoch} - Validation - Knowledge Integration - Loss: {loss.item():.4f}")
                 if batch_idx <= 5: 
                     self.writer.add_text(f'Validation/Prediction_vs_Label_{epoch}', 
                                      f'Prediction: {decoded_predictions[0]}\nLabel: {label[0]}', epoch)
             avg_loss = total_loss / len(self.val_dataloader)
             avg_em_perc = total_em / len(self.val_dataloader.dataset)
-            avg_f1_perc = f1_score / len(self.val_dataloader.dataset)
+            avg_f1_perc = total_f1 / len(self.val_dataloader.dataset)
             self.log_tensorboard(avg_loss, epoch, 'Validation', 'Knowledge_Integration')
             self.log_tensorboard(avg_em_perc, epoch, 'Validation', 'Knowledge_Integration', eval_metric='em')
             self.log_tensorboard(avg_f1_perc, epoch, 'Validation', 'Knowledge_Integration', eval_metric='f1')
