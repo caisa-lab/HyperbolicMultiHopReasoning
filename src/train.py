@@ -91,24 +91,18 @@ class Trainer:
             raise ValueError(f"Unsupported phase: {method} Supported Phases are: ['single_hop_training', 'random_walk_training', 'random_walk_training', 'parse_then_hop_training']")
         if method == 'single_hop_training':
             self.log_dir = os.path.join(self.config.single_hop_training.log_dir, current_time)
-            self.model_dir = os.path.join(self.config.single_hop_training.model_save_path, current_time)
-            os.makedirs(f"tboard_logs/{self.log_dir}", exist_ok=True)
-            os.makedirs(f"checkpoints/{self.model_dir}", exist_ok=True)   
+            self.model_dir = os.path.join(self.config.single_hop_training.model_save_path, current_time) 
         elif method == 'one_hop_wiki_training':
             self.log_dir = os.path.join(self.config.one_hop_wiki_training.log_dir, current_time)
-            self.model_dir = os.path.join(self.config.one_hop_wiki_training.model_save_path, current_time)
-            os.makedirs(f"tboard_logs/{self.log_dir}", exist_ok=True)
-            os.makedirs(f"checkpoints/{self.model_dir}", exist_ok=True)  
+            self.model_dir = os.path.join(self.config.one_hop_wiki_training.model_save_path, current_time) 
         elif method == 'random_walk_training':
             self.log_dir = os.path.join(self.config.random_walk_training.log_dir, current_time)
-            self.model_dir = os.path.join(self.config.random_walk_training.model_save_path, current_time)
-            os.makedirs(f"tboard_logs/{self.log_dir}", exist_ok=True)
-            os.makedirs(f"checkpoints/{self.model_dir}", exist_ok=True)  
+            self.model_dir = os.path.join(self.config.random_walk_training.model_save_path, current_time) 
         elif method == 'parse_then_hop_training':
             self.log_dir = os.path.join(self.config.parse_then_hop_training.log_dir, current_time)
             self.model_dir = os.path.join(self.config.parse_then_hop_training.model_save_path, current_time)
-            os.makedirs(f"tboard_logs/{self.log_dir}", exist_ok=True)
-            os.makedirs(f"checkpoints/{self.model_dir}", exist_ok=True)  
+        os.makedirs(self.log_dir, exist_ok=True)
+        os.makedirs(self.model_dir, exist_ok=True)  
     
     def load_checkpoint(self, checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=self.device)

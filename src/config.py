@@ -20,21 +20,21 @@ class Config:
     
     class SingleHopTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(log_dir='knowledge_integration', model_save_path='knowledge_integration')
+            super().__init__(log_dir='tboard_logs/knowledge_integration', model_save_path='checkpoints/knowledge_integration')
 
                 
     class OneHopWikiTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(log_dir='one_hop_wiki_finetuning', model_save_path='one_hop_wiki_finetuning')
+            super().__init__(log_dir='tboard_logs/one_hop_wiki_finetuning', model_save_path='checkpoints/one_hop_wiki_finetuning')
 
     class RandomWalkTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(learning_rate=0.3, epochs=40, log_dir='random_walk_training', model_save_path='random_walk_training')
+            super().__init__(learning_rate=0.3, epochs=40, log_dir='tboard_logs/random_walk_training', model_save_path='checkpoints/random_walk_training')
             self.prompt_length = 100
 
     class ParseThenHopTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(learning_rate=0.3, epochs=40, log_dir='parse_then_hop_training', model_save_path='parse_then_hop_training')
+            super().__init__(learning_rate=0.3, epochs=40, log_dir='tboard_logs/parse_then_hop_training', model_save_path='checkpoints/parse_then_hop_training')
             self.prompt_length = 100
                 
     class T5_Model:
