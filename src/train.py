@@ -254,7 +254,7 @@ class Trainer:
         
         
         
-        model_path = f"knowledge_integration/{self.model_dir}/model_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
+        model_path = f"{self.model_dir}/model_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         
         if avg_loss < self.best_loss:
             if self.best_model_path:
@@ -374,7 +374,7 @@ class Trainer:
                 progress_bar.set_description(f"Epoch {epoch} - Validation - Random Walk Training - Loss: {loss.item():.4f}")
             avg_loss = total_loss / len(self.val_dataloader)
             self.log_tensorboard(avg_loss, epoch * len(self.val_dataloader) + batch_idx, 'Validation', 'Random_Walk_Training')
-        model_path = f"{self.model_dir}/random_walk/model_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
+        model_path = f"{self.model_dir}/model_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         #TODO: SAVE SOFT PROMPT
 
 def parse_then_hop(self, hp_embeddings : nn.Parameter,
