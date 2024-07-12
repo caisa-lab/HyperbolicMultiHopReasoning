@@ -7,7 +7,6 @@ import torch
 from src.knowledge_graph import create_knowledge_graph
 from src.config import Config
 from torch.utils.data import DataLoader
-import argparse
 
 def _train_finetuning_single_hop():
     #Create Datasets
@@ -46,10 +45,11 @@ def _train_finetuning_single_hop():
     one_hop_wiki_dataloader_train = DataLoader(one_hop_wiki_train, batch_size=config.t5_model.batch_size, shuffle=True)
     one_hop_wiki_dataloader_dev = DataLoader(one_hop_wiki_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
     
-    trainer = Trainer(model, tokenizer, [one_hop_wiki_dataloader_train], one_hop_wiki_dataloader_dev, config, device=device, validation_step=1)
+    trainer = Trainer(model, tokenizer, [one_hop_wiki_dataloader_train], one_hop_wiki_dataloader_dev, config, device=device, validation_step=1, checkpoint_path='knowledge_integration/checkpoints/Jul10_14-20-11/model_epoch_7_val_loss_0.0379.pth', method='one_hop_wiki_training')
     
-    optimizer = trainer.get_optimizer(model.parameters(), config)
+    optimizer = trainer.get_optimizer(model.parameters(), config, method='one_hop_wiki_training')
     
+    print(f'Single Hop Finetuning...')
     print(f'with model: {config.t5_model.model_name}')
     print(f'Model Config: {model.config}')
     print(f'for: {config.single_hop_training.epochs} epochs')
