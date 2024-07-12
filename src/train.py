@@ -88,8 +88,8 @@ class Trainer:
     def setup_directories(self, method):
         current_time = datetime.now().strftime('%b%d_%H-%M-%S')
         if method not in ['single_hop_training', 'one_hop_wiki_training', 'random_walk_training', 'parse_then_hop_training']:
-            raise ValueError(f"Unsupported phase: {method} Supported Phases are: ['single_hop_training', 'random_walk_training']")
-        if method == 'singe_hop_training':
+            raise ValueError(f"Unsupported phase: {method} Supported Phases are: ['single_hop_training', 'random_walk_training', 'random_walk_training', 'parse_then_hop_training']")
+        if method == 'single_hop_training':
             self.log_dir = os.path.join(self.config.single_hop_training.log_dir, current_time)
             self.model_dir = os.path.join(self.config.single_hop_training.model_save_path, current_time)
             os.makedirs(f"tboard_logs/{self.log_dir}", exist_ok=True)
