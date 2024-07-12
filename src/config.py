@@ -4,7 +4,7 @@ class Config:
         def __init__(self, optimizer = 'AdaFactor',
                      learning_rate = 0.001,
                      optimizer_param = 1e-5,
-                     epochs = 40,
+                     epochs = 50,
                      scheduler = None,
                      scheduler_factor = 1,
                      log_dir = 'default_log',
