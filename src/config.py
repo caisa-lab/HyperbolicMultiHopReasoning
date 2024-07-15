@@ -25,7 +25,7 @@ class Config:
                 
     class OneHopWikiTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(log_dir='tboard_logs/one_hop_wiki_finetuning', model_save_path='checkpoints/one_hop_wiki_finetuning')
+            super().__init__(log_dir='tboard_logs/one_hop_wiki_finetuning', model_save_path='checkpoints/one_hop_wiki_finetuning', epochs=160)
 
     class RandomWalkTraining(BaseTrainingConfig):
         def __init__(self):
