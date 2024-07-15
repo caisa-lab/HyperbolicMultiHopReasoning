@@ -5,9 +5,9 @@
 #SBATCH --gpus=1
 
 #SBATCH --ntasks=1
-#SBATCH --job-name=knowledge_integration_training
-#SBATCH --output=outputs/output_large_adapt_c4_bsize64_%j.txt
-#SBATCH --error=outputs/error_large_adapt_c4_bsize64_%j.txt
+#SBATCH --job-name=finetune_large_adapt_on_OneHopWiki
+#SBATCH --output=outputs/output_finetune_large_adapt_bsize256_%j.txt
+#SBATCH --error=outputs/error_finetune_large_adapt_bsize256_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
@@ -20,4 +20,4 @@ pip install transformers --quiet
 pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu118 --quiet
 pip install sentencepiece
 
-python -u train_knowledge_integration.py --c4
+python -u train_finetuning_single_hop.py
