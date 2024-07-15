@@ -35,7 +35,7 @@ def _train_finetuning_single_hop():
     #Define Tokenizer and Model
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(config.t5_model.model_name)
-    print(f"Loading Model...")
+    print(f"Loading Model {config.t5_model.model_name}...")
     model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
     #Adjust Dropout
     model.config.dropout_rate = 0.1
@@ -52,9 +52,9 @@ def _train_finetuning_single_hop():
     print(f'Single Hop Finetuning...')
     print(f'with model: {config.t5_model.model_name}')
     print(f'Model Config: {model.config}')
-    print(f'for: {config.single_hop_training.epochs} epochs')
+    print(f'for: {config.one_hop_wiki_training.epochs} epochs')
     print(f'with batch size: {config.t5_model.batch_size}')
-    print(f'with optimizer: {config.single_hop_training.optimizer}')
+    print(f'with optimizer: {config.one_hop_wiki_training.optimizer}')
     
     trainer.train_single_hop(optimizer, epochs=config.single_hop_training.epochs)
 
