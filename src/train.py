@@ -49,8 +49,10 @@ class Trainer:
         self.early_stop_counter=0
         self.best_model_path = None
         
-        if method not in ['single_hop_training', 'one_hop_wiki_training', 'random_walk_training', 'parse_then_hop_training']:
-            raise ValueError(f"Unsupported phase: {method} Supported Phases are: ['single_hop_training', 'random_walk_training']")
+        self.supported_methods = ['single_hop_training', 'one_hop_wiki_training', 'random_walk_training', 'parse_then_hop_training']
+        
+        if method not in self.supported_methods:
+            raise ValueError(f"Unsupported phase: {method} Supported Phases are: {self.supported_methods}")
         else:
             self.method = method
         
@@ -63,32 +65,24 @@ class Trainer:
                       parameters,
                       config : Config,
                       method : str ='single_hop_training'):
-        if method not in ['single_hop_training', 'random_walk_training']:
-            raise ValueError(f"Unsupported phase: {method} Supported Phases are: ['single_hop_training', 'random_walk_training']")
+        if method not in self.supported_methods:
+            raise ValueError(f"Unsupported phase: {method} Supported Phases are: {self.supported_methods}")
         
-        if method == 'single_hop_training':
-            if config.single_hop_training.optimizer == 'Adam':
-                return optim.Adam(parameters, lr=config.single_hop_training.learning_rate)
-            elif config.single_hop_training.optimizer == 'AdamW':
-                return optim.AdamW(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param)
-            elif config.single_hop_training.optimizer == 'AdaFactor':
-                return Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False, scale_parameter=False)
-            else:
-                raise ValueError(f"Unsupported optimizer: {config.single_hop_training.optimizer}")
-        elif method == 'random_walk_training':
-            if config.random_walk_training.optimizer == 'Adam':
-                return optim.Adam(parameters, lr=config.prompt_training.learning_rate)
-            elif config.random_walk_training.optimizer == 'AdamW':
-                return optim.AdamW(parameters, lr=config.prompt_training.learning_rate, weight_decay=config.prompt_training.optimizer_param)
-            elif config.single_hop_training.optimizer == 'AdaFactor':
-                return Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False, scale_parameter=False)
-            else:
-                raise ValueError(f"Unsupported optimizer: {config.prompt_training.optimizer}")
+        
+        if config.single_hop_training.optimizer == 'Adam':
+            return optim.Adam(parameters, lr=config.single_hop_training.learning_rate)
+        elif config.single_hop_training.optimizer == 'AdamW':
+            return optim.AdamW(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param)
+        elif config.single_hop_training.optimizer == 'AdaFactor':
+            return Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False, scale_parameter=False)
+        else:
+            raise ValueError(f"Unsupported optimizer: {config.single_hop_training.optimizer}")
+    
         
     def setup_directories(self, method):
         current_time = datetime.now().strftime('%b%d_%H-%M-%S')
-        if method not in ['single_hop_training', 'one_hop_wiki_training', 'random_walk_training', 'parse_then_hop_training']:
-            raise ValueError(f"Unsupported phase: {method} Supported Phases are: ['single_hop_training', 'random_walk_training', 'random_walk_training', 'parse_then_hop_training']")
+        if method not in self.supported_methods:
+            raise ValueError(f"Unsupported phase: {method} Supported Phases are: {self.supported_methods}")
         if method == 'single_hop_training':
             self.log_dir = os.path.join(self.config.single_hop_training.log_dir, current_time)
             self.model_dir = os.path.join(self.config.single_hop_training.model_save_path, current_time) 
@@ -298,35 +292,35 @@ class Trainer:
                 
                 incomplete_sequence, complete_sequence = batch
                 
-                print(f'Incomplete Sequence: {incomplete_sequence[0]}')
-                print(f'Complete Sequence: {complete_sequence[0]}')
+                #print(f'Incomplete Sequence: {incomplete_sequence[0]}')
+                #print(f'Complete Sequence: {complete_sequence[0]}')
                 
                 inputs = self.tokenizer(incomplete_sequence, padding=True, truncation=True, return_tensors = 'pt').to(self.device)
                 labels = self.tokenizer(complete_sequence, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
-                print(f'Labels Shape: {labels.shape}')
+                #print(f'Labels Shape: {labels.shape}')
                 
                 #Generate HP Embedding and concatenate with input IDs
                 hp_input = hopping_soft_prompt.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
                 
-                print(f'Soft Prompt Shape : {hp_input.shape}')
+                #print(f'Soft Prompt Shape : {hp_input.shape}')
                 
                 input_embeddings = self.model.shared(inputs['input_ids'])  # Convert input IDs to embeddings
 
-                print(f'Input Embeds shape: {input_embeddings.shape}')
+                #print(f'Input Embeds shape: {input_embeddings.shape}')
 
                 concatenated_embeddings = torch.cat([hp_input, input_embeddings], dim=1)
 
-                print(f'Concat Embeds Shape: {concatenated_embeddings.shape}')
+                #print(f'Concat Embeds Shape: {concatenated_embeddings.shape}')
                 
                 #Adjust attention mask (take all of the soft prompt tokens should be attented)
                 hp_attention_mask = torch.ones((inputs['attention_mask'].size(0), hp_input.size(1)), device=self.device)
                 
-                print(f'Soft Prompt Attention mask: {hp_attention_mask.shape}')
+                #print(f'Soft Prompt Attention mask: {hp_attention_mask.shape}')
                 
                 concatenated_attention_mask = torch.cat((hp_attention_mask, inputs['attention_mask']), dim=1)
                              
-                print(f'Concat Attention mask: {concatenated_attention_mask.shape}')
+                #print(f'Concat Attention mask: {concatenated_attention_mask.shape}')
                 
                 outputs = self.model(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, labels=labels)
                 loss = outputs.loss
@@ -349,6 +343,8 @@ class Trainer:
                              epoch : int):
         self.model.eval()
         total_loss = 0
+        total_em = 0
+        total_f1 = 0
         progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - Random Walk Training", file=sys.stdout)
         with torch.no_grad():
             for batch_idx, batch in enumerate(progress_bar):
@@ -371,11 +367,53 @@ class Trainer:
                 loss = outputs.loss
                 
                 total_loss += loss.item()
+                
+                predictions = torch.argmax(outputs.logits, dim=-1)
+                decoded_predictions = [self.tokenizer.decode(pred, skip_special_tokens=True) for pred in predictions]
+                #print(f'Prediction: {decoded_predictions}')
+                #print(f'Labels: {label}')
+                _f1_score = sum([f1_score(pred, truth)[0] for pred, truth, in zip(decoded_predictions, complete_sequence)])
+                em_score = sum([1 if exact_match_score(pred, truth) else 0 for pred, truth in zip(decoded_predictions, complete_sequence)])
+                
+                #print(f'Shapes:')
+                #print(f'Prediction Shape: {predictions.shape}')
+                #print(f'Labels Shape: {labels.shape}')
+                
+                #print(f'Prediction: {predictions}')
+                #print(f'Labels: {labels}')
+                
+                total_em += em_score
+                total_f1 += _f1_score
+                progress_bar.set_description(f"Epoch {epoch} - Validation - Knowledge Integration - Loss: {loss.item():.4f}")
+                if batch_idx <= 5: 
+                    self.writer.add_text(f'Validation/Prediction_vs_Label_{epoch}', 
+                                     f'Prediction: {decoded_predictions[0]}\nLabel: {complete_sequence[0]}', epoch)
+                
                 progress_bar.set_description(f"Epoch {epoch} - Validation - Random Walk Training - Loss: {loss.item():.4f}")
             avg_loss = total_loss / len(self.val_dataloader)
-            self.log_tensorboard(avg_loss, epoch * len(self.val_dataloader) + batch_idx, 'Validation', 'Random_Walk_Training')
+            avg_em_perc = total_em / len(self.val_dataloader.dataset)
+            avg_f1_perc = total_f1 / len(self.val_dataloader.dataset)
+            self.log_tensorboard(avg_loss, epoch, 'Validation', 'Random_Walk_Training')
+            self.log_tensorboard(avg_em_perc, epoch, 'Validation', 'Random_Walk_Training', eval_metric='em')
+            self.log_tensorboard(avg_f1_perc, epoch, 'Validation', 'Random_Walk_Training', eval_metric='f1')
+            print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
         model_path = f"{self.model_dir}/model_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
-        #TODO: SAVE SOFT PROMPT
+        
+        
+        if avg_loss < self.best_loss:
+            if self.best_model_path:
+                os.remove(self.best_model_path)
+            self.best_loss = avg_loss
+            self.early_stop_counter = 0
+            self.best_model_path = model_path
+            torch.save(self.model.state_dict(), model_path)
+        else:
+            self.early_stop_counter += 1
+            print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
+            if self.early_stop_counter >= self.patience:
+                print("Early stopping trigered. Stopping training")
+                return True
+        return False
 
 def parse_then_hop(self, hp_embeddings : nn.Parameter,
                    pp_embeddings : nn.Parameter,
