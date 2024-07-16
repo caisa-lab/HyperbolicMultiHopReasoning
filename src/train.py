@@ -365,12 +365,11 @@ class Trainer:
                 labels = self.tokenizer(complete_sequence, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
                 #Generate HP Embedding and concatenate with input IDs
-                hp_input = hopping_soft_prompt.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+                hp_input = hopping_soft_prompt.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
                 input_embeddings = self.model.shared(inputs['input_ids'])  # Convert input IDs to embeddings
 
                 concatenated_embeddings = torch.cat([hp_input, input_embeddings], dim=1)
                 
-                #TODO EM score and F1 Score
                 #Adjust attention mask (take all of the soft prompt tokens should be attented)
                 hp_attention_mask = torch.ones((inputs['attention_mask'].size(0), hp_input.size(1)), device=self.device)
                 concatenated_attention_mask = torch.cat((hp_attention_mask, inputs['attention_mask']), dim=1)
@@ -401,7 +400,7 @@ class Trainer:
                     self.writer.add_text(f'Validation/Prediction_vs_Label_{epoch}', 
                                      f'Prediction: {decoded_predictions[0]}\nLabel: {complete_sequence[0]}', epoch)
                 
-                progress_bar.set_description(f"Epoch {epoch} - Validation - Random Walk Training - Loss: {loss.item():.4f}")
+                #progress_bar.set_description(f"Epoch {epoch} - Validation - Random Walk Training - Loss: {loss.item():.4f}")
             avg_loss = total_loss / len(self.val_dataloader)
             avg_em_perc = total_em / len(self.val_dataloader.dataset)
             avg_f1_perc = total_f1 / len(self.val_dataloader.dataset)
