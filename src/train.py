@@ -304,7 +304,7 @@ class Trainer:
                 labels = self.tokenizer(complete_sequence, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
                 #print(f'Labels Shape: {labels.shape}')
-                print_gpu_memory()
+                #print_gpu_memory()
                 #Generate HP Embedding and concatenate with input IDs
                 hp_input = hopping_soft_prompt.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
                 
@@ -324,14 +324,14 @@ class Trainer:
                 #print(f'Soft Prompt Attention mask: {hp_attention_mask.shape}')
                 
                 concatenated_attention_mask = torch.cat((hp_attention_mask, inputs['attention_mask']), dim=1)
-                print_gpu_memory()             
+                #print_gpu_memory()             
                 
                 outputs = self.model(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, labels=labels)
-                print_gpu_memory()
+                #print_gpu_memory()
                 loss = outputs.loss
-                print_gpu_memory()
+                #print_gpu_memory()
                 loss.backward()
-                print_gpu_memory()
+                #print_gpu_memory()
                 
 		        
                 optimizer.step()

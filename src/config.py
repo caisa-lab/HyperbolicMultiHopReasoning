@@ -40,7 +40,7 @@ class Config:
                 
     class T5_Model:
         def __init__(self):
-            self.batch_size = 128#128 # From the Paper or 32 if xxl
+            self.batch_size = 64#128 # From the Paper or 32 if xxl
             self.model_name = "google/t5-large-lm-adapt"            
             self.tokenizer_max_length = 64
 
