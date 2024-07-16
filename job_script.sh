@@ -6,8 +6,8 @@
 
 #SBATCH --ntasks=1
 #SBATCH --job-name=finetune_large_adapt_on_OneHopWiki
-#SBATCH --output=outputs/output_finetune_large_adapt_bsize256_%j.txt
-#SBATCH --error=outputs/error_finetune_large_adapt_bsize256_%j.txt
+#SBATCH --output=outputs/output_finetune_large_adapt_c4_bsize64_%j.txt
+#SBATCH --error=outputs/error_finetune_large_adapt_c4_bsize64_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 

@@ -45,7 +45,7 @@ def _train_finetuning_single_hop():
     one_hop_wiki_dataloader_train = DataLoader(one_hop_wiki_train, batch_size=config.t5_model.batch_size, shuffle=True)
     one_hop_wiki_dataloader_dev = DataLoader(one_hop_wiki_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
     
-    trainer = Trainer(model, tokenizer, [one_hop_wiki_dataloader_train], one_hop_wiki_dataloader_dev, config, device=device, validation_step=1, checkpoint_path='checkpoints/knowledge_integration/large_adapt_bsize256/model_epoch_29_val_loss_0.0019.pth', method='one_hop_wiki_training')
+    trainer = Trainer(model, tokenizer, [one_hop_wiki_dataloader_train], one_hop_wiki_dataloader_dev, config, device=device, validation_step=1, checkpoint_path='checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth', method='one_hop_wiki_training')
     
     optimizer = trainer.get_optimizer(model.parameters(), config, method='one_hop_wiki_training')
     
