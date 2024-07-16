@@ -320,17 +320,20 @@ class Trainer:
                 #print(f'Soft Prompt Attention mask: {hp_attention_mask.shape}')
                 
                 concatenated_attention_mask = torch.cat((hp_attention_mask, inputs['attention_mask']), dim=1)
-                             
-                #print(f'Concat Attention mask: {concatenated_attention_mask.shape}')
                 vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
-                print(f'VRAM reserved: {vram_reserved} MB')
+                print(f'VRAM reserved: {vram_reserved} MB')             
+                
                 outputs = self.model(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, labels=labels)
                 vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
                 print(f'VRAM reserved: {vram_reserved} MB')
-		loss = outputs.loss
-                loss.backward()
-		vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
+                loss = outputs.loss
+                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
                 print(f'VRAM reserved: {vram_reserved} MB')
+                loss.backward()
+                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
+                print(f'VRAM reserved: {vram_reserved} MB')
+                
+		        
                 optimizer.step()
 
                 total_loss += loss.item()
