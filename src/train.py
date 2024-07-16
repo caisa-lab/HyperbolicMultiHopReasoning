@@ -330,8 +330,6 @@ class Trainer:
                 total_loss += loss.item()
                 progress_bar.set_description(f"Epoch {epoch} - Training - Random Walk Training - Loss: {loss.item():.4f}")
                 
-                return
-                
             avg_loss = total_loss / len(self.train_dataloader)
             self.log_tensorboard(avg_loss, epoch*len(self.train_dataloader) + batch_idx, 'Training', 'Random_Walk_Training')
             print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")

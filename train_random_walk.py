@@ -10,57 +10,78 @@ from sklearn.model_selection import train_test_split
 from src.knowledge_graph import create_knowledge_graph
 import torch.nn as nn
 
+def _get_top_token_embeddings(model : AutoModelForSeq2SeqLM, tokenizer : AutoTokenizer, k : int):
+    vocab = tokenizer.get_vocab()
+    sorted_vocab = sorted(vocab.items(), key=lambda item: item[1])
+    
+    top_tokens = [token for token, idx in sorted_vocab[:k]]
+    
+    top_tokens_ids = tokenizer.convert_tokens_to_ids(top_tokens)
+    
+    token_embeddings = model.shared.weight.data
+    
+    top_embeddings = token_embeddings[top_tokens_ids]
+    return top_embeddings
 
 if __name__ == '__main__':    
-    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset()
-    
-    #correct_wrong_evidences(train_dataset)
-    #correct_wrong_evidences(dev_dataset)
-    #correct_wrong_evidences(test_dataset)
-    
+    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
+
     all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
     all_kg = create_knowledge_graph(all_data)
-    
+
     print(f"Nodes in Data: {len(list(all_kg.nodes()))}")
-    
+
     print(f"Lenght Train Data: {len(train_dataset)}")
     print(f"Lenght Dev Data: {len(dev_dataset)}")
     print(f"Lenght Test Data: {len(test_dataset)}")
-    
+
     random_walk_train = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='train')
     random_walk_dev = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='dev')
     random_walk_test = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='test')
-    
+
     print(f"Number of Random Walks Train: {len(random_walk_train)}")
     print(f"Number of Random Walk Dev: {len(random_walk_dev)}")
     print(f"Number of Random Walk Test: {len(random_walk_test)}")
-    
+
     #Specify Hyperparameters via config file
     config = Config()
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Training on device: {device}')
-    
+
     #google/t5-large-lm-adapt
-    model_name = "google/t5-v1_1-base"
+    model_name = config.t5_model.model_name
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    
-    
-    single_hop_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_large_model.batch_size, shuffle=True)
-    single_hop_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_large_model.batch_size, shuffle=False)
-    
-    
-    trainer = Trainer(model, tokenizer, single_hop_dataloader_train, single_hop_dataloader_dev, config, device=device)
-    
+
+
+    random_walk_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_model.batch_size, shuffle=True)
+    random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
+
+
+    trainer = Trainer(model, tokenizer, [random_walk_dataloader_train], random_walk_dataloader_dev, config, device=device, method='random_walk_training', checkpoint_path=config.random_walk_training.model_checkpoint_path)
+
     #HP Soft Prompt will be tuned
-    hp_length = config.prompt_training.prompt_length
-    #hp_embedding_size = model.config.d_model 
+    hp_length = config.random_walk_training.prompt_length
+  
     hp_embedding_size = model.config.hidden_size 
-    hp_embeddings = nn.Parameter(torch.randn(hp_length, hp_embedding_size, requires_grad=True))
-    print(hp_embeddings.shape)
+    hp_embeddings = nn.Embedding(hp_length, hp_embedding_size)
     
-    optimizer = trainer.get_optimizer([hp_embeddings], config, phase='random_walk_training')
+    #dont use random use top 100 most common tokens of tokenizer.getvocab
+    top_100_token_embeddings = _get_top_token_embeddings(model, tokenizer, 100)
+    hp_embeddings.weight.data[:top_100_token_embeddings.size(0), :] = top_100_token_embeddings
     
-    trainer.train_random_walk(hopping_soft_prompt= hp_embeddings, optimizer=optimizer, epochs=1)
+    #print(hp_embeddings.num_embeddings)
+    #print(hp_embeddings.embedding_dim)
+
+    optimizer = trainer.get_optimizer(hp_embeddings.parameters(), config, method='random_walk_training')
+
+    print(f'Random Walk Training..')
+    print(f'with model: {config.t5_model.model_name}')
+    print(f'Model Config: {model.config}')
+    print(f'for: {config.random_walk_training.epochs} epochs')
+    print(f'with batch size: {config.t5_model.batch_size}')
+    print(f'with optimizer: {config.random_walk_training.optimizer}')
+
+    trainer.train_random_walk(hopping_soft_prompt=hp_embeddings, optimizer=optimizer, epochs=config.random_walk_training.epochs)

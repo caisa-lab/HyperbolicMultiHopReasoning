@@ -39,11 +39,6 @@ def _knowledge_integration_with_c4():
     model.config.hidden_dropout_prob = 0.1
     model.config.attention_probs_dropout_prob = 0.1
     
-    
-    #TODO: Mixed Precision Using O1 Apex     https://nvidia.github.io/apex/amp.html#o1-mixed-precision-recommended-for-typical-use
-    #TODO: model = amp.initialize(model, opt_level="O1")
-    #TODO: Look PERT to reduce VRAM
-    
     base_path = 'c4/en/c4-train.{:05d}-of-01024.json'
     c4_dataset = load_c4_dataset(base_path, number_of_files=15)
     
