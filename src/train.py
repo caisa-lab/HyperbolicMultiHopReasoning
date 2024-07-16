@@ -338,9 +338,14 @@ class Trainer:
 
                 total_loss += loss.item()
                 progress_bar.set_description(f"Epoch {epoch} - Training - Random Walk Training - Loss: {loss.item():.4f}")
+                self.log_tensorboard(loss.item(), epoch*len(self.train_dataloader) + batch_idx, 'Training', 'Knowledge_Integration')
+                
+                vram_allocated = torch.cuda.memory_allocated(self.device) / (1024 ** 2)  # Convert to MB
+                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
+                self.writer.add_scalar('Knowledge_Integration/Training/VRAM/Allocated', vram_allocated, epoch*len(self.train_dataloader) + batch_idx)
+                self.writer.add_scalar('Knowledge_Integration/Training/VRAM/Reserved', vram_reserved, epoch*len(self.train_dataloader) + batch_idx)
                 
             avg_loss = total_loss / len(self.train_dataloader)
-            self.log_tensorboard(avg_loss, epoch*len(self.train_dataloader) + batch_idx, 'Training', 'Random_Walk_Training')
             print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")
             if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
                 self.evaluate_random_walk(hopping_soft_prompt, epoch)
