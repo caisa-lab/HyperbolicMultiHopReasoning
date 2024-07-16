@@ -270,6 +270,11 @@ class Trainer:
                           hopping_soft_prompt : nn.Embedding,
                           optimizer : optim.Optimizer,
                           epochs : int):
+        import subprocess
+        
+        def print_gpu_memory():
+            result = subprocess.run(['nvidia-smi'], stdout=subprocess.PIPE)
+            print(result.stdout.decode('utf-8'))
         """Trains the Random Walk Part. Random Walk takes in a sequence "e1 ; r1 ; r2" and should predict "e1 ; r1 ; e2 ; r2 ; e3"
         In this part the Soft Prompt HP will be Finetuned and the Model will be frozen.
         
@@ -299,8 +304,7 @@ class Trainer:
                 labels = self.tokenizer(complete_sequence, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
                 #print(f'Labels Shape: {labels.shape}')
-                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
-                print(f'VRAM reserved: {vram_reserved} MB')
+                print_gpu_memory()
                 #Generate HP Embedding and concatenate with input IDs
                 hp_input = hopping_soft_prompt.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
                 
@@ -320,18 +324,14 @@ class Trainer:
                 #print(f'Soft Prompt Attention mask: {hp_attention_mask.shape}')
                 
                 concatenated_attention_mask = torch.cat((hp_attention_mask, inputs['attention_mask']), dim=1)
-                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
-                print(f'VRAM reserved: {vram_reserved} MB')             
+                print_gpu_memory()             
                 
                 outputs = self.model(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, labels=labels)
-                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
-                print(f'VRAM reserved: {vram_reserved} MB')
+                print_gpu_memory()
                 loss = outputs.loss
-                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
-                print(f'VRAM reserved: {vram_reserved} MB')
+                print_gpu_memory()
                 loss.backward()
-                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
-                print(f'VRAM reserved: {vram_reserved} MB')
+                print_gpu_memory()
                 
 		        
                 optimizer.step()
