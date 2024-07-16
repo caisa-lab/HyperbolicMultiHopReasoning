@@ -5,9 +5,9 @@
 #SBATCH --gpus=1
 
 #SBATCH --ntasks=1
-#SBATCH --job-name=finetune_large_adapt_on_OneHopWiki
-#SBATCH --output=outputs/output_finetune_large_adapt_c4_bsize64_%j.txt
-#SBATCH --error=outputs/error_finetune_large_adapt_c4_bsize64_%j.txt
+#SBATCH --job-name=random_walk_training_large_256
+#SBATCH --output=outputs/output_random_walk_large_adapt_bsize256_%j.txt
+#SBATCH --error=outputs/error_random_walk_large_adapt_bsize256_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
@@ -18,6 +18,6 @@ source activate thesis
 
 pip install transformers --quiet
 pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu118 --quiet
-pip install sentencepiece
+pip install sentencepiece --quiet
 
-python -u train_finetuning_single_hop.py
+python -u train_random_walk.py

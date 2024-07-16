@@ -31,7 +31,7 @@ class Config:
         def __init__(self):
             super().__init__(learning_rate=0.3, epochs=250, log_dir='tboard_logs/random_walk_training', model_save_path='checkpoints/random_walk_training')
             self.prompt_length = 100
-            self.model_checkpoint_path = 'checkpoints/knowledge_integration/large_finetune_adapt_bsize256/model_epoch_0_val_loss_0.0328.pth'
+            self.model_checkpoint_path = 'checkpoints/one_hop_wiki_finetuning/finetune_adapt_large_bsize256/model_epoch_0_val_loss_0.0328.pth'
 
     class ParseThenHopTraining(BaseTrainingConfig):
         def __init__(self):
@@ -42,7 +42,7 @@ class Config:
         def __init__(self):
             self.batch_size = 128#128 # From the Paper or 32 if xxl
             self.model_name = "google/t5-large-lm-adapt"            
-            self.tokenizer_max_length = 128
+            self.tokenizer_max_length = 64
 
 
             

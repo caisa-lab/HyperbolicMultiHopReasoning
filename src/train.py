@@ -299,7 +299,8 @@ class Trainer:
                 labels = self.tokenizer(complete_sequence, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
                 #print(f'Labels Shape: {labels.shape}')
-                
+                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
+                print(f'VRAM reserved: {vram_reserved} MB')
                 #Generate HP Embedding and concatenate with input IDs
                 hp_input = hopping_soft_prompt.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
                 
@@ -321,10 +322,15 @@ class Trainer:
                 concatenated_attention_mask = torch.cat((hp_attention_mask, inputs['attention_mask']), dim=1)
                              
                 #print(f'Concat Attention mask: {concatenated_attention_mask.shape}')
-                
+                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
+                print(f'VRAM reserved: {vram_reserved} MB')
                 outputs = self.model(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, labels=labels)
-                loss = outputs.loss
+                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
+                print(f'VRAM reserved: {vram_reserved} MB')
+		loss = outputs.loss
                 loss.backward()
+		vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
+                print(f'VRAM reserved: {vram_reserved} MB')
                 optimizer.step()
 
                 total_loss += loss.item()
