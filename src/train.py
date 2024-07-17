@@ -26,7 +26,8 @@ class Trainer:
                  device : str ='cpu',
                  checkpoint_path : str = None,
                  validation_step : int = 1,
-                 method : str = 'singe_hop_training'):
+                 method : str = 'singe_hop_training',
+                 load_optimizer = True):
         self.model = model.to(device)
         self.tokenizer = tokenizer
         self.tokenizer.model_max_length = config.t5_model.tokenizer_max_length
@@ -43,6 +44,8 @@ class Trainer:
         self.config = config
         self.checkpoint_path = checkpoint_path
         self.validation_step = validation_step
+        self.load_optimizer = load_optimizer
+        
         
         self.patience = 5
         self.best_loss = float('inf')
@@ -70,13 +73,14 @@ class Trainer:
         
         
         if config.single_hop_training.optimizer == 'Adam':
-            return optim.Adam(parameters, lr=config.single_hop_training.learning_rate)
+            self.optimizer = optim.Adam(parameters, lr=config.single_hop_training.learning_rate)
         elif config.single_hop_training.optimizer == 'AdamW':
-            return optim.AdamW(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param)
+            self.optimizer = optim.AdamW(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param)
         elif config.single_hop_training.optimizer == 'AdaFactor':
-            return Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False, scale_parameter=False)
+            self.optimizer = Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False, scale_parameter=False)
         else:
             raise ValueError(f"Unsupported optimizer: {config.single_hop_training.optimizer}")
+        return self.optimizer
     
         
     def setup_directories(self, method):
@@ -102,6 +106,19 @@ class Trainer:
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
         self.model.load_state_dict(checkpoint)
         print(f"Loaded checkpoint from {checkpoint_path}")
+        
+    def load_soft_prompt(self,
+                         soft_prompt : nn.Embedding,
+                         soft_prompt_path : str,
+                         load_optimizer):
+        checkpoint = torch.load(soft_prompt_path)
+        soft_prompt.weight = checkpoint['soft_prompt_weights']
+        soft_prompt.to(self.device)
+        print(f'Loading Soft Prompt Checkpoint from {soft_prompt_path}')
+        if load_optimizer:
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            print(f'Loading Optimizer Checkpoint from {soft_prompt_path}')
+            
         
         
     def log_tensorboard(self, loss, idx, phase, method, eval_metric = 'loss'):
@@ -280,7 +297,8 @@ class Trainer:
         
         For the Dataset we will use the RandomWalk Dataset which contains gives as a complete and an incomplete path
         """
-        
+        if self.config.random_walk_training.hopping_prompt_checkpoint_path:
+            self.load_soft_prompt(hopping_soft_prompt, self.config.random_walk_training.hopping_prompt_checkpoint_path, self.load_optimizer)
         #Freeze Model in Random Walk Training
         for param in self.model.parameters():
             param.required_grad = False
@@ -348,10 +366,11 @@ class Trainer:
             avg_loss = total_loss / len(self.train_dataloader)
             print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")
             if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
-                self.evaluate_random_walk(hopping_soft_prompt, epoch)
+                self.evaluate_random_walk(hopping_soft_prompt, optimizer, epoch)
             
     def evaluate_random_walk(self,
                              hopping_soft_prompt : nn.Parameter,
+                             optimizer : optim.Optimizer,
                              epoch : int):
         self.model.eval()
         total_loss = 0
@@ -408,7 +427,7 @@ class Trainer:
             self.log_tensorboard(avg_em_perc, epoch, 'Validation', 'Random_Walk_Training', eval_metric='em')
             self.log_tensorboard(avg_f1_perc, epoch, 'Validation', 'Random_Walk_Training', eval_metric='f1')
             print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
-        model_path = f"{self.model_dir}/model_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
+        soft_prompt_path = f"{self.model_dir}/hopping_soft_prompt_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         
         
         if avg_loss < self.best_loss:
@@ -416,8 +435,11 @@ class Trainer:
                 os.remove(self.best_model_path)
             self.best_loss = avg_loss
             self.early_stop_counter = 0
-            self.best_model_path = model_path
-            torch.save(self.model.state_dict(), model_path)
+            self.best_model_path = soft_prompt_path
+            torch.save({
+                
+                'soft_prompt_weights': hopping_soft_prompt.weight,
+                'optimizer_state_dict': optimizer.state_dict()}, soft_prompt_path)
         else:
             self.early_stop_counter += 1
             print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
