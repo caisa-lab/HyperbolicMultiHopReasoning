@@ -1,4 +1,4 @@
-from src.util import load_dataset
+from src.util import load_dataset, get_top_token_embeddings
 import pandas as pd
 from src.train import Trainer
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -6,22 +6,9 @@ from src.datasets import RandomWalkDataset
 import torch
 from src.config import Config
 from torch.utils.data import DataLoader
-from sklearn.model_selection import train_test_split
 from src.knowledge_graph import create_knowledge_graph
 import torch.nn as nn
 
-def _get_top_token_embeddings(model : AutoModelForSeq2SeqLM, tokenizer : AutoTokenizer, k : int):
-    vocab = tokenizer.get_vocab()
-    sorted_vocab = sorted(vocab.items(), key=lambda item: item[1])
-    
-    top_tokens = [token for token, idx in sorted_vocab[:k]]
-    
-    top_tokens_ids = tokenizer.convert_tokens_to_ids(top_tokens)
-    
-    token_embeddings = model.shared.weight.data
-    
-    top_embeddings = token_embeddings[top_tokens_ids]
-    return top_embeddings
 
 if __name__ == '__main__':    
     train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
@@ -69,11 +56,11 @@ if __name__ == '__main__':
     hp_embeddings = nn.Embedding(hp_length, hp_embedding_size)
     
     #dont use random use top 100 most common tokens of tokenizer.getvocab
-    top_100_token_embeddings = _get_top_token_embeddings(model, tokenizer, 100)
+    top_100_token_embeddings = get_top_token_embeddings(model, tokenizer, 100)
     hp_embeddings.weight.data[:top_100_token_embeddings.size(0), :] = top_100_token_embeddings
     
-    #print(hp_embeddings.num_embeddings)
-    #print(hp_embeddings.embedding_dim)
+    print(hp_embeddings.num_embeddings)
+    print(hp_embeddings.embedding_dim)
 
     optimizer = trainer.get_optimizer(hp_embeddings.parameters(), config, method='random_walk_training')
 

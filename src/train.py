@@ -18,7 +18,7 @@ in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/23
 """
 class Trainer:
     def __init__(self,
-                 model : nn.Module,
+                 model : AutoModelForSeq2SeqLM,
                  tokenizer : AutoTokenizer,
                  list_train_dataloader: list,
                  val_dataloader : DataLoader,
@@ -46,7 +46,7 @@ class Trainer:
         self.validation_step = validation_step
         self.load_optimizer = load_optimizer
         
-        
+        self.start_epoch = 0
         self.patience = 5
         self.best_loss = float('inf')
         self.early_stop_counter=0
@@ -112,12 +112,13 @@ class Trainer:
                          soft_prompt_path : str,
                          load_optimizer):
         checkpoint = torch.load(soft_prompt_path)
-        soft_prompt.weight = checkpoint['soft_prompt_weights']
+        soft_prompt.load_state_dict(checkpoint['soft_prompt_weights'])
         soft_prompt.to(self.device)
         print(f'Loading Soft Prompt Checkpoint from {soft_prompt_path}')
         if load_optimizer:
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             print(f'Loading Optimizer Checkpoint from {soft_prompt_path}')
+            self.start_epoch = checkpoint['epoch']
             
         
         
@@ -286,7 +287,8 @@ class Trainer:
     def train_random_walk(self,
                           hopping_soft_prompt : nn.Embedding,
                           optimizer : optim.Optimizer,
-                          epochs : int):
+                          epochs : int,
+                          start_epoch : int = 0):
         import subprocess
         
         def print_gpu_memory():
@@ -297,7 +299,7 @@ class Trainer:
         
         For the Dataset we will use the RandomWalk Dataset which contains gives as a complete and an incomplete path
         """
-        if self.config.random_walk_training.hopping_prompt_checkpoint_path:
+        if self.config.random_walk_training.hopping_prompt_checkpoint_path is not None:
             self.load_soft_prompt(hopping_soft_prompt, self.config.random_walk_training.hopping_prompt_checkpoint_path, self.load_optimizer)
         #Freeze Model in Random Walk Training
         for param in self.model.parameters():
@@ -306,7 +308,10 @@ class Trainer:
         for param in hopping_soft_prompt.parameters():
             param.requires_grad = True
         
-        for epoch in range(epochs):
+        if self.start_epoch != 0:
+            print(f'Starting training from epoch {self.start_epoch}')
+        
+        for epoch in range(start_epoch, epochs):
             progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - Random Walk Training", file=sys.stdout)
             total_loss = 0
             for batch_idx, batch in enumerate(progress_bar):
@@ -356,12 +361,12 @@ class Trainer:
 
                 total_loss += loss.item()
                 progress_bar.set_description(f"Epoch {epoch} - Training - Random Walk Training - Loss: {loss.item():.4f}")
-                self.log_tensorboard(loss.item(), epoch*len(self.train_dataloader) + batch_idx, 'Training', 'Knowledge_Integration')
+                self.log_tensorboard(loss.item(), epoch*len(self.train_dataloader) + batch_idx, 'Training', 'Random_Walk_Training')
                 
                 vram_allocated = torch.cuda.memory_allocated(self.device) / (1024 ** 2)  # Convert to MB
                 vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
-                self.writer.add_scalar('Knowledge_Integration/Training/VRAM/Allocated', vram_allocated, epoch*len(self.train_dataloader) + batch_idx)
-                self.writer.add_scalar('Knowledge_Integration/Training/VRAM/Reserved', vram_reserved, epoch*len(self.train_dataloader) + batch_idx)
+                self.writer.add_scalar('Random_Walk_Training/Training/VRAM/Allocated', vram_allocated, epoch*len(self.train_dataloader) + batch_idx)
+                self.writer.add_scalar('Random_Walk_Training/Training/VRAM/Reserved', vram_reserved, epoch*len(self.train_dataloader) + batch_idx)
                 
             avg_loss = total_loss / len(self.train_dataloader)
             print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")
@@ -369,7 +374,7 @@ class Trainer:
                 self.evaluate_random_walk(hopping_soft_prompt, optimizer, epoch)
             
     def evaluate_random_walk(self,
-                             hopping_soft_prompt : nn.Parameter,
+                             hopping_soft_prompt : nn.Embedding,
                              optimizer : optim.Optimizer,
                              epoch : int):
         self.model.eval()
@@ -414,7 +419,7 @@ class Trainer:
                 
                 total_em += em_score
                 total_f1 += _f1_score
-                progress_bar.set_description(f"Epoch {epoch} - Validation - Knowledge Integration - Loss: {loss.item():.4f}")
+                progress_bar.set_description(f"Epoch {epoch} - Validation - Random Walk Training - Loss: {loss.item():.4f}")
                 if batch_idx <= 5: 
                     self.writer.add_text(f'Validation/Prediction_vs_Label_{epoch}', 
                                      f'Prediction: {decoded_predictions[0]}\nLabel: {complete_sequence[0]}', epoch)
@@ -437,9 +442,9 @@ class Trainer:
             self.early_stop_counter = 0
             self.best_model_path = soft_prompt_path
             torch.save({
-                
-                'soft_prompt_weights': hopping_soft_prompt.weight,
-                'optimizer_state_dict': optimizer.state_dict()}, soft_prompt_path)
+                'hopping_prompt_state_dict': hopping_soft_prompt.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'epoch': epoch}, soft_prompt_path)
         else:
             self.early_stop_counter += 1
             print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
@@ -448,24 +453,27 @@ class Trainer:
                 return True
         return False
 
-def parse_then_hop(self, hp_embeddings : nn.Parameter,
-                   pp_embeddings : nn.Parameter,
+def parse_then_hop(self,
+                   hp_embeddings : nn.Embedding,
+                   pp_embeddings : nn.Embedding,
                    optimizer : optim.Optimizer,
                    epochs : int):
     """
     Finetunes a Soft Prompt Parsing Prompts (PP) everything else is kept frozen. Takes in a Question and the PP gives it to the model which should output an incomplete path.
     This incomplete path should be concatenated with the Hopping Prompt (HP) and then fed into the model which should output the complete path.
     """
+    for param in pp_embeddings.parameters():
+        param.requires_grad = True
+        
+    for param in hp_embeddings.parameters():
+        param.requires_grad = False
     
     # Freeze model parameters
     for param in self.model.parameters():
         param.requires_grad = False
     
-    hp_embeddings.requires_grad = False
-    pp_embeddings.requires_grad = True
-    
     for epoch in range(epochs):
-        progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - Random Walk Training", file=sys.stdout)
+        progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - Parse Then Hop", file=sys.stdout)
         total_loss = 0
         for batch_idx, batch in enumerate(progress_bar):
             
@@ -476,7 +484,7 @@ def parse_then_hop(self, hp_embeddings : nn.Parameter,
             labels = self.tokenizer(complete_sequence, padding=True, truncation=True, return_tensors='pt')['input_ids'].to(self.device)
             
             # Generate PP Embedding and concatenate with input IDs
-            pp_input = pp_embeddings.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+            pp_input = pp_embeddings.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
             input_embeddings = self.model.shared(inputs['input_ids'])  # Convert input IDs to embeddings
             concat_pp_question_embeddings = torch.cat([pp_input, input_embeddings], dim=1)
             
@@ -493,7 +501,7 @@ def parse_then_hop(self, hp_embeddings : nn.Parameter,
             
             # Generate HP Embedding and concatenate with input IDs
             input_embeddings = self.model.shared(inputs['input_ids'])  # Convert input IDs to embeddings
-            hp_input = hp_embeddings.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+            hp_input = hp_embeddings.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
             concat_hp_incomplete = torch.cat([hp_input, input_embeddings], dim=1)
             
             # Adjust attention mask (ensure all soft prompt tokens are attended)
@@ -508,13 +516,26 @@ def parse_then_hop(self, hp_embeddings : nn.Parameter,
             optimizer.step()
 
             total_loss += loss.item()
-            progress_bar.set_description(f"Epoch {epoch} - Training - Random Walk Training - Loss: {loss.item():.4f}")
+            progress_bar.set_description(f"Epoch {epoch} - Training - Parse Then Hop - Loss: {loss.item():.4f}")
+            self.log_tensorboard(loss.item(), epoch*len(self.train_dataloader) + batch_idx, 'Training', 'Parse_Then_Hop')
+            
+            
+            vram_allocated = torch.cuda.memory_allocated(self.device) / (1024 ** 2)  # Convert to MB
+            vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
+            self.writer.add_scalar('Knowledge_Integration/Training/VRAM/Allocated', vram_allocated, epoch*len(self.train_dataloader) + batch_idx)
+            self.writer.add_scalar('Knowledge_Integration/Training/VRAM/Reserved', vram_reserved, epoch*len(self.train_dataloader) + batch_idx)
         
         avg_loss = total_loss / len(self.train_dataloader)
-        self.log_tensorboard(avg_loss, epoch * len(self.train_dataloader) + batch_idx, 'Training', 'Knowledge_Integration')
-        print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}")
-        #if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
-        #    self.evaluate_random_walk(hopping_soft_prompt, epoch)
+        print(f"Epoch {epoch + 1}, AvgLoss: {avg_loss:.4f}")
+        if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
+                self.evaluate_parse_then_hop(pp_embeddings, hp_embeddings, optimizer, epoch)
+                
+    def evaluate_parse_then_hop(self,
+                   hp_embeddings : nn.Embedding,
+                   pp_embeddings : nn.Embedding,
+                   optimizer : optim.Optimizer,
+                   epochs : int):
+        pass
 
     
             
