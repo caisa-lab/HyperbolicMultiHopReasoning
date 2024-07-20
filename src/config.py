@@ -32,7 +32,7 @@ class Config:
             super().__init__(learning_rate=0.3, epochs=250, log_dir='tboard_logs/random_walk_training', model_save_path='checkpoints/random_walk_training')
             self.prompt_length = 100
             self.hopping_prompt_checkpoint_path = None
-            self.model_checkpoint_path = 'checkpoints/one_hop_wiki_finetuning/finetune_adapt_large_bsize256/model_epoch_0_val_loss_0.0328.pth'
+            self.model_checkpoint_path = 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth'
 
     class ParseThenHopTraining(BaseTrainingConfig):
         def __init__(self):
