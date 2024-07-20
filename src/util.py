@@ -1,4 +1,4 @@
-from transformers import T5Tokenizer, T5ForConditionalGeneration
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import networkx as nx
 import torch
 from torch.optim import Adam
@@ -107,3 +107,17 @@ def load_c4_dataset(base_path: str,
         for chunk in pd.read_json(base_path.format(i), lines=True, chunksize=chunk_size):
             list_of_texts.extend(chunk['text'])
     return list_of_texts
+    
+    
+def get_top_token_embeddings(model : AutoModelForSeq2SeqLM, tokenizer : AutoTokenizer, k : int):
+    vocab = tokenizer.get_vocab()
+    sorted_vocab = sorted(vocab.items(), key=lambda item: item[1])
+    
+    top_tokens = [token for token, idx in sorted_vocab[:k]]
+    
+    top_tokens_ids = tokenizer.convert_tokens_to_ids(top_tokens)
+    
+    token_embeddings = model.shared.weight.data
+    
+    top_embeddings = token_embeddings[top_tokens_ids]
+    return top_embeddings   
