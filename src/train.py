@@ -112,7 +112,7 @@ class Trainer:
                          soft_prompt_path : str,
                          load_optimizer):
         checkpoint = torch.load(soft_prompt_path)
-        soft_prompt.load_state_dict(checkpoint['soft_prompt_weights'])
+        soft_prompt.load_state_dict(checkpoint['hopping_prompt_state_dict'])
         soft_prompt.to(self.device)
         print(f'Loading Soft Prompt Checkpoint from {soft_prompt_path}')
         if load_optimizer:
