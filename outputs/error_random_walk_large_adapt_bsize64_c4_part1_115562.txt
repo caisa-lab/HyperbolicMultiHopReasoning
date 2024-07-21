@@ -1,0 +1,1 @@
+slurmstepd: error: *** JOB 115562 ON node-05 CANCELLED AT 2024-07-21T12:52:27 DUE TO TIME LIMIT ***
