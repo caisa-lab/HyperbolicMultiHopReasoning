@@ -6,8 +6,8 @@
 
 #SBATCH --ntasks=1
 #SBATCH --job-name=random_walk_training_large_adapt_c4_64
-#SBATCH --output=outputs/output_random_walk_large_adapt_bsize64_c4_part1_%j.txt
-#SBATCH --error=outputs/error_random_walk_large_adapt_bsize64_c4_part1_%j.txt
+#SBATCH --output=outputs/output_random_walk_large_adapt_bsize64_c4_part2_%j.txt
+#SBATCH --error=outputs/error_random_walk_large_adapt_bsize64_c4_part2_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
