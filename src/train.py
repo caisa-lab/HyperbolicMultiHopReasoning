@@ -63,7 +63,8 @@ class Trainer:
         
         self.setup_directories()
         if self.tboard_checkpoint_path is not None:
-            self.writer = SummaryWriter(log_dir=self.log_dir)
+            self.log_dir = tboard_checkpoint_path
+        self.writer = SummaryWriter(log_dir=self.log_dir)
         if self.checkpoint_path is not None:
             self.load_checkpoint(checkpoint_path)
         
