@@ -57,7 +57,7 @@ def _train_finetuning_single_hop():
                       method='one_hop_wiki_training',
                       load_optimizer=config.one_hop_wiki_training.load_optimizer)
     
-    optimizer = trainer.get_optimizer(model.parameters(), config)
+    optimizer = trainer.get_optimizer(model.parameters())
     
     print(f'Single Hop Finetuning...')
     print(f'with model: {config.t5_model.model_name}')

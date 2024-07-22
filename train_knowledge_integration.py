@@ -108,7 +108,7 @@ def _knowledge_integration_without_c4():
     
     trainer = Trainer(model, tokenizer, [single_hop_dataloader_train], single_hop_dataloader_dev, config, device=device, validation_step=1, method='single_hop_training')
     
-    optimizer = trainer.get_optimizer(model.parameters(), config)
+    optimizer = trainer.get_optimizer(model.parameters())
     
     print(f'Knowledge Integration training..')
     print(f'with model: {config.t5_model.model_name}')
