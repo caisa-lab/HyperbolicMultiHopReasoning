@@ -109,14 +109,14 @@ class Trainer:
                          parsing_prompt : nn.Embedding,
                          soft_prompts_path : str,
                          load_optimizer):
-        # TODO Need to add parsing prompt
         checkpoint = torch.load(soft_prompts_path) 
         if checkpoint['hopping_prompt_state_dict'] is not None:     
             hopping_prompt.load_state_dict(checkpoint['hopping_prompt_state_dict'])
             hopping_prompt.to(self.device)
-        if checkpoint['parsing_prompt_state_dict'] is not None:
-            parsing_prompt.load_state_dict(checkpoint['parsing_prompt_state_dict'])
-            parsing_prompt.to(self.device)
+        if 'parsing_prompt_state_dict' not in checkpoint:    
+            if checkpoint['parsing_prompt_state_dict'] is not None:
+                parsing_prompt.load_state_dict(checkpoint['parsing_prompt_state_dict'])
+                parsing_prompt.to(self.device)
         print(f'Loading Soft Prompt Checkpoint from {soft_prompts_path}')
         if load_optimizer:
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -302,7 +302,7 @@ class Trainer:
         For the Dataset we will use the RandomWalk Dataset which contains gives as a complete and an incomplete path
         """
         if self.config.random_walk_training.hopping_prompt_checkpoint_path is not None:
-            self.load_soft_prompt(hopping_soft_prompt, self.config.random_walk_training.hopping_prompt_checkpoint_path, self.load_optimizer)
+            self.load_soft_prompts(hopping_soft_prompt, self.config.random_walk_training.hopping_prompt_checkpoint_path, self.load_optimizer)
         #Freeze Model in Random Walk Training
         for param in self.model.parameters():
             param.required_grad = False
@@ -465,6 +465,11 @@ class Trainer:
         Finetunes a Soft Prompt Parsing Prompts (PP) everything else is kept frozen. Takes in a Question and the PP gives it to the model which should output an incomplete path.
         This incomplete path should be concatenated with the Hopping Prompt (HP) and then fed into the model which should output the complete path.
         """
+        if self.config.parse_then_hop_training.hopping_prompt_checkpoint_path is not None:
+            self.load_soft_prompts(hp_embeddings, self.config.parse_then_hop_training.hopping_prompt_checkpoint_path, self.load_optimizer)
+        if self.config.parse_then_hop_training.parsing_prompt_checkpoint_path is not None:
+            self.load_soft_prompts(pp_embeddings, self.config.parse_then_hop_training.parsing_prompt_checkpoint_path, self.load_optimizer)
+        
         for param in pp_embeddings.parameters():
             param.requires_grad = True
             
@@ -542,7 +547,7 @@ class Trainer:
         total_loss = 0
         total_em = 0
         total_f1 = 0
-        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - Random Walk Training", file=sys.stdout)
+        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - Parse Then Hop Training", file=sys.stdout)
         with torch.no_grad():
             for batch_idx, batch in enumerate(progress_bar):
                 optimizer.zero_grad()
@@ -598,7 +603,7 @@ class Trainer:
                 
                 total_em += em_score
                 total_f1 += _f1_score
-                progress_bar.set_description(f"Epoch {epoch} - Validation - Random Walk Training - Loss: {loss.item():.4f}")
+                progress_bar.set_description(f"Epoch {epoch} - Validation - Parse Then Hop Training - Loss: {loss.item():.4f}")
                 if batch_idx <= 5: 
                     self.writer.add_text(f'Validation/Prediction_vs_Label_{epoch}', 
                                     f'Prediction: {decoded_predictions[0]}\nLabel: {complete_sequence[0]}', epoch)
@@ -607,11 +612,11 @@ class Trainer:
             avg_loss = total_loss / len(self.val_dataloader)
             avg_em_perc = total_em / len(self.val_dataloader.dataset)
             avg_f1_perc = total_f1 / len(self.val_dataloader.dataset)
-            self.log_tensorboard(avg_loss, epoch, 'Validation', 'Random_Walk_Training')
-            self.log_tensorboard(avg_em_perc, epoch, 'Validation', 'Random_Walk_Training', eval_metric='em')
-            self.log_tensorboard(avg_f1_perc, epoch, 'Validation', 'Random_Walk_Training', eval_metric='f1')
+            self.log_tensorboard(avg_loss, epoch, 'Validation', 'Parse_Then_Hop')
+            self.log_tensorboard(avg_em_perc, epoch, 'Validation', 'Parse_Then_Hop', eval_metric='em')
+            self.log_tensorboard(avg_f1_perc, epoch, 'Validation', 'Parse_Then_Hop', eval_metric='f1')
             print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
-        soft_prompt_path = f"{self.model_dir}/hopping_soft_prompt_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
+        soft_prompt_path = f"{self.model_dir}/parsing_soft_prompt_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         
         
         if avg_loss < self.best_loss:
@@ -621,7 +626,7 @@ class Trainer:
             self.early_stop_counter = 0
             self.best_model_path = soft_prompt_path
             torch.save({
-                'hopping_prompt_state_dict': None,
+                'hopping_prompt_state_dict': hp_embeddings.state_dict(),
                 'parsing_prompt_state_dict': pp_embeddings.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'epoch': epoch}, soft_prompt_path)
