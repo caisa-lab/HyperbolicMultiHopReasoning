@@ -47,7 +47,16 @@ if __name__ == '__main__':
     random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
 
 
-    trainer = Trainer(model, tokenizer, [random_walk_dataloader_train], random_walk_dataloader_dev, config, device=device, method='random_walk_training', checkpoint_path=config.random_walk_training.model_checkpoint_path)
+    trainer = Trainer(model,
+                      tokenizer,
+                      [random_walk_dataloader_train],
+                      random_walk_dataloader_dev,
+                      config,
+                      device=device,
+                      method='random_walk_training',
+                      checkpoint_path=config.random_walk_training.model_checkpoint_path,
+                      tboard_checkpoint_path=config.random_walk_training.tboard_checkpoint_path
+                      )
 
     #HP Soft Prompt will be tuned
     hp_length = config.random_walk_training.prompt_length
