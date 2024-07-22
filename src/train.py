@@ -543,7 +543,7 @@ class Trainer:
         total_em_hopping_step = 0
         total_f1_parsing_step = 0
         total_f1_hopping_step = 0
-        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - Parse Then Hop Training", file=sys.stdout)
+        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - Parse Then Hop", file=sys.stdout)
         with torch.no_grad():
             for batch_idx, batch in enumerate(progress_bar):
                 optimizer.zero_grad()
@@ -583,7 +583,7 @@ class Trainer:
                 complete_path_outputs = self.model(inputs_embeds=concat_hp_incomplete, attention_mask=concatenated_hp_question_attention_mask, labels=labels)
                 
                 loss_parsing_step = incomplete_paths_outputs.loss
-                loss_hopping_step = complete_path_outputs
+                loss_hopping_step = complete_path_outputs.loss
                 
                 total_loss_hopping_step += loss_hopping_step.item()
                 total_loss_parsing_step += loss_parsing_step.item()
