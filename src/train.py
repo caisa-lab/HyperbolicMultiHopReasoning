@@ -18,7 +18,7 @@ in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/23
 """
 class Trainer:
     def __init__(self,
-                 model : AutoModelForSeq2SeqLM,
+                 model : nn.Module,
                  tokenizer : AutoTokenizer,
                  list_train_dataloader: list,
                  val_dataloader : DataLoader,
@@ -111,13 +111,12 @@ class Trainer:
                          soft_prompts_path : str,
                          load_optimizer):
         checkpoint = torch.load(soft_prompts_path) 
-        if checkpoint['hopping_prompt_state_dict'] is not None:     
+        if hopping_prompt is not None:  
             hopping_prompt.load_state_dict(checkpoint['hopping_prompt_state_dict'])
             hopping_prompt.to(self.device)
-        if 'parsing_prompt_state_dict' not in checkpoint:    
-            if checkpoint['parsing_prompt_state_dict'] is not None:
-                parsing_prompt.load_state_dict(checkpoint['parsing_prompt_state_dict'])
-                parsing_prompt.to(self.device)
+        if parsing_prompt is not None:  
+            parsing_prompt.load_state_dict(checkpoint['parsing_prompt_state_dict'])
+            parsing_prompt.to(self.device)
         print(f'Loading Soft Prompt Checkpoint from {soft_prompts_path}')
         if load_optimizer:
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -309,7 +308,7 @@ class Trainer:
         For the Dataset we will use the RandomWalk Dataset which contains gives as a complete and an incomplete path
         """
         if self.config.random_walk_training.hopping_prompt_checkpoint_path is not None:
-            self.load_soft_prompts(hopping_soft_prompt, self.config.random_walk_training.hopping_prompt_checkpoint_path, self.load_optimizer)
+            self.load_soft_prompts(hopping_soft_prompt, None, self.config.random_walk_training.hopping_prompt_checkpoint_path, self.load_optimizer)
         #Freeze Model in Random Walk Training
         for param in self.model.parameters():
             param.required_grad = False
@@ -473,10 +472,12 @@ class Trainer:
         Finetunes a Soft Prompt Parsing Prompts (PP) everything else is kept frozen. Takes in a Question and the PP gives it to the model which should output an incomplete path.
         This incomplete path should be concatenated with the Hopping Prompt (HP) and then fed into the model which should output the complete path.
         """
+        
+        #TODO check this and make this more clear
         if self.config.parse_then_hop_training.hopping_prompt_checkpoint_path is not None:
-            self.load_soft_prompts(hp_embeddings, self.config.parse_then_hop_training.hopping_prompt_checkpoint_path, self.load_optimizer)
+            self.load_soft_prompts(hp_embeddings, None, self.config.parse_then_hop_training.hopping_prompt_checkpoint_path, self.load_optimizer)
         if self.config.parse_then_hop_training.parsing_prompt_checkpoint_path is not None:
-            self.load_soft_prompts(pp_embeddings, self.config.parse_then_hop_training.parsing_prompt_checkpoint_path, self.load_optimizer)
+            self.load_soft_prompts(pp_embeddings, pp_embeddings, self.config.parse_then_hop_training.parsing_prompt_checkpoint_path, self.load_optimizer)
         
         for param in pp_embeddings.parameters():
             param.requires_grad = True
