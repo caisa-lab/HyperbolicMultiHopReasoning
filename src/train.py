@@ -514,8 +514,9 @@ class Trainer:
                 outputs = self.model(inputs_embeds=concat_pp_question_embeddings, attention_mask=concatenated_pp_question_attention_mask, labels = intermediate_labels)
                 
                 # Decode incomplete path
-                incomplete_path = self.tokenizer.decode(outputs.logits.argmax(dim=-1).squeeze().tolist(), skip_special_tokens=True)
-                inputs = self.tokenizer(incomplete_path, padding=True, truncation=True, return_tensors='pt').to(self.device)
+                predictions = outputs.logits.argmax(dim=-1).squeeze().tolist()
+                incomplete_paths = [tokenizer.decode(pred, skip_special_tokens=True) for pred in predictions]
+                inputs = tokenizer(incomplete_paths, padding=True, truncation=True, return_tensors='pt').to(device)
                 
                 # Generate HP Embedding and concatenate with input IDs
                 input_embeddings = self.model.shared(inputs['input_ids'])  # Convert input IDs to embeddings

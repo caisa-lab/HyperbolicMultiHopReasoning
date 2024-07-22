@@ -26,12 +26,20 @@ class Config:
     
     class SingleHopTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(log_dir='tboard_logs/knowledge_integration', model_save_path='checkpoints/knowledge_integration', model_checkpoint_path= None, tboard_checkpoint_path=None, load_optimizer=False)
+            super().__init__(log_dir='tboard_logs/knowledge_integration',
+                             model_save_path='checkpoints/knowledge_integration',
+                             model_checkpoint_path= None,
+                             tboard_checkpoint_path=None,
+                             load_optimizer=False)
 
                 
     class OneHopWikiTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(log_dir='tboard_logs/one_hop_wiki_finetuning', model_save_path='checkpoints/one_hop_wiki_finetuning', epochs=160, model_checkpoint_path= None, tboard_checkpoint_path=None, load_optimizer=False)
+            super().__init__(log_dir='tboard_logs/one_hop_wiki_finetuning',
+                             model_save_path='checkpoints/one_hop_wiki_finetuning',
+                             epochs=160, model_checkpoint_path= None,
+                             tboard_checkpoint_path=None,
+                             load_optimizer=False)
 
     class RandomWalkTraining(BaseTrainingConfig):
         def __init__(self):
