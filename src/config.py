@@ -53,7 +53,7 @@ class Config:
                              tboard_checkpoint_path=None
                              )
             self.prompt_length = 100
-            self.hopping_prompt_checkpoint_path = 'checkpoints/random_walk_training/large_adapt_bsize64_c4_part1/hopping_soft_prompt_epoch_25_val_loss_0.2693.pth'
+            self.hopping_prompt_checkpoint_path = 'checkpoints/random_walk_training/large_adapt_bsize64_c4_part2/hopping_soft_prompt_epoch_25_val_loss_0.2434.pth'
             self.parsing_prompt_checkpoint_path = None
                 
     class T5_Model:
