@@ -55,7 +55,8 @@ if __name__ == '__main__':
                       device=device,
                       method='random_walk_training',
                       checkpoint_path=config.random_walk_training.model_checkpoint_path,
-                      tboard_checkpoint_path=config.random_walk_training.tboard_checkpoint_path
+                      tboard_checkpoint_path=config.random_walk_training.tboard_checkpoint_path,
+                      load_optimizer=config.random_walk_training.load_optimizer
                       )
 
     #HP Soft Prompt will be tuned

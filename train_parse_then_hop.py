@@ -47,8 +47,9 @@ if __name__ == '__main__':
                       config,
                       device=device,
                       method='parse_then_hop_training',
-                      checkpoint_path=config.random_walk_training.model_checkpoint_path,
-                      tboard_checkpoint_path=config.random_walk_training.tboard_checkpoint_path
+                      checkpoint_path=config.parse_then_hop_training.model_checkpoint_path,
+                      tboard_checkpoint_path=config.parse_then_hop_training.tboard_checkpoint_path,
+                      load_optimizer=config.parse_then_hop_training.load_optimizer
                       )
 
     #PP Soft Prompt will be tuned

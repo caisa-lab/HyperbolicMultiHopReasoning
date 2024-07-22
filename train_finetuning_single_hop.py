@@ -54,7 +54,8 @@ def _train_finetuning_single_hop():
                       validation_step=1,
                       checkpoint_path=config.one_hop_wiki_training.model_checkpoint_path,
                       tboard_checkpoint_path=config.one_hop_wiki_training.tboard_checkpoint_path,
-                      method='one_hop_wiki_training')
+                      method='one_hop_wiki_training',
+                      load_optimizer=config.one_hop_wiki_training.load_optimizer)
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     

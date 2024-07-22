@@ -10,7 +10,8 @@ class Config:
                      log_dir = 'default_log',
                      model_save_path = 'default_model_save',
                      tboard_checkpoint_path = None,
-                     model_checkpoint_path = None):
+                     model_checkpoint_path = None,
+                     load_optimizer = False):
             self.optimizer = optimizer #[Adam, AdamW, AdaFactor]
             self.learning_rate = learning_rate #Same as in the paper
             self.optimizer_param = optimizer_param #weight_decay for AdamW Check which Optimizer
@@ -21,15 +22,16 @@ class Config:
             self.model_save_path = model_save_path
             self.tboard_checkpoint_path = tboard_checkpoint_path
             self.model_checkpoint_path = model_checkpoint_path
+            self.load_optimizer = load_optimizer
     
     class SingleHopTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(log_dir='tboard_logs/knowledge_integration', model_save_path='checkpoints/knowledge_integration', model_checkpoint_path= None, tboard_checkpoint_path=None)
+            super().__init__(log_dir='tboard_logs/knowledge_integration', model_save_path='checkpoints/knowledge_integration', model_checkpoint_path= None, tboard_checkpoint_path=None, load_optimizer=False)
 
                 
     class OneHopWikiTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(log_dir='tboard_logs/one_hop_wiki_finetuning', model_save_path='checkpoints/one_hop_wiki_finetuning', epochs=160, model_checkpoint_path= None, tboard_checkpoint_path=None)
+            super().__init__(log_dir='tboard_logs/one_hop_wiki_finetuning', model_save_path='checkpoints/one_hop_wiki_finetuning', epochs=160, model_checkpoint_path= None, tboard_checkpoint_path=None, load_optimizer=False)
 
     class RandomWalkTraining(BaseTrainingConfig):
         def __init__(self):
@@ -38,7 +40,8 @@ class Config:
                              log_dir='tboard_logs/random_walk_training',
                              model_save_path='checkpoints/random_walk_training',
                              model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth',
-                             tboard_checkpoint_path=None
+                             tboard_checkpoint_path=None,
+                             load_optimizer=False
                              )
             self.prompt_length = 100
             self.hopping_prompt_checkpoint_path = 'checkpoints/random_walk_training/large_adapt_bsize64_c4_part1/hopping_soft_prompt_epoch_25_val_loss_0.2693.pth'
@@ -50,7 +53,8 @@ class Config:
                              log_dir='tboard_logs/parse_then_hop_training',
                              model_save_path='checkpoints/parse_then_hop_training',
                              model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth',
-                             tboard_checkpoint_path=None
+                             tboard_checkpoint_path=None,
+                             load_optimizer=False
                              )
             self.prompt_length = 100
             self.hopping_prompt_checkpoint_path = 'checkpoints/random_walk_training/large_adapt_bsize64_c4_part2/hopping_soft_prompt_epoch_25_val_loss_0.2434.pth'

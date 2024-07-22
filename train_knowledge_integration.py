@@ -58,7 +58,8 @@ def _knowledge_integration_with_c4():
                       validation_step=1,
                       checkpoint_path=config.single_hop_training.model_checkpoint_path,
                       tboard_checkpoint_path=config.single_hop_training.tboard_checkpoint_path,
-                      method='single_hop_training')
+                      method='single_hop_training',
+                      load_optimizer=config.single_hop_training.load_optimizer)
     
     optimizer = trainer.get_optimizer(model.parameters(), config)
     

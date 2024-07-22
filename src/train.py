@@ -100,6 +100,7 @@ class Trainer:
         os.makedirs(self.model_dir, exist_ok=True)  
     
     def load_checkpoint(self, checkpoint_path):
+        #TODO Add optimizer checkpoint load
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
         self.model.load_state_dict(checkpoint)
         print(f"Loaded checkpoint from {checkpoint_path}")
@@ -217,10 +218,11 @@ class Trainer:
             print(f"Epoch {epoch} - Training - AVGLoss: {avg_loss:.4f}")
             
             if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
-                if self.evaluate_single_hop(epoch=epoch):
+                if self.evaluate_single_hop(epoch=epoch, optimizer=optimizer):
                     break #Early Stopping
             
     def evaluate_single_hop(self,
+                            optimizer : optim.Optimizer,
                             epoch : int):
         self.model.eval()
         total_loss = 0
@@ -277,7 +279,12 @@ class Trainer:
             self.best_loss = avg_loss
             self.early_stop_counter = 0
             self.best_model_path = model_path
-            torch.save(self.model.state_dict(), model_path)
+            torch.save({
+                'model_state_dict': self.model.state_dict(),
+                'hopping_prompt_state_dict': None,
+                'parsing_prompt_state_dict': None,
+                'optimizer_state_dict': optimizer.state_dict(),
+                'epoch': epoch}, model_path)
         else:
             self.early_stop_counter += 1
             print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
@@ -444,6 +451,7 @@ class Trainer:
             self.early_stop_counter = 0
             self.best_model_path = soft_prompt_path
             torch.save({
+                'model_state_dict': self.model.state_dict(),
                 'hopping_prompt_state_dict': hopping_soft_prompt.state_dict(),
                 'parsing_prompt_state_dict': None,
                 'optimizer_state_dict': optimizer.state_dict(),
@@ -626,6 +634,7 @@ class Trainer:
             self.early_stop_counter = 0
             self.best_model_path = soft_prompt_path
             torch.save({
+                'model_state_dict': self.model.state_dict(),
                 'hopping_prompt_state_dict': hp_embeddings.state_dict(),
                 'parsing_prompt_state_dict': pp_embeddings.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
