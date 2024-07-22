@@ -71,7 +71,7 @@ if __name__ == '__main__':
     print(hp_embeddings.num_embeddings)
     print(hp_embeddings.embedding_dim)
 
-    optimizer = trainer.get_optimizer(hp_embeddings.parameters(), config, method='random_walk_training')
+    optimizer = trainer.get_optimizer(hp_embeddings.parameters(), config)
 
     print(f'Random Walk Training..')
     print(f'with model: {config.t5_model.model_name}')

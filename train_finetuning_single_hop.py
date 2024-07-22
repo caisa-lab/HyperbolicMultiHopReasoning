@@ -56,7 +56,7 @@ def _train_finetuning_single_hop():
                       tboard_checkpoint_path=config.one_hop_wiki_training.tboard_checkpoint_path,
                       method='one_hop_wiki_training')
     
-    optimizer = trainer.get_optimizer(model.parameters(), config, method='one_hop_wiki_training')
+    optimizer = trainer.get_optimizer(model.parameters(), config)
     
     print(f'Single Hop Finetuning...')
     print(f'with model: {config.t5_model.model_name}')

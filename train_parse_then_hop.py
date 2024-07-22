@@ -75,7 +75,7 @@ if __name__ == '__main__':
     print(f' HP Embedding num Embedding: {hp_embeddings.num_embeddings}')
     print(f' HP Embedding embedding dim: {hp_embeddings.embedding_dim}')
 
-    optimizer = trainer.get_optimizer(pp_embeddings.parameters(), config, method='random_walk_training')
+    optimizer = trainer.get_optimizer(pp_embeddings.parameters(), config)
 
     print(f'Parse Then Hop Training..')
     print(f'with model: {config.t5_model.model_name}')
