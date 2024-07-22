@@ -69,18 +69,30 @@ class Trainer:
             self.load_checkpoint(checkpoint_path)
         
     def get_optimizer(self,
-                      parameters,
-                      config : Config):
-        
-        if config.single_hop_training.optimizer == 'Adam':
-            self.optimizer = optim.Adam(parameters, lr=config.single_hop_training.learning_rate)
-        elif config.single_hop_training.optimizer == 'AdamW':
-            self.optimizer = optim.AdamW(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param)
-        elif config.single_hop_training.optimizer == 'AdaFactor':
-            self.optimizer = Adafactor(parameters, lr=config.single_hop_training.learning_rate, weight_decay=config.single_hop_training.optimizer_param, relative_step=False, scale_parameter=False)
-        else:
-            raise ValueError(f"Unsupported optimizer: {config.single_hop_training.optimizer}")
-        return self.optimizer
+                      parameters):
+        if self.method == 'single_hop_training' or self.method == 'one_hop_wiki_training':
+            print(f'Using {self.config.single_hop_training.optimizer} with learning rate {self.config.single_hop_training.learning_rate}')
+            if self.config.single_hop_training.optimizer == 'Adam':
+                self.optimizer = optim.Adam(parameters, lr= self.config.single_hop_training.learning_rate)
+            elif  self.config.single_hop_training.optimizer == 'AdamW':
+                self.optimizer = optim.AdamW(parameters, lr= self.config.single_hop_training.learning_rate, weight_decay= self.config.single_hop_training.optimizer_param)
+            elif  self.config.single_hop_training.optimizer == 'AdaFactor':
+                self.optimizer = Adafactor(parameters, lr= self.config.single_hop_training.learning_rate, weight_decay= self.config.single_hop_training.optimizer_param, relative_step=False, scale_parameter=False)
+            else:
+                raise ValueError(f"Unsupported optimizer: {self.config.single_hop_training.optimizer}")
+            return self.optimizer
+        elif self.method == 'random_walk_training' or self.method == 'parse_then_hop_training':
+            print(f'Using {self.config.random_walk_training.optimizer} with learning rate {self.config.random_walk_training.learning_rate}')
+            if self.config.random_walk_training.optimizer == 'Adam':
+                self.optimizer = optim.Adam(parameters, lr= self.config.random_walk_training.learning_rate)
+            elif self.config.random_walk_training.optimizer == 'AdamW':
+                self.optimizer = optim.AdamW(parameters, lr= self.config.random_walk_training.learning_rate, weight_decay= self.config.random_walk_training.optimizer_param)
+            elif self.config.random_walk_training.optimizer == 'AdaFactor':
+                self.optimizer = Adafactor(parameters, lr= self.config.random_walk_training.learning_rate, weight_decay= self.config.random_walk_training.optimizer_param, relative_step=False, scale_parameter=False)
+            else:
+                raise ValueError(f"Unsupported optimizer: {self.config.random_walk_training.optimizer}")
+            return self.optimizer
+            
         
     def setup_directories(self):
         current_time = datetime.now().strftime('%b%d_%H-%M-%S')
