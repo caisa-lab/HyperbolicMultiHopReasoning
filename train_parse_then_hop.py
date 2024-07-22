@@ -36,14 +36,14 @@ if __name__ == '__main__':
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
 
-    random_walk_dataloader_train = DataLoader(parse_then_hop_train, batch_size=config.t5_model.batch_size, shuffle=True)
-    random_walk_dataloader_dev = DataLoader(parse_then_hop_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
+    parse_then_hop_dataloader_train = DataLoader(parse_then_hop_train, batch_size=config.t5_model.batch_size, shuffle=True)
+    parse_then_hop_dataloader_dev = DataLoader(parse_then_hop_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
 
 
     trainer = Trainer(model,
                       tokenizer,
-                      [random_walk_dataloader_train],
-                      random_walk_dataloader_dev,
+                      [parse_then_hop_dataloader_train],
+                      parse_then_hop_dataloader_dev,
                       config,
                       device=device,
                       method='parse_then_hop_training',

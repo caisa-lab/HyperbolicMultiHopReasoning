@@ -496,8 +496,9 @@ class Trainer:
                 
                 optimizer.zero_grad()
                 
-                question, complete_sequence = batch
+                question, incomplete_sequence, complete_sequence = batch
                 inputs = self.tokenizer(question, padding=True, truncation=True, return_tensors='pt').to(self.device)
+                intermediate_labels = self.tokenizer(incomplete_sequence, padding=True, truncation=True, return_tensors='pt')['input_ids'].to(self.device)
                 labels = self.tokenizer(complete_sequence, padding=True, truncation=True, return_tensors='pt')['input_ids'].to(self.device)
                 
                 # Generate PP Embedding and concatenate with input IDs
@@ -510,7 +511,7 @@ class Trainer:
                 concatenated_pp_question_attention_mask = torch.cat((pp_attention_mask, inputs['attention_mask']), dim=1)
                 
                 # First pass through the model with PP
-                outputs = self.model(inputs_embeds=concat_pp_question_embeddings, attention_mask=concatenated_pp_question_attention_mask)
+                outputs = self.model(inputs_embeds=concat_pp_question_embeddings, attention_mask=concatenated_pp_question_attention_mask, labels = intermediate_labels)
                 
                 # Decode incomplete path
                 incomplete_path = self.tokenizer.decode(outputs.logits.argmax(dim=-1).squeeze().tolist(), skip_special_tokens=True)

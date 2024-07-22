@@ -387,9 +387,12 @@ class ParseThenHopDataset(Dataset):
         
         evidence_list = [evidences[0][0], evidences[0][1], evidences[0][2], evidences[1][1], evidences[1][2]]
         complete_path = f"{evidence_list[0]}"
+        incomplete_path = f"{evidence_list[0]}"
         for i in range(1, len(evidence_list)):
             complete_path += f" ; {evidence_list[i]}"
+            if i % 2 != 0:
+                incomplete_path += f" ; {evidence_list[i]}"
             
-        return question, complete_path
+        return question, incomplete_path, complete_path
 
         
