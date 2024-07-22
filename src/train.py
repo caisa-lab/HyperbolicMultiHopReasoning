@@ -511,10 +511,10 @@ class Trainer:
                 concatenated_pp_question_attention_mask = torch.cat((pp_attention_mask, inputs['attention_mask']), dim=1)
                 
                 # First pass through the model with PP
-                outputs = self.model(inputs_embeds=concat_pp_question_embeddings, attention_mask=concatenated_pp_question_attention_mask, labels = intermediate_labels)
+                incomplete_paths_outputs = self.model(inputs_embeds=concat_pp_question_embeddings, attention_mask=concatenated_pp_question_attention_mask, labels = intermediate_labels)
                 
                 # Decode incomplete path
-                predictions = outputs.logits.argmax(dim=-1).squeeze().tolist()
+                predictions = incomplete_paths_outputs.logits.argmax(dim=-1).squeeze().tolist()
                 incomplete_paths = [self.tokenizer.decode(pred, skip_special_tokens=True) for pred in predictions]
                 inputs = self.tokenizer(incomplete_paths, padding=True, truncation=True, return_tensors='pt').to(self.device)
                 
@@ -528,9 +528,9 @@ class Trainer:
                 concatenated_hp_question_attention_mask = torch.cat((hp_attention_mask, inputs['attention_mask']), dim=1)
                 
                 # Second pass through the model with HP and labels
-                outputs = self.model(inputs_embeds=concat_hp_incomplete, attention_mask=concatenated_hp_question_attention_mask, labels=labels)
+                complete_path_outputs = self.model(inputs_embeds=concat_hp_incomplete, attention_mask=concatenated_hp_question_attention_mask, labels=labels)
                 
-                loss = outputs.loss
+                loss = incomplete_paths_outputs.loss
                 loss.backward()
                 optimizer.step()
 
