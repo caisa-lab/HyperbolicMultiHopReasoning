@@ -542,7 +542,7 @@ class Trainer:
             avg_loss = total_loss / len(self.train_dataloader)
             print(f"Epoch {epoch}, AvgLoss: {avg_loss:.4f}")
             if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
-                if self.evaluate_parse_then_hop(pp_embeddings, hp_embeddings, optimizer, epoch):
+                if self.evaluate_parse_then_hop(hp_embeddings, pp_embeddings, optimizer, epoch):
                     break
                     
     def evaluate_parse_then_hop(self,
@@ -583,57 +583,56 @@ class Trainer:
                 inputs = self.tokenizer(decoded_predicted_incomplete_sequence, padding=True, truncation=True, return_tensors='pt').to(self.device)
                 
                 # Generate HP Embedding and concatenate with input IDs
-                #input_embeddings = self.model.shared(inputs['input_ids'])  # Convert input IDs to embeddings
-                #hp_input = hp_embeddings.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
-                #concat_hp_incomplete = torch.cat([hp_input, input_embeddings], dim=1)
+                input_embeddings = self.model.shared(inputs['input_ids'])  # Convert input IDs to embeddings
+                hp_input = hp_embeddings.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+                concat_hp_incomplete = torch.cat([hp_input, input_embeddings], dim=1)
                 
                 # Adjust attention mask (ensure all soft prompt tokens are attended)
-                #hp_attention_mask = torch.ones((inputs['attention_mask'].size(0), hp_input.size(1)), device=self.device)
-                #concatenated_hp_question_attention_mask = torch.cat((hp_attention_mask, inputs['attention_mask']), dim=1)
+                hp_attention_mask = torch.ones((inputs['attention_mask'].size(0), hp_input.size(1)), device=self.device)
+                concatenated_hp_question_attention_mask = torch.cat((hp_attention_mask, inputs['attention_mask']), dim=1)
                 
                 # Second pass through the model with HP and labels
-                #complete_path_outputs = self.model(inputs_embeds=concat_hp_incomplete, attention_mask=concatenated_hp_question_attention_mask, labels=labels)
+                complete_path_outputs = self.model(inputs_embeds=concat_hp_incomplete, attention_mask=concatenated_hp_question_attention_mask, labels=labels)
                 
                 loss_parsing_step = incomplete_paths_outputs.loss
-                #loss_hopping_step = complete_path_outputs.loss
+                loss_hopping_step = complete_path_outputs.loss
                 
-                #total_loss_hopping_step += loss_hopping_step.item()
+                total_loss_hopping_step += loss_hopping_step.item()
                 total_loss_parsing_step += loss_parsing_step.item()
                 
-                #predictions_hopping_step = torch.argmax(complete_path_outputs.logits, dim=-1)
-                #decoded_predicted_complete_sequence = [self.tokenizer.decode(pred, skip_special_tokens=True) for pred in predictions_hopping_step]
+                predictions_hopping_step = torch.argmax(complete_path_outputs.logits, dim=-1)
+                decoded_predicted_complete_sequence = [self.tokenizer.decode(pred, skip_special_tokens=True) for pred in predictions_hopping_step]
     
                 _f1_score_incomplete = sum([f1_score(pred, truth)[0] for pred, truth, in zip(decoded_predicted_incomplete_sequence, incomplete_sequence)])
-                #_f1_score_complete = sum([f1_score(pred, truth)[0] for pred, truth, in zip(decoded_predicted_complete_sequence, complete_sequence)])
+                _f1_score_complete = sum([f1_score(pred, truth)[0] for pred, truth, in zip(decoded_predicted_complete_sequence, complete_sequence)])
                 em_score_incomplete = sum([1 if exact_match_score(pred, truth) else 0 for pred, truth in zip(decoded_predicted_incomplete_sequence, incomplete_sequence)])
-                #em_score_complete = sum([1 if exact_match_score(pred, truth) else 0 for pred, truth in zip(decoded_predicted_complete_sequence, complete_sequence)])
+                em_score_complete = sum([1 if exact_match_score(pred, truth) else 0 for pred, truth in zip(decoded_predicted_complete_sequence, complete_sequence)])
                 
                 total_em_parsing_step += em_score_incomplete
-                #total_em_hopping_step += em_score_complete
+                total_em_hopping_step += em_score_complete
                 total_f1_parsing_step += _f1_score_incomplete
-                #total_f1_hopping_step += _f1_score_complete
+                total_f1_hopping_step += _f1_score_complete
                 progress_bar.set_description(f"Epoch {epoch} - Validation - Parse Then Hop Training - Parsing Loss: {loss_parsing_step.item():.4f}")
                 if batch_idx <= 5: 
                     self.writer.add_text(f'Validation/Parsing_Prediction_vs_Label_{epoch}', 
                                     f'Prediction: {decoded_predicted_incomplete_sequence[0]}\nLabel: {incomplete_sequence[0]}', epoch)
-                   # self.writer.add_text(f'Validation/Hopping_Prediction_vs_Label_{epoch}', 
-                    #                f'Prediction: {decoded_predicted_complete_sequence[0]}\nLabel: {complete_sequence[0]}', epoch)
+                    self.writer.add_text(f'Validation/Hopping_Prediction_vs_Label_{epoch}', 
+                                    f'Prediction: {decoded_predicted_complete_sequence[0]}\nLabel: {complete_sequence[0]}', epoch)
                 
                 #progress_bar.set_description(f"Epoch {epoch} - Validation - Random Walk Training - Loss: {loss.item():.4f}")
             avg_loss_parsing = total_loss_parsing_step / len(self.val_dataloader)
-            #avg_loss_hopping = total_loss_hopping_step / len(self.val_dataloader)
+            avg_loss_hopping = total_loss_hopping_step / len(self.val_dataloader)
             avg_em_perc_parsing = total_em_parsing_step / len(self.val_dataloader.dataset)
-            #avg_em_perc_hopping = total_em_hopping_step / len(self.val_dataloader.dataset)
+            avg_em_perc_hopping = total_em_hopping_step / len(self.val_dataloader.dataset)
             avg_f1_perc_parsing = total_f1_parsing_step / len(self.val_dataloader.dataset)
-            #avg_f1_perc_hopping = total_f1_hopping_step / len(self.val_dataloader.dataset)
+            avg_f1_perc_hopping = total_f1_hopping_step / len(self.val_dataloader.dataset)
             self.log_tensorboard(avg_loss_parsing, epoch, 'Validation/Parsing', 'Parse_Then_Hop')
-            #self.log_tensorboard(avg_loss_hopping, epoch, 'Validation/Hopping', 'Parse_Then_Hop')
+            self.log_tensorboard(avg_loss_hopping, epoch, 'Validation/Hopping', 'Parse_Then_Hop')
             self.log_tensorboard(avg_em_perc_parsing, epoch, 'Validation/Parsing', 'Parse_Then_Hop', eval_metric='em')
-            #self.log_tensorboard(avg_em_perc_hopping, epoch, 'Validation/Hopping', 'Parse_Then_Hop', eval_metric='em')
+            self.log_tensorboard(avg_em_perc_hopping, epoch, 'Validation/Hopping', 'Parse_Then_Hop', eval_metric='em')
             self.log_tensorboard(avg_f1_perc_parsing, epoch, 'Validation/Parsing', 'Parse_Then_Hop', eval_metric='f1')
-            #self.log_tensorboard(avg_f1_perc_hopping, epoch, 'Validation/Hopping', 'Parse_Then_Hop', eval_metric='f1')
-            print(f"Epoch {epoch} - Validation - Parsing: AvgLoss: {avg_loss_parsing:.4f} | AvgEM: {avg_em_perc_parsing:.4f} | AvgF1: {avg_f1_perc_parsing:.4f} ")
-                  #|||| Hopping: AvgLoss: {avg_loss_hopping:.4f} | AvgEM: {avg_em_perc_hopping:.4f} | AvgF1: {avg_f1_perc_hopping:.4f}")
+            self.log_tensorboard(avg_f1_perc_hopping, epoch, 'Validation/Hopping', 'Parse_Then_Hop', eval_metric='f1')
+            print(f"Epoch {epoch} - Validation - Parsing: AvgLoss: {avg_loss_parsing:.4f} | AvgEM: {avg_em_perc_parsing:.4f} | AvgF1: {avg_f1_perc_parsing:.4f} |||| Hopping: AvgLoss: {avg_loss_hopping:.4f} | AvgEM: {avg_em_perc_hopping:.4f} | AvgF1: {avg_f1_perc_hopping:.4f}")
         soft_prompt_path = f"{self.model_dir}/parsing_soft_prompt_epoch_{epoch}_val_loss_{avg_loss_parsing:.4f}.pth"
         
         
