@@ -391,7 +391,7 @@ class Trainer:
             avg_loss = total_loss / len(self.train_dataloader)
             print(f"Epoch {epoch}, Loss: {avg_loss:.4f}")
             if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
-                if self.evaluate_single_hop(epoch=epoch, optimizer=optimizer):
+                if self.evaluate_random_walk(epoch=epoch, optimizer=optimizer):
                     break #Early Stopping
             
     def evaluate_random_walk(self,
@@ -426,17 +426,9 @@ class Trainer:
                 
                 predictions = torch.argmax(outputs.logits, dim=-1)
                 decoded_predictions = [self.tokenizer.decode(pred, skip_special_tokens=True) for pred in predictions]
-                #print(f'Prediction: {decoded_predictions}')
-                #print(f'Labels: {label}')
                 _f1_score = sum([f1_score(pred, truth)[0] for pred, truth, in zip(decoded_predictions, complete_sequence)])
                 em_score = sum([1 if exact_match_score(pred, truth) else 0 for pred, truth in zip(decoded_predictions, complete_sequence)])
                 
-                #print(f'Shapes:')
-                #print(f'Prediction Shape: {predictions.shape}')
-                #print(f'Labels Shape: {labels.shape}')
-                
-                #print(f'Prediction: {predictions}')
-                #print(f'Labels: {labels}')
                 
                 total_em += em_score
                 total_f1 += _f1_score
