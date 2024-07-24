@@ -52,7 +52,7 @@ class Config:
                              load_optimizer=False
                              )
             self.prompt_length = 100
-            self.hopping_prompt_checkpoint_path = 'checkpoints/random_walk_training/large_adapt_bsize64_c4_part1/hopping_soft_prompt_epoch_25_val_loss_0.2693.pth'
+            self.hopping_prompt_checkpoint_path = None
 
     class ParseThenHopTraining(BaseTrainingConfig):
         def __init__(self):
