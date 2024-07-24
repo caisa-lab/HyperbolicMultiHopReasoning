@@ -391,7 +391,7 @@ class Trainer:
             avg_loss = total_loss / len(self.train_dataloader)
             print(f"Epoch {epoch}, Loss: {avg_loss:.4f}")
             if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
-                if self.evaluate_random_walk(epoch=epoch, optimizer=optimizer):
+                if self.evaluate_random_walk(epoch=epoch, optimizer=optimizer, hopping_soft_prompt=hopping_soft_prompt):
                     break #Early Stopping
             
     def evaluate_random_walk(self,
