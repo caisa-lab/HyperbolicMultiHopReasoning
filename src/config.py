@@ -1,6 +1,4 @@
-class Config:
-    
-    class BaseTrainingConfig:
+class BaseTrainingConfig:
         def __init__(self, optimizer = 'AdaFactor',
                      learning_rate = 0.001,
                      optimizer_param = 1e-5,
@@ -23,7 +21,8 @@ class Config:
             self.tboard_checkpoint_path = tboard_checkpoint_path
             self.model_checkpoint_path = model_checkpoint_path
             self.load_optimizer = load_optimizer
-    
+            
+class Config:  
     class SingleHopTraining(BaseTrainingConfig):
         def __init__(self):
             super().__init__(log_dir='tboard_logs/knowledge_integration',
