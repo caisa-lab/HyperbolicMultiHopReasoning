@@ -17,10 +17,11 @@ Contains the output and error files from the jobs.
 ### [src](./src)
 
 Contains the actual code implementations which consist of:
-1. [datasets](./src/datasets) has all necessary datasets that should be created like KnowledgeIntegrationDataset, RandomWalkDataset, OneHopWikiDataset, etc.
-2. [train](./src/train.py) has all training methods like KnowledgeIntegration, RandomWalkTraining, ParseThenHop.
+1. [datasets](./src/datasets/) has all necessary datasets that should be created like KnowledgeIntegrationDataset, RandomWalkDataset, OneHopWikiDataset, etc.
+2. [train](./src/train/) consists of 2 training methods. ModelTraining (for pretraining) and SoftPromptTraining for training the parsing and hopping soft prompt. 
 3. [eval](./src/eval.py) has evaluation functions which capture EM and F1 scores.
 4. [config](./src/config.py) manages hyperparameters
+5. [models](./src/models/) consists of the soft_prompt_model and in future the hyperbolic_soft_prompt_model
 
 ### [tboard_logs](./tboard_logs)
 
