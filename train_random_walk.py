@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
     print(f'Random Walk Training..')
     print(f'with model: {config.t5_model.model_name}')
-    print(f'Model Config: {model.config}')
+    print(f'Model Config: {model.knit5.config}')
     print(f'for: {config.random_walk_training.epochs} epochs')
     print(f'with batch size: {config.t5_model.batch_size}')
     print(f'with optimizer: {config.random_walk_training.optimizer}')
