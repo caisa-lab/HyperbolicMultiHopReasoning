@@ -3,6 +3,7 @@ import random
 from tqdm import tqdm
 import numpy as np
 import sys
+from config import Config
 class C4Dataset(Dataset):
     """
     Gets the list of texts. 
@@ -10,6 +11,9 @@ class C4Dataset(Dataset):
     def __init__(self, list_of_texts, tokenizer, corruption_rate=0.15, average_length_of_spans=3, objective = 'span_corruption'):
         if objective not in ['span_corruption', 'prefix_language_modeling']:
             raise ValueError(f'Unknown objective {objective}. Supported are [span_corruption, prefix_language_modeling]')
+        
+        
+        self.config = Config()
         
         print(f'C4 Dataset with objective: {objective}')
         self.tokenizer = tokenizer
@@ -22,15 +26,29 @@ class C4Dataset(Dataset):
         
         
     def _cleanup_dataset(self, dataset):
-        cleaned_dataset = []
-        count_removed = 0
-        for text in tqdm(dataset, desc=f'Cleanup Dataset: Remove texts with < {self.average_length_of_spans} corrupted tokens', file=sys.stdout):
-        
-            if len(text.split()) * self.corruption_rate < self.average_length_of_spans:
-                count_removed += 1
-                continue
-            cleaned_dataset.append(text)
+               
+        if self.objective == 'span_corruption':
+            cleaned_dataset = []
+            for text in tqdm(cleaned_dataset, desc=f'Cleanup Dataset: Remove texts with < {self.average_length_of_spans} corrupted tokens', file=sys.stdout):
+            
+                if len(text.split()) * self.corruption_rate < self.average_length_of_spans:
+                    count_removed += 1
+                    continue
+                cleaned_dataset.append(text)
+                
+        else:
+            cleaned_dataset = []
+            count_removed = 0
+            for text in tqdm(dataset, desc=f"Cleanup Dataset: Remove texts with > {self.config.t5_model.tokenizer_max_length} tokens", file=sys.stdout):
+                if len(text.split()) > self.config.t5_model.tokenizer_max_length:
+                    count_removed += 1
+                    continue
+                cleaned_dataset.append(text)
         print(f'Cleaned {count_removed} Datapoints remaining {len(cleaned_dataset)} Datapoints')
+        
+        
+        
+        
         return cleaned_dataset
             
     def _span_corruption(self, text):

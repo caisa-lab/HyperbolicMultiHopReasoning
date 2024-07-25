@@ -1,6 +1,6 @@
 from src.util import load_dataset, get_top_token_embeddings
 import pandas as pd
-from src.train import Trainer
+from src.train.soft_prompt_trainer import SoftPromptTrainer
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from src.datasets import RandomWalkDataset
 import torch
@@ -8,6 +8,7 @@ from src.config import Config
 from torch.utils.data import DataLoader
 from src.knowledge_graph import create_knowledge_graph
 import torch.nn as nn
+from src.models import * 
 
 
 if __name__ == '__main__':    
@@ -40,39 +41,26 @@ if __name__ == '__main__':
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    knit5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    
+    model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt')
 
 
     random_walk_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_model.batch_size, shuffle=True)
     random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
 
 
-    trainer = Trainer(model,
+    trainer = SoftPromptTrainer(model,
                       tokenizer,
-                      [random_walk_dataloader_train],
+                      random_walk_dataloader_train,
                       random_walk_dataloader_dev,
                       config,
                       device=device,
                       method='random_walk_training',
-                      checkpoint_path=config.random_walk_training.model_checkpoint_path,
+                      checkpoint_path=config.random_walk_training.hopping_prompt_checkpoint_path,
                       tboard_checkpoint_path=config.random_walk_training.tboard_checkpoint_path,
-                      load_optimizer=config.random_walk_training.load_optimizer
                       )
 
-    #HP Soft Prompt will be tuned
-    hp_length = config.random_walk_training.prompt_length
-  
-    hp_embedding_size = model.config.hidden_size 
-    hp_embeddings = nn.Embedding(hp_length, hp_embedding_size)
-    
-    #dont use random use top 100 most common tokens of tokenizer.getvocab
-    top_100_token_embeddings = get_top_token_embeddings(model, tokenizer, 100)
-    hp_embeddings.weight.data[:top_100_token_embeddings.size(0), :] = top_100_token_embeddings
-    
-    print(hp_embeddings.num_embeddings)
-    print(hp_embeddings.embedding_dim)
-
-    optimizer = trainer.get_optimizer(hp_embeddings.parameters())
 
     print(f'Random Walk Training..')
     print(f'with model: {config.t5_model.model_name}')
@@ -81,4 +69,4 @@ if __name__ == '__main__':
     print(f'with batch size: {config.t5_model.batch_size}')
     print(f'with optimizer: {config.random_walk_training.optimizer}')
 
-    trainer.train_random_walk(hopping_soft_prompt=hp_embeddings, optimizer=optimizer, epochs=config.random_walk_training.epochs)
+    trainer.train(epochs=config.random_walk_training.epochs)
