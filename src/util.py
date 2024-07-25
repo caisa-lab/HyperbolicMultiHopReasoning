@@ -53,7 +53,21 @@ def project_to_hyperbolic(x, c):
     tanh_term = np.tanh(sqrt_c * norm_x)
     scaled_x = x / (sqrt_c * norm_x)
     return tanh_term * scaled_x
-        
+def krackhardt_hierarchy_score(knowledge_graph):
+    """
+    Calculate the Krackhardt hierarchy score for a directed graph.
+    """
+    adj_matrix = nx.to_numpy_array(knowledge_graph, dtype=np.int8)
+    R = np.array(adj_matrix, dtype=np.int8)
+    
+    numerator = np.sum(R * (1-R.T))
+    denominator = np.sum(R)
+    
+    if denominator == 0:
+        return 0.0
+    else:
+        khs = numerator / denominator
+        return khs        
 def print_datapoint(dataset, idx):
     print(f"id: {dataset['_id'][idx]}")
     print(f"type: {dataset['type'][idx]}") # Type of Question: ['bridge_comparison' 'compositional' 'inference' 'comparison'] / 

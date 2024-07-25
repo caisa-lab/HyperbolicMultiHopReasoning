@@ -45,14 +45,14 @@ class SoftPromptModel(nn.Module):
         return pp_embeddings
     
     def forward(self, inputs, labels):
-        pp_input = self.soft_prompt.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+        soft_prompt_input = self.soft_prompt.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
         input_embeddings = self.knit5.shared(inputs['input_ids'])  # Convert input IDs to embeddings
 
-        concatenated_embeddings = torch.cat([pp_input, input_embeddings], dim=1)
+        concatenated_embeddings = torch.cat([soft_prompt_input, input_embeddings], dim=1)
         
         #Adjust attention mask (take all of the soft prompt tokens should be attented)
-        pp_attention_mask = torch.ones((inputs['attention_mask'].size(0), pp_input.size(1)), device=self.device)
-        concatenated_attention_mask = torch.cat((pp_attention_mask, inputs['attention_mask']), dim=1)
+        soft_prompt_attention_mask = torch.ones((inputs['attention_mask'].size(0), soft_prompt_input.size(1)), device=self.device)
+        concatenated_attention_mask = torch.cat((soft_prompt_attention_mask, inputs['attention_mask']), dim=1)
 
         outputs = self.knit5(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, labels=labels)
         return outputs

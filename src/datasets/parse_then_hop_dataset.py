@@ -20,4 +20,4 @@ class ParseThenHopDataset(Dataset):
             if i % 2 != 0:
                 incomplete_path += f" ; {evidence_list[i]}"
             
-        return question, incomplete_path, complete_path
+        return question, incomplete_path

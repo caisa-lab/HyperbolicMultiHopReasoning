@@ -1,1 +1,2 @@
 from .soft_prompt_model import SoftPromptModel
+from .hyperbolic_prompt_learning_model import HyperbolicSoftPromptModel
