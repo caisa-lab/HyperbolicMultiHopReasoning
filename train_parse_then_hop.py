@@ -38,7 +38,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 print("Loading Model...")
 t5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
-model = SoftPromptModel(t5_model, config.parse_then_hop_training.model_checkpoint_path, 'parsing_model', None)
+model = SoftPromptModel(t5_model, config.parse_then_hop_training.model_checkpoint_path, 'parsing_prompt', None)
 
 
 parse_then_hop_dataloader_train = DataLoader(parse_then_hop_train, batch_size=config.t5_model.batch_size, shuffle=True)
