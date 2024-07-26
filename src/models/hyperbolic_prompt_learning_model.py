@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from src.util import project_to_hyperbolic, get_top_token_embeddings
+from src.util import get_top_token_embeddings, expmap0
 from transformers import T5Model
 from src.train import load_model_checkpoint
 from transformers import AutoTokenizer
@@ -11,8 +11,8 @@ class HyperbolicSoftPromptModel(nn.Module):
                  knit5 : T5Model,
                  knit5_checkpoint_path : str,
                  model_name : str,
-                 soft_prompt : nn.Embedding = None,
-                 curvature = 1):
+                 soft_prompt = None,
+                 curvature : float = 1.0):
         super().__init__()
         self.knit5 = knit5
         self.curvature = curvature
@@ -20,7 +20,7 @@ class HyperbolicSoftPromptModel(nn.Module):
         self.config = Config()
         self.knit5 = load_model_checkpoint(self.knit5, knit5_checkpoint_path)
         
-
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if soft_prompt is None:
             self.soft_prompt = self.init_soft_prompt()
         else:
@@ -40,11 +40,6 @@ class HyperbolicSoftPromptModel(nn.Module):
         print(f"Initializing Soft Prompt with top 100 tokens from pretraining corpus")
         return pp_embeddings   
         
-    def exp_map(self, x):
-        curvature_tensor = torch.tensor(self.curvature, device=x.device)
-        norm = torch.norm(x, dim=-1, keepdim=True)
-        return torch.tanh(norm * torch.sqrt(curvature_tensor)) * x / (norm * torch.sqrt(curvature_tensor))
-
     
     
     def forward(self, inputs, labels):
@@ -53,9 +48,9 @@ class HyperbolicSoftPromptModel(nn.Module):
         
         
         #Map input embeddings to hyperbolic space
-        hyperbolic_input_embeddings = self.exp_map(input_embeddings)
+        hyperbolic_input_embeddings = expmap0(input_embeddings, self.curvature)
         
-        hyperbolic_soft_prompt_embeddings = self.exp_map(soft_prompt_input)
+        hyperbolic_soft_prompt_embeddings = expmap0(soft_prompt_input, self.curvature)
         
 
         concatenated_embeddings = torch.cat([hyperbolic_soft_prompt_embeddings, hyperbolic_input_embeddings], dim=1)
@@ -65,6 +60,24 @@ class HyperbolicSoftPromptModel(nn.Module):
         concatenated_attention_mask = torch.cat((soft_prompt_attention_mask, inputs['attention_mask']), dim=1)
 
         outputs = self.knit5(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, labels=labels)
+        return outputs
+    
+    def generate(self, inputs, max_length=50, num_beams = 5, early_stopping=True):
+        soft_prompt_input = self.soft_prompt.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+        input_embeddings = self.knit5.shared(inputs['input_ids'])  # Convert input IDs to embeddings
+
+        hyperbolic_input_embeddings = expmap0(input_embeddings, self.curvature)
+        
+        hyperbolic_soft_prompt_embeddings = expmap0(soft_prompt_input, self.curvature)
+        
+
+        concatenated_embeddings = torch.cat([hyperbolic_soft_prompt_embeddings, hyperbolic_input_embeddings], dim=1)
+        
+        #Adjust attention mask (take all of the soft prompt tokens should be attented)
+        pp_attention_mask = torch.ones((inputs['attention_mask'].size(0), soft_prompt_input.size(1)), device=self.device)
+        concatenated_attention_mask = torch.cat((pp_attention_mask, inputs['attention_mask']), dim=1)
+
+        outputs = self.knit5.generate(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, max_length=max_length, num_beams=num_beams, early_stopping=early_stopping)
         return outputs
     
     

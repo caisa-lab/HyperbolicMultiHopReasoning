@@ -21,7 +21,7 @@ in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/23
 """
 class ModelTrainer:
     def __init__(self,
-                 model : nn.Module,
+                 model : Union[nn.Module, HyperbolicT5Model],
                  tokenizer : AutoTokenizer,
                  list_train_dataloader: list,
                  val_dataloader : DataLoader,
@@ -85,10 +85,7 @@ class ModelTrainer:
     def train(self,
             epochs : int):
         
-        """Trains the Random Walk Part. Random Walk takes in a sequence "e1 ; r1 ; r2" and should predict "e1 ; r1 ; e2 ; r2 ; e3"
-        In this part the Soft Prompt HP will be Finetuned and the Model will be frozen.
-        
-        For the Dataset we will use the RandomWalk Dataset which contains gives as a complete and an incomplete path
+        """Trains Knowledge Integration part. Given 'e1 ; r1' predict 'e2'
         """
         
         if self.start_epoch != 0:
@@ -137,7 +134,10 @@ class ModelTrainer:
                 labels = tokenized_labels['input_ids']
                 
                 self.optimizer.zero_grad()
-                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+                if batch_idx % 2 == 0:
+                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels)
+                else:
+                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels, hyperbolic = False)
                 loss = outputs.loss   
 
                 
@@ -155,7 +155,6 @@ class ModelTrainer:
                     log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx, 'Training/SingleHop', eval_metric='loss')
                 
                 progress_bar.set_description(f"Epoch {epoch} - Training - {self.method} - Loss: {loss.item():.4f}")
-                
                 
                 
                 vram_allocated = torch.cuda.memory_allocated(self.device) / (1024 ** 2)  # Convert to MB
@@ -184,11 +183,18 @@ class ModelTrainer:
                 input_str, label = batch
                 
                 
-                inputs = self.tokenizer(input_str, padding=True, truncation=True, return_tensors = 'pt').to(self.device)
-                labels = self.tokenizer(label, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
+                tokenized_inputs = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt').to(self.device)
+                tokenized_labels = self.tokenizer(label, padding=True, truncation=True, return_tensors='pt').to(self.device)
+                input_ids = tokenized_inputs['input_ids']
+                attention_mask = tokenized_inputs['attention_mask']
+                labels = tokenized_labels['input_ids']
                 
-                
-                outputs = self.model(input_ids=inputs['input_ids'], attention_mask=inputs['attention_mask'], labels=labels)
+                if batch_idx % 2 == 0:
+                    print("With hyperbolic")
+                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels)
+                else:
+                    print("Without hyperbolic")
+                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels, hyperbolic = False)
                 loss = outputs.loss
                 loss.backward()         
                 

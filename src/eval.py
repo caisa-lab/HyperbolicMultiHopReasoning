@@ -95,7 +95,7 @@ def evaluate_one_hop_wiki(model : nn.Module,
         avg_f1_perc = total_f1 / len(test_dataloader.dataset)
     print(f"Test - AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
 
-from models import *
+from models import SoftPromptModel, HyperbolicSoftPromptModel
 
 def evaluate_random_walk_training(model : SoftPromptModel,
                                   tokenizer,

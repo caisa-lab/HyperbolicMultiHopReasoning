@@ -1,10 +1,7 @@
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import networkx as nx
 import torch
-from torch.optim import Adam
-import random
 import pandas as pd
-import matplotlib.pyplot as plt
 import sys
 import os
 from tqdm import tqdm
@@ -13,6 +10,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Add the parent directory to the system path
 sys.path.append(current_dir)
+
 
 from knowledge_graph import create_knowledge_graph
 import numpy as np
@@ -47,12 +45,6 @@ def check_for_wrong_2_hops(df : pd.DataFrame):
     rows_with_wrong_evidences = df[df['wrong_evidences']]
     
     return rows_with_wrong_evidences
-def project_to_hyperbolic(x, c):
-    norm_x = np.linalg.norm(x)
-    sqrt_c = np.sqrt(c)
-    tanh_term = np.tanh(sqrt_c * norm_x)
-    scaled_x = x / (sqrt_c * norm_x)
-    return tanh_term * scaled_x
 def krackhardt_hierarchy_score(knowledge_graph):
     """
     Calculate the Krackhardt hierarchy score for a directed graph.
@@ -135,3 +127,33 @@ def get_top_token_embeddings(model : AutoModelForSeq2SeqLM, tokenizer : AutoToke
     
     top_embeddings = token_embeddings[top_tokens_ids]
     return top_embeddings   
+
+
+##---------------------hyperbolic operations ----------------------- CODE TAKEN FROM https://github.com/HazyResearch/KGEmb/blob/master/utils/hyperbolic.py
+import torch
+import torch.nn.functional as F
+
+MIN_NORM = 1e-15
+BALL_EPS = {torch.float32: 1e-5, torch.float64: 1e-7}
+
+def expmap0(u : torch.Tensor, c : float):
+    """Exponential map taken at the origin of the Poincare ball with curvature c."""
+    sqrt_c = c ** 0.5
+    u_norm = u.norm(dim=-1, p=2, keepdim=True).clamp_min(MIN_NORM)
+    gamma_1 = torch.tanh(sqrt_c * u_norm) * u / (sqrt_c * u_norm)
+    return project(gamma_1, c)
+
+def logmap0(y : torch.Tensor, c : float):
+    """Logarithmic map taken at the origin of the Poincare ball with curvature c."""
+    sqrt_c = c ** 0.5
+    y_norm = y.norm(dim=-1, p=2, keepdim=True).clamp_min(MIN_NORM)
+    return y / y_norm / sqrt_c * torch.atanh(sqrt_c * y_norm)
+
+def project(x : torch.Tensor, c : float):
+    """Project points to Poincare ball with curvature c."""
+    norm = x.norm(dim=-1, p=2, keepdim=True).clamp_min(MIN_NORM)
+    eps = BALL_EPS[x.dtype]
+    maxnorm = (1 - eps) / (c ** 0.5)
+    cond = norm > maxnorm
+    projected = x / norm * maxnorm
+    return torch.where(cond, projected, x)

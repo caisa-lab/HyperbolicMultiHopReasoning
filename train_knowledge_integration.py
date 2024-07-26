@@ -7,8 +7,9 @@ from src.config import Config
 from torch.utils.data import DataLoader
 from train import *
 import argparse
+from src.models import HyperbolicT5Model
 
-def _knowledge_integration_with_c4():
+def _knowledge_integration_with_c4(hyperbolic):
     train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=True)
 
 
@@ -30,11 +31,17 @@ def _knowledge_integration_with_c4():
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(config.t5_model.model_name)
     print(f"Loading Model {config.t5_model.model_name}...")
-    model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
+    t5_model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
     #Adjust Dropout
-    model.config.dropout_rate = 0.1
-    model.config.hidden_dropout_prob = 0.1
-    model.config.attention_probs_dropout_prob = 0.1
+    t5_model.config.dropout_rate = 0.1
+    t5_model.config.hidden_dropout_prob = 0.1
+    t5_model.config.attention_probs_dropout_prob = 0.1
+    if hyperbolic:
+        print("Train with Hyperbolic model.")
+        model = HyperbolicT5Model(t5_model, 'hyperbolic_knit5')
+    else:
+        model = t5_model
+
 
     base_path = 'c4/en/c4-train.{:05d}-of-01024.json'
     c4_dataset = load_c4_dataset(base_path, number_of_files=15)
@@ -71,7 +78,7 @@ def _knowledge_integration_with_c4():
     trainer.train(epochs=config.single_hop_training.epochs)
     
     
-def _knowledge_integration_without_c4():
+def _knowledge_integration_without_c4(hyperbolic):
     train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=True)
 
 
@@ -92,11 +99,16 @@ def _knowledge_integration_without_c4():
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(config.t5_model.batch_size)
     print(f"Loading Model {config.t5_model.batch_size}...")
-    model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.batch_size)
+    t5_model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
     #Adjust Dropout
-    model.config.dropout_rate = 0.1
-    model.config.hidden_dropout_prob = 0.1
-    model.config.attention_probs_dropout_prob = 0.1
+    t5_model.config.dropout_rate = 0.1
+    t5_model.config.hidden_dropout_prob = 0.1
+    t5_model.config.attention_probs_dropout_prob = 0.1
+    if hyperbolic:
+        print("Train with Hyperbolic Model.")
+        model = HyperbolicT5Model(t5_model, 'hyperbolic_knit5')
+    else:
+        model = t5_model
 
     single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_model.batch_size, shuffle=True)
     single_hop_dataloader_dev = DataLoader(ki_train,  batch_size=config.t5_model.batch_size, shuffle=False)
@@ -128,9 +140,10 @@ def _knowledge_integration_without_c4():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Knowledge Integration Training')
     parser.add_argument('--c4', action='store_true', help='Include C4 dataset in training')
+    parser.add_argument('--hyperbolic', action='store_true', help='Train with hyperbolic representation in single hop dataset')
     args = parser.parse_args()
     
     if args.c4:
-        _knowledge_integration_with_c4()
+        _knowledge_integration_with_c4(hyperbolic = args.hyperbolic)
     else:
-        _knowledge_integration_without_c4()
+        _knowledge_integration_without_c4(hyperbolic = args.hyperbolic)
