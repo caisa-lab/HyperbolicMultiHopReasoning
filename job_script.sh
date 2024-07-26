@@ -6,8 +6,8 @@
 
 #SBATCH --ntasks=1
 #SBATCH --job-name=random_walk_training_adapt_bsize64_c4
-#SBATCH --output=outputs/output_random_walk_training_adapt_bsize64_c4_part2_%j.txt
-#SBATCH --error=outputs/error_random_walk_training_adapt_bsize64_c4_part2_%j.txt
+#SBATCH --output=outputs/output_parse_training_adapt_bsize64_c4_part1_%j.txt
+#SBATCH --error=outputs/error_parse_training_adapt_bsize64_c4_part1_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
@@ -25,5 +25,5 @@ pip install torch torchvision torchaudio --extra-index-url https://download.pyto
 pip install sentencepiece --quiet
 
 echo "Libraries Installed"
-echo "Starting train_random_walk.py"
-python -u train_random_walk.py
+echo "Starting train_parse_then_hop.py"
+python -u train_parse_then_hop.py
