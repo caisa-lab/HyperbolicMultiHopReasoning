@@ -50,9 +50,9 @@ def _knowledge_integration_with_c4(hyperbolic):
     C4_train = C4Dataset(c4_dataset ,tokenizer=tokenizer, objective=objective)
         
 
-    c4_dataloader_train = DataLoader(C4_train, batch_size = 2, shuffle=True)
-    single_hop_dataloader_train = DataLoader(ki_train, batch_size=2, shuffle=True)
-    single_hop_dataloader_dev = DataLoader(ki_train,  batch_size=2, shuffle=False)
+    c4_dataloader_train = DataLoader(C4_train, batch_size=config.t5_model.batch_size, shuffle=True)
+    single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_model.batch_size, shuffle=True)
+    single_hop_dataloader_dev = DataLoader(ki_train,  batch_size=config.t5_model.batch_size, shuffle=False)
 
     trainer = ModelTrainer(model,
                         tokenizer,
@@ -138,8 +138,6 @@ def _knowledge_integration_without_c4(hyperbolic):
 
     
 if __name__ == '__main__':
-    _knowledge_integration_with_c4(hyperbolic=True)
-    
     parser = argparse.ArgumentParser(description='Knowledge Integration Training')
     parser.add_argument('--c4', action='store_true', help='Include C4 dataset in training')
     parser.add_argument('--hyperbolic', action='store_true', help='Train with hyperbolic representation in single hop dataset')
