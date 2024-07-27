@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
-from src.util import get_top_token_embeddings, expmap0
+from utils.util import expmap0
 from transformers import T5Model
-from src.train import load_model_checkpoint
 from transformers import AutoTokenizer
 from src.config import Config
 

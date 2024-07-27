@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from util import *
+from utils.util import *
 from config import Config
 
 class SoftPromptModel(nn.Module):

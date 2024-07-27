@@ -1,11 +1,11 @@
-from src.util import load_dataset, load_c4_dataset
+from src.utils.util import load_dataset, load_c4_dataset
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from src.datasets import KnowledgeIntegrationDataset, C4Dataset
 import torch
 from src.config import Config
 from torch.utils.data import DataLoader
-from train import *
+from src.train import *
 import argparse
 from src.models import HyperbolicT5Model
 
@@ -50,9 +50,9 @@ def _knowledge_integration_with_c4(hyperbolic):
     C4_train = C4Dataset(c4_dataset ,tokenizer=tokenizer, objective=objective)
         
 
-    c4_dataloader_train = DataLoader(C4_train, batch_size = config.t5_model.batch_size, shuffle=True)
-    single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_model.batch_size, shuffle=True)
-    single_hop_dataloader_dev = DataLoader(ki_train,  batch_size=config.t5_model.batch_size, shuffle=False)
+    c4_dataloader_train = DataLoader(C4_train, batch_size = 2, shuffle=True)
+    single_hop_dataloader_train = DataLoader(ki_train, batch_size=2, shuffle=True)
+    single_hop_dataloader_dev = DataLoader(ki_train,  batch_size=2, shuffle=False)
 
     trainer = ModelTrainer(model,
                         tokenizer,
@@ -138,6 +138,8 @@ def _knowledge_integration_without_c4(hyperbolic):
 
     
 if __name__ == '__main__':
+    _knowledge_integration_with_c4(hyperbolic=True)
+    
     parser = argparse.ArgumentParser(description='Knowledge Integration Training')
     parser.add_argument('--c4', action='store_true', help='Include C4 dataset in training')
     parser.add_argument('--hyperbolic', action='store_true', help='Train with hyperbolic representation in single hop dataset')

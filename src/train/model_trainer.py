@@ -12,8 +12,8 @@ from transformers import Adafactor
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from config import Config
 from eval import exact_match_score, f1_score
-from trainer_utils import *
-from models import *
+from utils.trainer_utils import *
+from models import HyperbolicT5Model
 from typing import Union
 
 """Triggering Multi-Hop Reasoning for Question Answering

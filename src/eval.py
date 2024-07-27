@@ -54,7 +54,7 @@ def exact_match_score(prediction, ground_truth):
 
 #-------------------------------------------------------------------------------------------------
 import torch.nn as nn
-from train.trainer_utils import load_model_checkpoint, load_soft_prompt
+from utils.trainer_utils import load_model_checkpoint, load_soft_prompt
 def evaluate_one_hop_wiki(model : nn.Module,
                           tokenizer,
                           test_dataloader : DataLoader,
@@ -95,7 +95,7 @@ def evaluate_one_hop_wiki(model : nn.Module,
         avg_f1_perc = total_f1 / len(test_dataloader.dataset)
     print(f"Test - AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
 
-from models import SoftPromptModel, HyperbolicSoftPromptModel
+from models import SoftPromptModel
 
 def evaluate_random_walk_training(model : SoftPromptModel,
                                   tokenizer,
