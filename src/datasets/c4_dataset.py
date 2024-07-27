@@ -3,7 +3,7 @@ import random
 from tqdm import tqdm
 import numpy as np
 import sys
-from config import Config
+from src.config import Config
 class C4Dataset(Dataset):
     """
     Gets the list of texts. 
