@@ -14,13 +14,14 @@ from config import Config
 from eval import exact_match_score, f1_score
 from utils.trainer_utils import *
 from models import *
+from typing import Union
 
 """Triggering Multi-Hop Reasoning for Question Answering
 in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/2306.04009
 """
 class SoftPromptTrainer:
     def __init__(self,
-                 model : SoftPromptModel,
+                 model : Union[SoftPromptModel, HyperbolicSoftPromptModel],
                  tokenizer : AutoTokenizer,
                  train_dataloader: DataLoader,
                  val_dataloader : DataLoader,
@@ -65,8 +66,11 @@ class SoftPromptTrainer:
             
             
         self.optimizer = get_optimizer(self.model.soft_prompt.parameters(), self.training_config)
-        for param in self.model.knit5.parameters():
-            param.requires_grad = False
+        if isinstance(self.model, (HyperbolicSoftPromptModel, SoftPromptModel)):
+            for param in self.model.parameters():
+                param.requires_grad = False
+        else:
+            raise ValueError(f'model is not of type [HyperbolicSoftPromptModel, SoftPromptModel]')
         for param in self.model.soft_prompt.parameters():
             param.requires_grad = True
         
