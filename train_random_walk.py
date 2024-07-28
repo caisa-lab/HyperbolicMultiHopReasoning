@@ -68,7 +68,10 @@ def _train_random_walk(hyperbolic : bool):
 
     print(f'Random Walk Training..')
     print(f'with model: {config.t5_model.model_name}')
-    print(f'Model Config: {model.knit5.config}')
+    if hyperbolic:
+        print(f'Model Config: {model.hyperbolic_knit5.t5.config}')
+    else:
+        print(f'Model Config: {model.knit5.config}')
     print(f'for: {config.random_walk_training.epochs} epochs')
     print(f'with batch size: {config.t5_model.batch_size}')
     print(f'with optimizer: {config.random_walk_training.optimizer}')
