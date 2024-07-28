@@ -149,10 +149,10 @@ class ModelTrainer:
                 
                 if batch_idx % 2 == 0:
                     total_single_hop_loss += loss.item()
-                    log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx, 'Training/C4', eval_metric='loss')
+                    log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx, 'Training/SingleHop', eval_metric='loss')
                 else:
                     total_c4_loss += loss.item() 
-                    log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx, 'Training/SingleHop', eval_metric='loss')
+                    log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx, 'Training/C4', eval_metric='loss')
                 
                 progress_bar.set_description(f"Epoch {epoch} - Training - {self.method} - Loss: {loss.item():.4f}")
                 
