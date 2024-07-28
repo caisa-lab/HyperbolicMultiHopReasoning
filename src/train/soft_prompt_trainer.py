@@ -66,7 +66,7 @@ class SoftPromptTrainer:
             
             
         self.optimizer = get_optimizer(self.model.soft_prompt.parameters(), self.training_config)
-        if isinstance(self.model, (HyperbolicSoftPromptModel, SoftPromptModel)):
+        if isinstance(self.model, (HyperbolicT5Model, AutoModelForSeq2SeqLM)):
             for param in self.model.parameters():
                 param.requires_grad = False
         else:
