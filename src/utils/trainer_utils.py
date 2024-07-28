@@ -46,10 +46,14 @@ def setup_directories(trainer_config : BaseTrainingConfig):
 
 def load_model_checkpoint(model : nn.Module,
                           checkpoint_path,
-                          device = 'cuda' if torch.cuda.is_available() else 'cpu'
+                          device = 'cuda' if torch.cuda.is_available() else 'cpu',
+                          with_model_state_dict = True
                           ):
     checkpoint = torch.load(checkpoint_path, map_location=device)
-    model.load_state_dict(checkpoint)
+    if with_model_state_dict:
+        model.load_state_dict(checkpoint['model_state_dict'])
+    else:
+        model.load_state_dict(checkpoint)
     print(f"Loaded checkpoint from {checkpoint_path}")
     return model
                     
