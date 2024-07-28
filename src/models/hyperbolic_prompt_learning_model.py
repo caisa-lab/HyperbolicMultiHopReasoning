@@ -18,7 +18,8 @@ class HyperbolicSoftPromptModel(nn.Module):
         self.curvature = curvature
         self.model_name = model_name
         self.config = Config()
-        self.knit5 = load_model_checkpoint(self.knit5, knit5_checkpoint_path)
+        if knit5_checkpoint_path is not None:
+            self.knit5 = load_model_checkpoint(self.knit5, knit5_checkpoint_path)
         
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if soft_prompt is None:
