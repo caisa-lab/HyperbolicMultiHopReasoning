@@ -11,9 +11,9 @@ class HyperbolicSoftPromptModel(nn.Module):
                  hyperbolic_knit5 : HyperbolicT5Model,
                  hyperbolic_knit5_checkpoint_path : str,
                  model_name : str,
-                 soft_prompt = None,
+                 soft_prompt : nn.Embedding = None,
                  curvature : float = 1.0):
-        super().__init__()
+        super(HyperbolicSoftPromptModel, self).__init__()
         self.hyperbolic_knit5 = hyperbolic_knit5
         self.curvature = curvature
         self.model_name = model_name
@@ -22,10 +22,8 @@ class HyperbolicSoftPromptModel(nn.Module):
             self.hyperbolic_knit5 = load_model_checkpoint(self.hyperbolic_knit5, hyperbolic_knit5_checkpoint_path, with_model_state_dict=True)
         
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        if soft_prompt is None:
-            self.soft_prompt = self.init_soft_prompt()
-        else:
-            self.soft_prompt = soft_prompt
+            
+        self.soft_prompt = soft_prompt if soft_prompt else self.init_soft_prompt()
         
     def init_soft_prompt(self):
         tokenizer = AutoTokenizer.from_pretrained(self.config.t5_model.model_name)

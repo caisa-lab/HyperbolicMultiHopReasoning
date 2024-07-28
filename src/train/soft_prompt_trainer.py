@@ -1,19 +1,14 @@
 import torch
-import torch.optim as optim
-import torch.nn as nn
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import os
 import sys
-from datetime import datetime
-from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
-from transformers import Adafactor
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer
 from config import Config
 from eval import exact_match_score, f1_score
 from utils.trainer_utils import *
-from models import *
+from src.models import HyperbolicSoftPromptModel, SoftPromptModel
 from typing import Union
 
 """Triggering Multi-Hop Reasoning for Question Answering
@@ -66,14 +61,20 @@ class SoftPromptTrainer:
             
             
         self.optimizer = get_optimizer(self.model.soft_prompt.parameters(), self.training_config)
-        if isinstance(self.model, (HyperbolicT5Model, AutoModelForSeq2SeqLM)):
-            for param in self.model.parameters():
+        if isinstance(self.model, SoftPromptModel):
+            print('Model is of Type SoftPromptModel')
+            for param in self.model.knit5.parameters():
+                param.requires_grad = False
+        elif isinstance(self.model, HyperbolicSoftPromptModel):
+            print('Model is of Type HyperbolicSoftPromptModel')
+            for param in self.model.hyperbolic_knit5.parameters():
                 param.requires_grad = False
         else:
-            raise ValueError(f'model is not of type [HyperbolicSoftPromptModel, SoftPromptModel]')
+            print("Model class hierarchy:", self.model.__class__.mro())
+            raise ValueError(f'model is not of type [SoftPromptModel, HyperbolicSoftPromptModel]')
         for param in self.model.soft_prompt.parameters():
             param.requires_grad = True
-        
+            
         self.log_dir, self.model_dir = setup_directories(self.training_config)
         if self.tboard_checkpoint_path is not None:
             self.log_dir = tboard_checkpoint_path

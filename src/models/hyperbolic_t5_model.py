@@ -10,7 +10,7 @@ class HyperbolicT5Model(nn.Module):
                  t5 : T5Model,
                  model_name : str,
                  curvature : float = 1.0):
-        super().__init__()
+        super(HyperbolicT5Model, self).__init__()
         self.t5 = t5
         self.curvature = curvature
         self.model_name = model_name

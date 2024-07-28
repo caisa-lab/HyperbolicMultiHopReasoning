@@ -7,7 +7,7 @@ import torch
 from src.config import Config
 from torch.utils.data import DataLoader
 from src.knowledge_graph import create_knowledge_graph
-from src.models import * 
+from src.models import HyperbolicSoftPromptModel, SoftPromptModel, HyperbolicT5Model
 import argparse
 
 def _train_random_walk(hyperbolic : bool):
@@ -45,7 +45,7 @@ def _train_random_walk(hyperbolic : bool):
     if hyperbolic:
         hyperbolic_knit5_model = HyperbolicT5Model(knit5_model, 'hyperbolic_knit5')
         print("Train with hyperbolic Soft Prompt Model.")
-        model = HyperbolicSoftPromptModel(hyperbolic_knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt')
+        model = HyperbolicSoftPromptModel(hyperbolic_knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt')   
     else:
         model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt')
 
@@ -53,6 +53,8 @@ def _train_random_walk(hyperbolic : bool):
     random_walk_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_model.batch_size, shuffle=True)
     random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
 
+    
+    print("Model type before passing to SoftPromptTrainer:", type(model))
 
     trainer = SoftPromptTrainer(model,
                       tokenizer,
@@ -86,4 +88,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
 
-    _train_random_walk(hyperbolic = args.hyperbolic)
+    _train_random_walk(hyperbolic = True)
