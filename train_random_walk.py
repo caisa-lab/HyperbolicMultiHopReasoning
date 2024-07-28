@@ -44,8 +44,9 @@ def _train_random_walk(hyperbolic : bool):
     knit5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     
     if hyperbolic:
+        hyperbolic_knit5_model = HyperbolicT5Model(knit5_model, 'hyperbolic_knit5')
         print("Train with hyperbolic Soft Prompt Model.")
-        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt')
+        model = HyperbolicSoftPromptModel(hyperbolic_knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt')
     else:
         model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt')
 
