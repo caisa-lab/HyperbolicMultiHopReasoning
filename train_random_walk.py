@@ -1,4 +1,4 @@
-from src.util import load_dataset, get_top_token_embeddings
+from src.utils.util import load_dataset, get_top_token_embeddings
 import pandas as pd
 from src.train.soft_prompt_trainer import SoftPromptTrainer
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -9,9 +9,9 @@ from torch.utils.data import DataLoader
 from src.knowledge_graph import create_knowledge_graph
 import torch.nn as nn
 from src.models import * 
+import argparse
 
-
-if __name__ == '__main__':    
+def _train_random_walk(hyperbolic : bool):
     train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
 
     all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
@@ -43,7 +43,11 @@ if __name__ == '__main__':
     print("Loading Model...")
     knit5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     
-    model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt')
+    if hyperbolic:
+        print("Train with hyperbolic Soft Prompt Model.")
+        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt')
+    else:
+        model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt')
 
 
     random_walk_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_model.batch_size, shuffle=True)
@@ -70,3 +74,13 @@ if __name__ == '__main__':
     print(f'with optimizer: {config.random_walk_training.optimizer}')
 
     trainer.train(epochs=config.random_walk_training.epochs)
+
+
+if __name__ == '__main__':    
+    parser = argparse.ArgumentParser(description='Knowledge Integration Training')
+    parser.add_argument('--c4', action='store_true', help='Include C4 dataset in training')
+    parser.add_argument('--hyperbolic', action='store_true', help='Train with hyperbolic representation in single hop dataset')
+    args = parser.parse_args()
+    
+
+    _train_random_walk(hyperbolic = args.hyperbolic)
