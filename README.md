@@ -33,7 +33,7 @@ Loads the C4 dataset. With `--files` you can specify how many files should be do
 
 ### [train_knowledge_integration](./train_knowledge_integration.py)
 
-Training script for the Knowledge Integration part. Hyperparameters and model type can be adjusted in the [config](./src/config).
+Training script for the Knowledge Integration part. You can do `--c4` to train with pretraining objective on the c4 dataset and you can do `--hyperbolic` to train the hyperbolic t5 model. Hyperparameters and model type can be adjusted in the [config](./src/config).
 
 ### [train_finetuning_single_hop](./train_finetuning_single_hop.py)
 
@@ -41,4 +41,4 @@ Finetunes the Knowledge Integrated Model on the One Hop Wiki Dataset. Hyperparam
 
 ### [train_random_walk](./train_random_walk.py)
 
-Training script for the Random Walk part. Hyperparameters and model type can be adjusted in the [config](./src/config).
+Training script for the Random Walk part. You can do `--hyperbolic` to train the HyperbolicSoftPromptModel. Hyperparameters and model type can be adjusted in the [config](./src/config).
