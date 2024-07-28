@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from utils.util import get_top_token_embeddings, expmap0
 from utils.trainer_utils import load_model_checkpoint
-from hyperbolic_t5_model import HyperbolicT5Model
+from .hyperbolic_t5_model import HyperbolicT5Model
 from transformers import AutoTokenizer
 from src.config import Config
 

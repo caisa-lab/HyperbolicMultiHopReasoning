@@ -7,7 +7,6 @@ import torch
 from src.config import Config
 from torch.utils.data import DataLoader
 from src.knowledge_graph import create_knowledge_graph
-import torch.nn as nn
 from src.models import * 
 import argparse
 
