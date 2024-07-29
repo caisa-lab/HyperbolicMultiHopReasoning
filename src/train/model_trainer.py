@@ -145,7 +145,7 @@ class ModelTrainer:
                 loss.backward()
                 self.optimizer.step()
                 
-                len_trainloader = min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))
+                len_trainloader = len(self.single_hop_train_dataloader)
                 
                 if batch_idx % 2 == 0:
                     total_single_hop_loss += loss.item()
