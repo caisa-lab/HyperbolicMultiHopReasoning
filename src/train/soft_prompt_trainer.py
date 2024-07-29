@@ -174,7 +174,7 @@ class SoftPromptTrainer:
             self.log_tensorboard(avg_em_perc, epoch, 'Validation', eval_metric='em')
             self.log_tensorboard(avg_f1_perc, epoch, 'Validation', eval_metric='f1')
             print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
-        soft_prompt_path = f"{self.model_dir}/{self.model.name}_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
+        soft_prompt_path = f"{self.model_dir}/{self.model.model_name}_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         
         
         if avg_loss < self.best_loss:

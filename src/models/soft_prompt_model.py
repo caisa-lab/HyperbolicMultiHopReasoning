@@ -11,7 +11,7 @@ class SoftPromptModel(nn.Module):
                  soft_prompt = None):
         super(SoftPromptModel, self).__init__()
         self.knit5 = knit5
-        self.name = model_name
+        self.model_name = model_name
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if knit5_checkpoint_path is not None:
             self.load_checkpoint(knit5, knit5_checkpoint_path)
