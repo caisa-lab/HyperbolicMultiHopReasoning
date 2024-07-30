@@ -6,8 +6,8 @@
 
 #SBATCH --ntasks=1
 #SBATCH --job-name=random_walk_training_adapt_bsize64_c4_hyperbolic
-#SBATCH --output=outputs/output_random_walk_training_adapt_bsize64_c4_hyperbolic_part1_%j.txt
-#SBATCH --error=outputs/error_random_walk_training_adapt_bsize64_c4_hyperbolic_part1_%j.txt
+#SBATCH --output=outputs/output_random_walk_training_adapt_bsize64_c4_hyperbolic_with_normal_pretrained_part1_%j.txt
+#SBATCH --error=outputs/error_random_walk_training_adapt_bsize64_c4_hyperbolic_with_normal_pretrained_part1_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
