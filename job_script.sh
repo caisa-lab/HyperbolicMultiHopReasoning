@@ -27,4 +27,4 @@ pip install optuna --quiet
 
 echo "Libraries Installed"
 echo "Starting train_random_walk.py"
-python -u train_random_walk.py --hyperbolic --optuna
+python -u train_random_walk.py --optuna
