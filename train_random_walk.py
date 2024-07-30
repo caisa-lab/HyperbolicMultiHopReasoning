@@ -11,43 +11,79 @@ from src.models import HyperbolicSoftPromptModel, SoftPromptModel, HyperbolicT5M
 import argparse
 import optuna
 
+train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
+
+all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
+all_kg = create_knowledge_graph(all_data)
+
+print(f"Nodes in Data: {len(list(all_kg.nodes()))}")
+
+print(f"Lenght Train Data: {len(train_dataset)}")
+print(f"Lenght Dev Data: {len(dev_dataset)}")
+print(f"Lenght Test Data: {len(test_dataset)}")
+
+random_walk_train = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='train')
+random_walk_dev = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='dev')
+random_walk_test = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='test')
+
+print(f"Number of Random Walks Train: {len(random_walk_train)}")
+print(f"Number of Random Walk Dev: {len(random_walk_dev)}")
+print(f"Number of Random Walk Test: {len(random_walk_test)}")
+
+#Specify Hyperparameters via config file
+config = Config()
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print(f'Training on device: {device}')
+
+random_walk_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_model.batch_size, shuffle=True)
+random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
+
 def objective(trial):
     print("Optimizing learning_rate with optuna")
+    
     learning_rate = trial.suggest_float('lr', 0.1, 1.0)
-    loss = _train_random_walk(True, learning_rate=learning_rate, epochs = 10)
-    return loss
+    #google/t5-large-lm-adapt
+    model_name = config.t5_model.model_name
+    print("Loading Tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    print("Loading Model...")
+    knit5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    
+    config.random_walk_training.learning_rate = learning_rate
+    config.random_walk_training.epochs = 10
+ 
+    hyperbolic_knit5_model = HyperbolicT5Model(knit5_model, 'hyperbolic_knit5')
+    print("Train with hyperbolic Soft Prompt Model.")
+    model = HyperbolicSoftPromptModel(hyperbolic_knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=True)   
+
+
+    trainer = SoftPromptTrainer(model,
+                      tokenizer,
+                      random_walk_dataloader_train,
+                      random_walk_dataloader_dev,
+                      config,
+                      device=device,
+                      method='random_walk_training',
+                      checkpoint_path=config.random_walk_training.hopping_prompt_checkpoint_path,
+                      tboard_checkpoint_path=config.random_walk_training.tboard_checkpoint_path,
+                      )
+
+
+    print(f'Random Walk Training..')
+    print(f'with model: {config.t5_model.model_name}')
+    print(f'Model Config: {model.hyperbolic_knit5.t5.config}')
+    print(f'for: {config.random_walk_training.epochs} epochs')
+    print(f'with batch size: {config.t5_model.batch_size}')
+    print(f'with optimizer: {config.random_walk_training.optimizer}')
+
+    trainer.train(epochs=config.random_walk_training.epochs)  
+    
+    
+    
+    return trainer.best_loss
     
 
-def _train_random_walk(hyperbolic : bool, learning_rate = None, epochs = None):
-    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
-
-    all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
-    all_kg = create_knowledge_graph(all_data)
-
-    print(f"Nodes in Data: {len(list(all_kg.nodes()))}")
-
-    print(f"Lenght Train Data: {len(train_dataset)}")
-    print(f"Lenght Dev Data: {len(dev_dataset)}")
-    print(f"Lenght Test Data: {len(test_dataset)}")
-
-    random_walk_train = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='train')
-    random_walk_dev = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='dev')
-    random_walk_test = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='test')
-
-    print(f"Number of Random Walks Train: {len(random_walk_train)}")
-    print(f"Number of Random Walk Dev: {len(random_walk_dev)}")
-    print(f"Number of Random Walk Test: {len(random_walk_test)}")
-
-    #Specify Hyperparameters via config file
-    config = Config()
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f'Training on device: {device}')
-    
-    if learning_rate:
-        config.random_walk_training.learning_rate = learning_rate
-    if epochs:
-        config.random_walk_training.epochs = epochs
-
+def _train_random_walk(hyperbolic : bool):
     #google/t5-large-lm-adapt
     model_name = config.t5_model.model_name
     print("Loading Tokenizer...")
@@ -62,11 +98,6 @@ def _train_random_walk(hyperbolic : bool, learning_rate = None, epochs = None):
     else:
         model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt')
 
-
-    random_walk_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_model.batch_size, shuffle=True)
-    random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
-
-    
     print("Model type before passing to SoftPromptTrainer:", type(model))
 
     trainer = SoftPromptTrainer(model,
@@ -93,7 +124,6 @@ def _train_random_walk(hyperbolic : bool, learning_rate = None, epochs = None):
 
     trainer.train(epochs=config.random_walk_training.epochs)  
     
-    return trainer.best_loss
 
 
 if __name__ == '__main__':    
