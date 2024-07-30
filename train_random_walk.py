@@ -9,8 +9,15 @@ from torch.utils.data import DataLoader
 from src.knowledge_graph import create_knowledge_graph
 from src.models import HyperbolicSoftPromptModel, SoftPromptModel, HyperbolicT5Model
 import argparse
+import optuna
 
-def _train_random_walk(hyperbolic : bool):
+def objective(trial):
+    learning_rate = trial.suggest_float('lr', 0.1, 1.0)
+    loss = _train_random_walk(True, learning_rate=learning_rate, epochs = 10)
+    return loss
+    
+
+def _train_random_walk(hyperbolic : bool, learning_rate = None, epochs = None):
     train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
 
     all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
@@ -34,6 +41,11 @@ def _train_random_walk(hyperbolic : bool):
     config = Config()
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Training on device: {device}')
+    
+    if learning_rate:
+        config.random_walk_training.learning_rate = learning_rate
+    if epochs:
+        config.random_walk_training.epochs = epochs
 
     #google/t5-large-lm-adapt
     model_name = config.t5_model.model_name
@@ -45,7 +57,7 @@ def _train_random_walk(hyperbolic : bool):
     if hyperbolic:
         hyperbolic_knit5_model = HyperbolicT5Model(knit5_model, 'hyperbolic_knit5')
         print("Train with hyperbolic Soft Prompt Model.")
-        model = HyperbolicSoftPromptModel(hyperbolic_knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt')   
+        model = HyperbolicSoftPromptModel(hyperbolic_knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False)   
     else:
         model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt')
 
@@ -78,14 +90,23 @@ def _train_random_walk(hyperbolic : bool):
     print(f'with batch size: {config.t5_model.batch_size}')
     print(f'with optimizer: {config.random_walk_training.optimizer}')
 
-    trainer.train(epochs=config.random_walk_training.epochs)
+    trainer.train(epochs=config.random_walk_training.epochs)  
+    
+    return trainer.best_loss
 
 
 if __name__ == '__main__':    
+    
     parser = argparse.ArgumentParser(description='Knowledge Integration Training')
-    parser.add_argument('--c4', action='store_true', help='Include C4 dataset in training')
-    parser.add_argument('--hyperbolic', action='store_true', help='Train with hyperbolic representation in single hop dataset')
+    parser.add_argument('--hyperbolic', action='store_true', help='Train with hyperbolic representation')
+    parser.add_argument('--optuna', action='store_true', help='Optimizes learning rate of Soft Prompting for Random Walk')
     args = parser.parse_args()
     
-
-    _train_random_walk(hyperbolic = True)
+    if args.optuna:
+        study = optuna.create_study(direction='minimize')
+        study.optimize(objective, n_trials=20)
+        # Print the best hyperparameters
+        print("Best hyperparameters: ", study.best_params)
+        print("Best accuracy: ", study.best_value)
+    else:
+        _train_random_walk(hyperbolic = args.hyperbolic)

@@ -12,6 +12,7 @@ class HyperbolicSoftPromptModel(nn.Module):
                  hyperbolic_knit5_checkpoint_path : str,
                  model_name : str,
                  soft_prompt : nn.Embedding = None,
+                 with_model_state_dict = True,
                  curvature : float = 1.0):
         super(HyperbolicSoftPromptModel, self).__init__()
         self.hyperbolic_knit5 = hyperbolic_knit5
@@ -19,7 +20,7 @@ class HyperbolicSoftPromptModel(nn.Module):
         self.model_name = model_name
         self.config = Config()
         if hyperbolic_knit5_checkpoint_path is not None:
-            self.hyperbolic_knit5 = load_model_checkpoint(self.hyperbolic_knit5, hyperbolic_knit5_checkpoint_path, with_model_state_dict=True)
+            self.hyperbolic_knit5 = load_model_checkpoint(self.hyperbolic_knit5, hyperbolic_knit5_checkpoint_path, with_model_state_dict=with_model_state_dict)
         
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
             
