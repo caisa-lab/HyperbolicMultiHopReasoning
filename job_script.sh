@@ -23,6 +23,7 @@ echo "Environment Activated"
 pip install transformers --quiet
 pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu118 --quiet
 pip install sentencepiece --quiet
+pip install optuna --quiet
 
 echo "Libraries Installed"
 echo "Starting train_random_walk.py"
