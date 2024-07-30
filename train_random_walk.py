@@ -12,6 +12,7 @@ import argparse
 import optuna
 
 def objective(trial):
+    print("Optimizing learning_rate with optuna")
     learning_rate = trial.suggest_float('lr', 0.1, 1.0)
     loss = _train_random_walk(True, learning_rate=learning_rate, epochs = 10)
     return loss
