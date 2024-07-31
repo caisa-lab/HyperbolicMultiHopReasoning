@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from utils.util import expmap0
+from utils.util import expmap0, logmap0
 from transformers import T5Model
 from transformers import AutoTokenizer
 from src.config import Config
@@ -24,10 +24,15 @@ class HyperbolicT5Model(nn.Module):
         if hyperbolic:
             #Map input embeddings to hyperbolic space
             input_embeddings = expmap0(input_embeddings, self.curvature)
-        
+            
+        encoder_outputs = self.t5.encoder(inputs_embeds = input_embeddings, attention_mask=attention_mask)
+        encoder_hidden_states = encoder_outputs.last_hidden_state
+        if hyperbolic:
+            encoder_hidden_states = logmap0(encoder_hidden_states, self.curvature)
+            
+        decoder_outputs = self.t5.decoder(encoder_hidden_states=encoder_hidden_states, attention_mask=attention_mask, labels=labels)
 
-        outputs = self.t5(inputs_embeds=input_embeddings, attention_mask=attention_mask, labels=labels)
-        return outputs
+        return decoder_outputs
     
     def generate(self, input_ids, attention_mask, max_length=50, num_beams = 5, early_stopping=True):
         input_embeddings = self.t5.shared(input_ids)  # Convert input IDs to embeddings
