@@ -160,3 +160,28 @@ def project(x : torch.Tensor, c : float):
     cond = norm > maxnorm
     projected = x / norm * maxnorm
     return torch.where(cond, projected, x)
+
+#----------------------------------------------------------
+def compute_pairwise_distances(embeddings):
+    # embeddings: [seq_len, hidden_dim]
+    num_points = embeddings.shape[0]
+    distances = np.zeros((num_points, num_points))
+    for i in range(num_points):
+        for j in range(i+1, num_points):
+            distance = np.linalg.norm(embeddings[i] - embeddings[j])
+            distances[i, j] = distance
+            distances[j, i] = distance
+    return distances
+
+def compute_delta_hyperbolicity(distances):
+    from itertools import combinations
+    num_points = distances.shape[0]
+    delta_values = []
+    for quadruple in combinations(range(num_points), 4):
+        a, b, c, w = quadruple
+        ab_w = (distances[a, w] + distances[b, w] - distances[a, b]) / 2
+        ac_w = (distances[a, w] + distances[c, w] - distances[a, c]) / 2
+        bc_w = (distances[b, w] + distances[c, w] - distances[b, c]) / 2
+        delta = max(ab_w, ac_w, bc_w) - min(ab_w, ac_w, bc_w)
+        delta_values.append(delta)
+    return max(delta_values)
