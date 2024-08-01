@@ -7,6 +7,7 @@ import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 import os
 import sys
+from geoopt.optim import RiemannianAdam
 
 # Get the current directory (train)
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -32,6 +33,8 @@ def get_optimizer(parameters, trainer_config : BaseTrainingConfig):
         optimizer = optim.AdamW(parameters, lr= trainer_config.learning_rate, weight_decay= trainer_config.optimizer_param)
     elif  trainer_config.optimizer == 'AdaFactor':
         optimizer = Adafactor(parameters, lr= trainer_config.learning_rate, weight_decay= trainer_config.optimizer_param, relative_step=False, scale_parameter=False)
+    elif  trainer_config.optimizer == 'Hyperbolic':
+        optimizer = RiemannianAdam(parameters, lr= trainer_config.learning_rate, weight_decay= trainer_config.optimizer_param)
     else:
         raise ValueError(f"Unsupported optimizer: {trainer_config.optimizer}")
     return optimizer
