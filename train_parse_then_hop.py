@@ -1,4 +1,4 @@
-from src.util import load_dataset
+from src.utils.util import load_dataset
 from src.train import *
 from src.datasets import ParseThenHopDataset
 import pandas as pd

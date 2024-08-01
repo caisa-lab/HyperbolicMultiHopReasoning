@@ -60,19 +60,19 @@ class SoftPromptTrainer:
             
             
             
-        self.optimizer = get_optimizer(self.model.soft_prompt.parameters(), self.training_config)
+        self.optimizer = get_optimizer(self.model.hyperbolic_soft_prompt.parameters(), self.training_config)
         if isinstance(self.model, SoftPromptModel):
             print('Model is of Type SoftPromptModel')
             for param in self.model.knit5.parameters():
                 param.requires_grad = False
         elif isinstance(self.model, HyperbolicSoftPromptModel):
             print('Model is of Type HyperbolicSoftPromptModel')
-            for param in self.model.hyperbolic_knit5.parameters():
+            for param in self.model.knit5.parameters():
                 param.requires_grad = False
         else:
             print("Model class hierarchy:", self.model.__class__.mro())
             raise ValueError(f'model is not of type [SoftPromptModel, HyperbolicSoftPromptModel]')
-        for param in self.model.soft_prompt.parameters():
+        for param in self.model.hyperbolic_soft_prompt.parameters():
             param.requires_grad = True
             
         self.log_dir, self.model_dir = setup_directories(self.training_config)
@@ -81,7 +81,7 @@ class SoftPromptTrainer:
             print(f"Continue writing to {tboard_checkpoint_path}")
         self.writer = SummaryWriter(log_dir=self.log_dir)
         if self.checkpoint_path is not None:
-            self.model.soft_prompt = load_soft_prompt(self.model.soft_prompt, checkpoint_path)
+            self.model.hyperbolic_soft_prompt = load_soft_prompt(self.model.hyperbolic_soft_prompt, checkpoint_path)
             self.optimizer, self.start_epoch = load_optimizer_and_start_epoch(self.optimizer, checkpoint_path)
         
             
@@ -184,7 +184,7 @@ class SoftPromptTrainer:
             self.early_stop_counter = 0
             self.best_model_path = soft_prompt_path
             torch.save({
-                'soft_prompt_state_dict': self.model.soft_prompt.state_dict(),
+                'soft_prompt_state_dict': self.model.hyperbolic_soft_prompt.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'epoch': epoch}, soft_prompt_path)
         else:

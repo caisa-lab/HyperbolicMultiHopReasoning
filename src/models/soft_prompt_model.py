@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from utils.util import *
+from transformers import AutoTokenizer
+from utils.util import get_top_token_embeddings
 from config import Config
 
 class SoftPromptModel(nn.Module):

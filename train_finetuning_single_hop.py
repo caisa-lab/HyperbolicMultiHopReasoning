@@ -1,4 +1,4 @@
-from src.util import load_dataset, load_c4_dataset
+from src.utils.util import load_dataset, load_c4_dataset
 from src.datasets import *
 from src.config import Config
 from src.train import *

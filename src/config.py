@@ -10,7 +10,7 @@ class BaseTrainingConfig:
                      tboard_checkpoint_path = None,
                      model_checkpoint_path = None,
                      load_optimizer = False):
-            self.optimizer = optimizer #[Adam, AdamW, AdaFactor]
+            self.optimizer = optimizer #[Adam, AdamW, AdaFactor, Hyperbolic]
             self.learning_rate = learning_rate #Same as in the paper
             self.optimizer_param = optimizer_param #weight_decay for AdamW Check which Optimizer
             self.epochs = epochs # 100K steps with early Stopping 

@@ -5,6 +5,9 @@ from transformers import T5Model
 from transformers import AutoTokenizer
 from src.config import Config
 
+
+#TODO Implement Hyperbolic encoder with hyperbolic embedding, attention, feedforward ...
+#TODO Convert the output to euclidean and input it into the decoder
 class HyperbolicT5Model(nn.Module):
     def __init__(self,
                  t5 : T5Model,
@@ -42,3 +45,4 @@ class HyperbolicT5Model(nn.Module):
 
         outputs = self.t5.generate(inputs_embeds=hyperbolic_input_embeddings, attention_mask=attention_mask, max_length=max_length, num_beams=num_beams, early_stopping=early_stopping)
         return outputs
+    
