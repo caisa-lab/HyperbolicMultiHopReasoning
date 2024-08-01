@@ -1,5 +1,5 @@
 class BaseTrainingConfig:
-        def __init__(self, optimizer = 'AdaFactor',
+        def __init__(self, optimizer = 'Hyperbolic',
                      learning_rate = 0.001,
                      optimizer_param = 1e-5,
                      epochs = 50,

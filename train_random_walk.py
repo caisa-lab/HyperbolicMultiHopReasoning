@@ -35,13 +35,13 @@ config = Config()
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f'Training on device: {device}')
 
-random_walk_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_model.batch_size, shuffle=True)
-random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
+random_walk_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_model.batch_size, shuffle=True, num_workers=4)
+random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_model.batch_size, shuffle=False, num_workers=4)
 
 def objective(trial):
     print("Optimizing learning_rate with optuna")
     
-    learning_rate = trial.suggest_float('lr', 0.1, 1.0)
+    learning_rate = trial.suggest_float('lr', 0.01, 1.0, log=True)
     #google/t5-large-lm-adapt
     model_name = config.t5_model.model_name
     print("Loading Tokenizer...")
@@ -50,11 +50,10 @@ def objective(trial):
     knit5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     
     config.random_walk_training.learning_rate = learning_rate
-    config.random_walk_training.epochs = 10
+    config.random_walk_training.epochs = 5
  
-    hyperbolic_knit5_model = HyperbolicT5Model(knit5_model, 'hyperbolic_knit5')
     print("Train with hyperbolic Soft Prompt Model.")
-    model = HyperbolicSoftPromptModel(hyperbolic_knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=True)   
+    model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False)   
 
 
     trainer = SoftPromptTrainer(model,
@@ -71,7 +70,7 @@ def objective(trial):
 
     print(f'Random Walk Training..')
     print(f'with model: {config.t5_model.model_name}')
-    print(f'Model Config: {model.hyperbolic_knit5.t5.config}')
+    print(f'Model Config: {model.knit5.config}')
     print(f'for: {config.random_walk_training.epochs} epochs')
     print(f'with batch size: {config.t5_model.batch_size}')
     print(f'with optimizer: {config.random_walk_training.optimizer}')
