@@ -76,7 +76,7 @@ class HyperbolicSoftPromptModel(nn.Module):
         self.model_name = model_name
         self.config = Config()
         if hyperbolic_knit5_checkpoint_path is not None:
-            self.hyperbolic_knit5 = load_model_checkpoint(self.hyperbolic_knit5, hyperbolic_knit5_checkpoint_path, with_model_state_dict=with_model_state_dict)
+            self.knit5 = load_model_checkpoint(self.knit5, hyperbolic_knit5_checkpoint_path, with_model_state_dict=with_model_state_dict)
         
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
             
