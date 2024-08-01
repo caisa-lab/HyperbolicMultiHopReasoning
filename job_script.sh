@@ -6,8 +6,8 @@
 
 #SBATCH --ntasks=1
 #SBATCH --job-name=random_walk_training_adapt_bsize64_c4_hyperbolic
-#SBATCH --output=outputs/output_random_walk_training_adapt_bsize64_c4_hyperbolic_optimizing_part1_%j.txt
-#SBATCH --error=outputs/error_random_walk_training_adapt_bsize64_c4_hyperbolic_optimizing_part1_%j.txt
+#SBATCH --output=outputs/output_random_walk_training_adapt_bsize64_c4_hyperbolic_soft_prompt_part1_%j.txt
+#SBATCH --error=outputs/error_random_walk_training_adapt_bsize64_c4_hyperbolic_soft_prompt_part1_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
@@ -24,7 +24,8 @@ pip install transformers --quiet
 pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu118 --quiet
 pip install sentencepiece --quiet
 pip install optuna --quiet
+pip install geoopt --quiet
 
 echo "Libraries Installed"
 echo "Starting train_random_walk.py"
-python -u train_random_walk.py --optuna
+python -u train_random_walk.py --hyperbolic
