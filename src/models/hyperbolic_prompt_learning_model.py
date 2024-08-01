@@ -93,7 +93,7 @@ class HyperbolicSoftPromptModel(nn.Module):
         #dont use random use top 100 most common tokens of tokenizer.getvocab
         top_100_token_embeddings = get_top_token_embeddings(self.knit5, tokenizer, 100)
         with torch.no_grad():
-            soft_prompt_embeddings[:top_100_token_embeddings.size(0), :] = expmap0(top_100_token_embeddings, c=self.curvature)
+            soft_prompt_embeddings.soft_prompts[:top_100_token_embeddings.size(0), :] = expmap0(top_100_token_embeddings, c=self.curvature)
         print(f"Initializing Soft Prompt with top 100 tokens from pretraining corpus")
         return soft_prompt_embeddings   
         
