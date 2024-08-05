@@ -55,7 +55,9 @@ def exact_match_score(prediction, ground_truth):
 #-------------------------------------------------------------------------------------------------
 import torch.nn as nn
 from src.utils.trainer_utils import load_model_checkpoint, load_soft_prompt
-def evaluate_one_hop_wiki(model : nn.Module,
+from src.models import HyperbolicT5MapEmbeddings
+from typing import Union
+def evaluate_one_hop_wiki(model : Union[nn.Module, HyperbolicT5MapEmbeddings],
                           tokenizer,
                           test_dataloader : DataLoader,
                           model_checkpoint_path : str,
@@ -67,12 +69,12 @@ def evaluate_one_hop_wiki(model : nn.Module,
     model.eval()
     total_em = 0
     total_f1 = 0
+    prediction_vs_label = {}
     progress_bar = tqdm(test_dataloader, leave=True, desc=f"Test - Knowledge Integration", file = sys.stdout)
     with torch.no_grad():
         for batch_idx, (input_str, label) in enumerate(progress_bar):
             input_ids = tokenizer(input_str, padding=True, truncation=True, return_tensors='pt')['input_ids'].to(device)
             attention_mask = tokenizer(input_str, padding=True, truncation=True, return_tensors='pt')['attention_mask'].to(device)
-            
             
             outputs = model.generate(
                                     input_ids=input_ids,
@@ -89,12 +91,13 @@ def evaluate_one_hop_wiki(model : nn.Module,
             
             total_em += em_score
             total_f1 += _f1_score
-            if batch_idx <= 5: 
-                print(f'\nPrediction: {decoded_predictions[0]}\nLabel: {label[0]}')
+            prediction_vs_label[batch_idx] = f'Prediction: {decoded_predictions[0]} \n Label: {label[0]}'
         avg_em_perc = total_em / len(test_dataloader.dataset)
         avg_f1_perc = total_f1 / len(test_dataloader.dataset)
     print(f"Test - AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
-
+    random_numbers = [random.randint(0, len(prediction_vs_label)) for _ in range(10)]
+    for i in range(random_numbers):
+        print(prediction_vs_label[i])
 from models import SoftPromptModel
 
 def evaluate_random_walk_training(model : SoftPromptModel,
@@ -111,13 +114,18 @@ def evaluate_random_walk_training(model : SoftPromptModel,
     model.eval()
     total_em = 0
     total_f1 = 0
+    prediction_vs_label = {}
     progress_bar = tqdm(test_dataloader, leave=True, desc=f"Test - Random Walk Training", file=sys.stdout)
     with torch.no_grad():
         for batch_idx, batch in enumerate(progress_bar):
             incomplete_sequence, complete_sequence = batch
             inputs = tokenizer(incomplete_sequence, padding=True, truncation=True, return_tensors = 'pt').to(device)
 
-            outputs = model.generate(inputs=inputs)
+            outputs = model.generate(input_ids=inputs['input_ids'],
+                                    attention_mask=inputs['attention_mask'],
+                                    max_length=50,
+                                    num_beams = 5,
+                                    early_stopping=True)
             
             decoded_predictions = tokenizer.batch_decode(outputs, skip_special_tokens=True) 
 
@@ -126,12 +134,14 @@ def evaluate_random_walk_training(model : SoftPromptModel,
             
             total_em += em_score
             total_f1 += _f1_score
-            if batch_idx <= 5: 
-                print(f'Prediction: {decoded_predictions[0]}\nLabel: {complete_sequence[0]}')
+            prediction_vs_label[batch_idx] = f'Prediction: {decoded_predictions[0]} \n Label: {complete_sequence[0]}'
             
         avg_em_perc = total_em / len(test_dataloader.dataset)
         avg_f1_perc = total_f1 / len(test_dataloader.dataset)
         print(f"Test - AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
+        random_numbers = [random.randint(0, len(prediction_vs_label)) for _ in range(10)]
+        for i in range(random_numbers):
+            print(prediction_vs_label[i])
         
 import random
 def evaluate_parse_then_hop_training(parsing_model: SoftPromptModel,

@@ -34,7 +34,7 @@ class HyperbolicT5MapEmbeddings(T5ForConditionalGeneration):
             output_hidden_states: bool = None,
             return_dict: bool = None,
             labels = None):
-        if inputs_embeds is None:
+        if inputs_embeds is None and input_ids is not None:
             input_embeddings = self.shared(input_ids)  # Convert input IDs to embeddings
             
             #Map input embeddings to hyperbolic space
@@ -57,17 +57,6 @@ class HyperbolicT5MapEmbeddings(T5ForConditionalGeneration):
                                                             return_dict=return_dict,
                                                             inputs_embeds=input_embeddings,  # pass inputs_embeds here
                                                             labels=labels)
-    
-    
-    
-    def generate(self, input_ids, attention_mask, max_length=50, num_beams = 5, early_stopping=True):
-        input_embeddings = self.shared(input_ids)  # Convert input IDs to embeddings
-
-        #Map input embeddings to hyperbolic space
-        hyperbolic_input_embeddings = expmap0(input_embeddings, self.curvature)
-
-        outputs = self.generate(inputs_embeds=hyperbolic_input_embeddings, attention_mask=attention_mask, max_length=max_length, num_beams=num_beams, early_stopping=early_stopping)
-        return outputs
 
 class HyperbolicT5Model(T5ForConditionalGeneration):
     """
@@ -127,13 +116,3 @@ class HyperbolicT5Model(T5ForConditionalGeneration):
     return_dict=return_dict,
     inputs_embeds=input_embeddings,  
     labels=labels)
-    
-    def generate(self, input_ids, attention_mask, max_length=50, num_beams = 5, early_stopping=True):
-        input_embeddings = self.shared(input_ids)  # Convert input IDs to embeddings
-
-        #Map input embeddings to hyperbolic space
-        hyperbolic_input_embeddings = expmap0(input_embeddings, self.curvature)
-
-        outputs = self.generate(inputs_embeds=hyperbolic_input_embeddings, attention_mask=attention_mask, max_length=max_length, num_beams=num_beams, early_stopping=early_stopping)
-        return outputs
-    
