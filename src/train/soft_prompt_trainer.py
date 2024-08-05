@@ -60,7 +60,7 @@ class SoftPromptTrainer:
             
             
             
-        self.optimizer = get_optimizer([self.model.hyperbolic_soft_prompt], self.training_config)
+        self.optimizer = get_optimizer([self.model.hyperbolic_soft_prompt.parameters()], self.training_config)
         if isinstance(self.model, SoftPromptModel):
             print('Model is of Type SoftPromptModel')
             for param in self.model.knit5.parameters():
@@ -72,7 +72,7 @@ class SoftPromptTrainer:
         else:
             print("Model class hierarchy:", self.model.__class__.mro())
             raise ValueError(f'model is not of type [SoftPromptModel, HyperbolicSoftPromptModel]')
-        for param in self.model.hyperbolic_soft_prompt:
+        for param in self.model.hyperbolic_soft_prompt.parameters():
             param.requires_grad = True
             
         self.log_dir, self.model_dir = setup_directories(self.training_config)

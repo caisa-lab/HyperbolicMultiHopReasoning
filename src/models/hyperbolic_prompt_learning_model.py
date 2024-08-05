@@ -86,19 +86,19 @@ class HyperbolicSoftPromptModel(nn.Module):
         soft_prompt_length = self.config.parse_then_hop_training.prompt_length
 
         soft_prompt_embedding_size = self.knit5.config.hidden_size
-        soft_prompt_embeddings = nn.Parameter(torch.randn(soft_prompt_length, soft_prompt_embedding_size))
+        soft_prompt_embeddings = nn.Embedding(soft_prompt_length, soft_prompt_embedding_size)
         
         #dont use random use top 100 most common tokens of tokenizer.getvocab
         top_100_token_embeddings = get_top_token_embeddings(self.knit5, tokenizer, 100)
         with torch.no_grad():
-            soft_prompt_embeddings[:top_100_token_embeddings.size(0), :] = top_100_token_embeddings
+            soft_prompt_embeddings.weight.data[:top_100_token_embeddings.size(0), :] = top_100_token_embeddings
         print(f"Initializing Soft Prompt with top 100 tokens from pretraining corpus")
         return soft_prompt_embeddings   
         
     
     
     def forward(self, inputs, labels):
-        hyperbolic_soft_prompt_input = self.hyperbolic_soft_prompt.expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+        hyperbolic_soft_prompt_input = self.hyperbolic_soft_prompt.weight.data.expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
         input_embeddings = self.knit5.shared(inputs['input_ids'])  # Convert input IDs to embeddings
 
         concatenated_embeddings = torch.cat([hyperbolic_soft_prompt_input, input_embeddings], dim=1)
