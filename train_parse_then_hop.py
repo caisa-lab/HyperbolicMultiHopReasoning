@@ -1,6 +1,6 @@
 from src.utils.util import load_dataset
 from src.train import *
-from src.datasets import ParseThenHopDataset
+from src.datasets import ParseDataset
 import pandas as pd
 from src.knowledge_graph import create_knowledge_graph
 from src.config import Config
@@ -20,8 +20,8 @@ print(f"Lenght Train Data: {len(train_dataset)}")
 print(f"Lenght Dev Data: {len(dev_dataset)}")
 print(f"Lenght Test Data: {len(test_dataset)}")
 
-parse_then_hop_train = ParseThenHopDataset(train_dataset)
-parse_then_hop_dev = ParseThenHopDataset(dev_dataset)
+parse_then_hop_train = ParseDataset(train_dataset)
+parse_then_hop_dev = ParseDataset(dev_dataset)
 
 print(f"Number of Random Walks Train: {len(parse_then_hop_train)}")
 print(f"Number of Random Walk Dev: {len(parse_then_hop_dev)}")

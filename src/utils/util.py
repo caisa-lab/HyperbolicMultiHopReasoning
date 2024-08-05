@@ -135,6 +135,32 @@ def get_top_token_embeddings(model : AutoModelForSeq2SeqLM, tokenizer : AutoToke
 ##---------------------hyperbolic operations ----------------------- CODE TAKEN FROM https://github.com/HazyResearch/KGEmb/blob/master/utils/hyperbolic.py
 import torch
 import torch.nn.functional as F
+# ################# MATH FUNCTIONS ########################
+
+class Artanh(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x):
+        x = x.clamp(-1 + 1e-5, 1 - 1e-5)
+        ctx.save_for_backward(x)
+        dtype = x.dtype
+        x = x.double()
+        return (torch.log_(1 + x).sub_(torch.log_(1 - x))).mul_(0.5).to(dtype)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        input, = ctx.saved_tensors
+        return grad_output / (1 - input ** 2)
+
+
+def artanh(x):
+    return Artanh.apply(x)
+
+
+def tanh(x):
+    return x.clamp(-15, 15).tanh()
+
+
+# ################# HYP OPS ########################
 
 MIN_NORM = 1e-15
 BALL_EPS = {torch.float32: 1e-5, torch.float64: 1e-7}
@@ -143,7 +169,7 @@ def expmap0(u : torch.Tensor, c : float):
     """Exponential map taken at the origin of the Poincare ball with curvature c."""
     sqrt_c = c ** 0.5
     u_norm = u.norm(dim=-1, p=2, keepdim=True).clamp_min(MIN_NORM)
-    gamma_1 = torch.tanh(sqrt_c * u_norm) * u / (sqrt_c * u_norm)
+    gamma_1 = tanh(sqrt_c * u_norm) * u / (sqrt_c * u_norm)
     return project(gamma_1, c)
 
 def logmap0(y : torch.Tensor, c : float):
@@ -162,26 +188,3 @@ def project(x : torch.Tensor, c : float):
     return torch.where(cond, projected, x)
 
 #----------------------------------------------------------
-def compute_pairwise_distances(embeddings):
-    # embeddings: [seq_len, hidden_dim]
-    num_points = embeddings.shape[0]
-    distances = np.zeros((num_points, num_points))
-    for i in range(num_points):
-        for j in range(i+1, num_points):
-            distance = np.linalg.norm(embeddings[i] - embeddings[j])
-            distances[i, j] = distance
-            distances[j, i] = distance
-    return distances
-
-def compute_delta_hyperbolicity(distances):
-    from itertools import combinations
-    num_points = distances.shape[0]
-    delta_values = []
-    for quadruple in combinations(range(num_points), 4):
-        a, b, c, w = quadruple
-        ab_w = (distances[a, w] + distances[b, w] - distances[a, b]) / 2
-        ac_w = (distances[a, w] + distances[c, w] - distances[a, c]) / 2
-        bc_w = (distances[b, w] + distances[c, w] - distances[b, c]) / 2
-        delta = max(ab_w, ac_w, bc_w) - min(ab_w, ac_w, bc_w)
-        delta_values.append(delta)
-    return max(delta_values)

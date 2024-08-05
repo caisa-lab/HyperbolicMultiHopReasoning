@@ -54,7 +54,7 @@ def exact_match_score(prediction, ground_truth):
 
 #-------------------------------------------------------------------------------------------------
 import torch.nn as nn
-from utils.trainer_utils import load_model_checkpoint, load_soft_prompt
+from src.utils.trainer_utils import load_model_checkpoint, load_soft_prompt
 def evaluate_one_hop_wiki(model : nn.Module,
                           tokenizer,
                           test_dataloader : DataLoader,
@@ -133,7 +133,7 @@ def evaluate_random_walk_training(model : SoftPromptModel,
         avg_f1_perc = total_f1 / len(test_dataloader.dataset)
         print(f"Test - AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
         
-        
+import random
 def evaluate_parse_then_hop_training(parsing_model: SoftPromptModel,
                                      hopping_model: SoftPromptModel,
                                      tokenizer,
@@ -142,10 +142,10 @@ def evaluate_parse_then_hop_training(parsing_model: SoftPromptModel,
                                      hopping_soft_prompt_checkpoint_path: str,
                                      parsing_soft_prompt_checkpoint_path: str,
                                      device = 'cuda' if torch.cuda.is_available() else 'cpu'):
-    parsing_model.knit5 = load_model_checkpoint(parsing_model.knit5, model_checkpoint_path, device)
+    parsing_model.knit5 = load_model_checkpoint(parsing_model.knit5, model_checkpoint_path, device, with_model_state_dict=False)
     parsing_model.soft_prompt = load_soft_prompt(parsing_model.soft_prompt, parsing_soft_prompt_checkpoint_path, device)
     
-    hopping_model.knit5 = load_model_checkpoint(hopping_model.knit5, model_checkpoint_path, device)
+    hopping_model.knit5 = load_model_checkpoint(hopping_model.knit5, model_checkpoint_path, device, with_model_state_dict=False)
     hopping_model.soft_prompt = load_soft_prompt(hopping_model.soft_prompt, hopping_soft_prompt_checkpoint_path, device)
     
     parsing_model.to(device)
@@ -155,6 +155,7 @@ def evaluate_parse_then_hop_training(parsing_model: SoftPromptModel,
     total_em = 0
     total_f1 = 0
     progress_bar = tqdm(test_dataloader, leave=True, desc=f"Test - Parse Then Hop", file=sys.stdout)
+    prediction_vs_label = {}
     with torch.no_grad():
         for batch_idx, batch in enumerate(progress_bar):
             question, complete_sequence = batch
@@ -175,10 +176,12 @@ def evaluate_parse_then_hop_training(parsing_model: SoftPromptModel,
             
             total_em += em_score
             total_f1 += _f1_score
-            if batch_idx <= 5: 
-                print(f'Prediction: {decoded_predictions[0]} \n Label: {complete_sequence[0]}')
+            prediction_vs_label[batch_idx] = f'Prediction: {decoded_predictions[0]} \n Label: {complete_sequence[0]}'
             
         avg_em_perc = total_em / len(test_dataloader.dataset)
         avg_f1_perc = total_f1 / len(test_dataloader.dataset)
         print(f"Test - AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
+        random_numbers = [random.randint(0, len(prediction_vs_label)) for _ in range(10)]
+        for i in range(random_numbers):
+            print(prediction_vs_label[i])
 
