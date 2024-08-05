@@ -64,17 +64,17 @@ class HyperbolicSoftPromptModel(nn.Module):
                  with_model_state_dict = True,
                  curvature : float = 1.0):
         super(HyperbolicSoftPromptModel, self).__init__()
-        if hyperbolic_knit5_checkpoint_path is not None:
-            self.knit5 = load_model_checkpoint(hyperbolic_knit5, hyperbolic_knit5_checkpoint_path, with_model_state_dict=with_model_state_dict)
         if isinstance(hyperbolic_knit5, HyperbolicT5Model):
-            self.knit5 : T5Model = self.knit5.t5
+            self.knit5 : T5Model = hyperbolic_knit5.t5
             print("HyperbolicT5")
         elif isinstance(hyperbolic_knit5, T5ForConditionalGeneration):
-            self.knit5 : T5Model = self.knit5
+            self.knit5 : T5Model = hyperbolic_knit5
             print("T5")
         self.curvature = curvature
         self.model_name = model_name
         self.config = Config()
+        if hyperbolic_knit5_checkpoint_path is not None:
+            self.knit5 = load_model_checkpoint(self.knit5, hyperbolic_knit5_checkpoint_path, with_model_state_dict=with_model_state_dict)
         
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
             
@@ -86,7 +86,7 @@ class HyperbolicSoftPromptModel(nn.Module):
         soft_prompt_length = self.config.parse_then_hop_training.prompt_length
 
         soft_prompt_embedding_size = self.knit5.config.hidden_size
-        soft_prompt_embeddings = nn.Embedding(soft_prompt_length, soft_prompt_embedding_size)
+        soft_prompt_embeddings = nn.Embedding(soft_prompt_length, soft_prompt_embedding_size) 
         
         #dont use random use top 100 most common tokens of tokenizer.getvocab
         top_100_token_embeddings = get_top_token_embeddings(self.knit5, tokenizer, 100)
