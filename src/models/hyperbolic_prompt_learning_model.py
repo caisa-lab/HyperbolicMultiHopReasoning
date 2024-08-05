@@ -86,7 +86,7 @@ class HyperbolicSoftPromptModel(nn.Module):
         soft_prompt_length = self.config.parse_then_hop_training.prompt_length
 
         soft_prompt_embedding_size = self.knit5.config.hidden_size
-        soft_prompt_embeddings = nn.Parameter(soft_prompt_length, soft_prompt_embedding_size) 
+        soft_prompt_embeddings = nn.Parameter(torch.randn(soft_prompt_length, soft_prompt_embedding_size))
         
         #dont use random use top 100 most common tokens of tokenizer.getvocab
         top_100_token_embeddings = get_top_token_embeddings(self.knit5, tokenizer, 100)
