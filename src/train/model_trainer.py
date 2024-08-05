@@ -83,7 +83,8 @@ class ModelTrainer:
             self.optimizer, self.start_epoch = load_optimizer_and_start_epoch(self.optimizer, checkpoint_path)  
         
     def train(self,
-            epochs : int):
+            epochs : int,
+            hyperbolic : bool = False):
         
         """Trains Knowledge Integration part. Given 'e1 ; r1' predict 'e2'
         """
@@ -97,11 +98,12 @@ class ModelTrainer:
             self._train_without_c4(epochs)
         else:
             print(f"Training with C4...")
-            self._train_with_c4(epochs)
+            self._train_with_c4(epochs, hyperbolic)
                 
-                        
-    
-    def _train_with_c4(self, epochs : int):
+                    
+    def _train_with_c4(self, epochs : int, hyperbolic : bool):
+        hyperbolic_optimizer = get_optimizer(self.model.t5.shared.parameters(), self.training_config)
+        
         self.model.train()
         for epoch in range(epochs):
             total_c4_loss = 0

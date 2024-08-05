@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from utils.util import get_top_token_embeddings, expmap0, logmap0
 from utils.trainer_utils import load_model_checkpoint
-from .hyperbolic_t5_model import HyperbolicT5Model
+from .hyperbolic_t5_model import HyperbolicT5Model, HyperbolicT5MapEmbeddings
 from transformers import AutoTokenizer, T5ForConditionalGeneration, T5Model
 from src.config import Config
 from .hyperbolic_model_utils import HyperbolicSoftPrompts
@@ -57,21 +57,17 @@ for input_str, label in training_data:
 """
 class HyperbolicSoftPromptModel(nn.Module):
     def __init__(self,
-                 hyperbolic_knit5 : Union[HyperbolicT5Model, T5ForConditionalGeneration],
+                 hyperbolic_knit5 : Union[HyperbolicT5MapEmbeddings, T5ForConditionalGeneration, HyperbolicT5Model],
                  hyperbolic_knit5_checkpoint_path : str,
                  model_name : str,
                  hyperbolic_soft_prompt : HyperbolicSoftPrompts = None,
                  with_model_state_dict = True,
                  curvature : float = 1.0):
         super(HyperbolicSoftPromptModel, self).__init__()
+        self.knit5 = hyperbolic_knit5
         if hyperbolic_knit5_checkpoint_path is not None:
-            self.knit5 = load_model_checkpoint(hyperbolic_knit5, hyperbolic_knit5_checkpoint_path, with_model_state_dict=with_model_state_dict)
-        if isinstance(hyperbolic_knit5, HyperbolicT5Model):
-            self.knit5 = self.knit5.t5
-            print("HyperbolicT5")
-        elif isinstance(hyperbolic_knit5, T5ForConditionalGeneration):
-            self.knit5 : T5Model = hyperbolic_knit5
-            print("T5")
+            self.knit5 = load_model_checkpoint(self.knit5, hyperbolic_knit5_checkpoint_path, with_model_state_dict=with_model_state_dict)
+
             
             
         self.curvature = curvature
@@ -105,7 +101,7 @@ class HyperbolicSoftPromptModel(nn.Module):
     
     
     def forward(self, inputs, labels):
-        hyperbolic_soft_prompt_input = self.hyperbolic_soft_prompt.weight.data.expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+        hyperbolic_soft_prompt_input = self.hyperbolic_soft_prompt.weight.expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
         input_embeddings = self.knit5.shared(inputs['input_ids'])  # Convert input IDs to embeddings
 
         concatenated_embeddings = torch.cat([hyperbolic_soft_prompt_input, input_embeddings], dim=1)
@@ -115,25 +111,24 @@ class HyperbolicSoftPromptModel(nn.Module):
         #Adjust attention mask (take all of the soft prompt tokens should be attented)
         soft_prompt_attention_mask = torch.ones((inputs['attention_mask'].size(0), hyperbolic_soft_prompt_input.size(1)), device=self.device)
         concatenated_attention_mask = torch.cat((soft_prompt_attention_mask, inputs['attention_mask']), dim=1)
+        
+        
         outputs = self.knit5(inputs_embeds=hyperbolic_concat_embedding, attention_mask=concatenated_attention_mask, labels=labels)
         return outputs
-    
+    """
     def generate(self, inputs, max_length=50, num_beams = 5, early_stopping=True):
         soft_prompt_input = self.hyperbolic_soft_prompt.soft_prompts.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
         input_embeddings = self.knit5.shared(inputs['input_ids'])  # Convert input IDs to embeddings
 
-        hyperbolic_input_embeddings = expmap0(input_embeddings, self.curvature)
-        
-        hyperbolic_soft_prompt_embeddings = expmap0(soft_prompt_input, self.curvature)
-        
-
         concatenated_embeddings = torch.cat([hyperbolic_soft_prompt_embeddings, hyperbolic_input_embeddings], dim=1)
+        
+        hyperbolic_concat_embedding = expmap0(concatenated_embeddings, self.curvature)
         
         #Adjust attention mask (take all of the soft prompt tokens should be attented)
         pp_attention_mask = torch.ones((inputs['attention_mask'].size(0), soft_prompt_input.size(1)), device=self.device)
         concatenated_attention_mask = torch.cat((pp_attention_mask, inputs['attention_mask']), dim=1)
 
-        outputs = self.knit5.generate(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, max_length=max_length, num_beams=num_beams, early_stopping=early_stopping)
+        outputs = self.knit5.generate(inputs_embeds=hyperbolic_concat_embedding, attention_mask=concatenated_attention_mask, max_length=max_length, num_beams=num_beams, early_stopping=early_stopping)
         return outputs
     
-    
+    """

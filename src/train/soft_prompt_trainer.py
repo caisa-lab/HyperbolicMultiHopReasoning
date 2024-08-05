@@ -101,13 +101,9 @@ class SoftPromptTrainer:
                 inputs = self.tokenizer(input_batch, padding=True, truncation=True, return_tensors = 'pt').to(self.device)
                 labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
-                outputs = self.model(inputs, labels=labels)
-                for name, param in self.model.named_parameters():
-                    print(f"Parameter {name} requires_grad: {param.requires_grad}")              
+                outputs = self.model(inputs, labels=labels)       
                 loss = outputs.loss
-                #print(f"Loss requires_grad: {loss.requires_grad}") 
-                with torch.autograd.set_detect_anomaly(True):
-                    loss.backward()
+                loss.backward()
 		        
                 self.optimizer.step()
 
