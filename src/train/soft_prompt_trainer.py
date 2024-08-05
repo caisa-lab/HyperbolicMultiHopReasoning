@@ -117,6 +117,7 @@ class SoftPromptTrainer:
                 outputs = self.model(inputs, labels=labels)
                 
                 loss = outputs.loss
+                print(f"Loss requires_grad: {loss.requires_grad}") 
                 loss.backward()
 		        
                 self.optimizer.step()
