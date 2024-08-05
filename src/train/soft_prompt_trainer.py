@@ -60,7 +60,7 @@ class SoftPromptTrainer:
             
             
             
-        self.optimizer = get_optimizer([self.model.hyperbolic_soft_prompt.parameters()], self.training_config)
+        self.optimizer = get_optimizer(self.model.hyperbolic_soft_prompt.parameters(), self.training_config)
         if isinstance(self.model, SoftPromptModel):
             print('Model is of Type SoftPromptModel')
             for param in self.model.knit5.parameters():
