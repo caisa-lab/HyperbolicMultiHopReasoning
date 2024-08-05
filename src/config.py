@@ -45,7 +45,7 @@ class Config:
                              epochs=250,
                              log_dir='tboard_logs/random_walk_training',
                              model_save_path='checkpoints/random_walk_training',
-                             model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth',
+                             model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4_hyperbolic/knit5_epoch_10_val_loss_0.0227.pth',
                              tboard_checkpoint_path=None
                              )
             self.prompt_length = 100
