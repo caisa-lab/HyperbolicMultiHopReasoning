@@ -41,7 +41,7 @@ random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_m
 def objective(trial):
     print("Optimizing learning_rate with optuna")
     
-    learning_rate = trial.suggest_float('lr', 0.01, 1.0, log=True)
+    learning_rate = trial.suggest_float('lr', 0.01, 1.0)
     c = trial.suggest_float('c', 0.1, 2.0)
     #google/t5-large-lm-adapt
     model_name = config.t5_model.model_name
