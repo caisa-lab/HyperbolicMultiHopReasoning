@@ -72,6 +72,8 @@ class HyperbolicSoftPromptModel(nn.Module):
         elif isinstance(hyperbolic_knit5, T5ForConditionalGeneration):
             self.knit5 : T5Model = hyperbolic_knit5
             print("T5")
+            
+            
         self.curvature = curvature
         self.model_name = model_name
         self.config = Config()
@@ -79,6 +81,11 @@ class HyperbolicSoftPromptModel(nn.Module):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
             
         self.hyperbolic_soft_prompt = hyperbolic_soft_prompt if hyperbolic_soft_prompt else self.init_soft_prompt()
+        
+        for param in self.knit5.parameters():
+            param.requires_grad = False
+        for param in self.hyperbolic_soft_prompt.parameters():
+            param.requires_grad = True
         
     def init_soft_prompt(self):
         tokenizer = AutoTokenizer.from_pretrained(self.config.t5_model.model_name)

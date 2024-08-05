@@ -61,19 +61,6 @@ class SoftPromptTrainer:
             
             
         self.optimizer = get_optimizer(self.model.hyperbolic_soft_prompt.parameters(), self.training_config)
-        if isinstance(self.model, SoftPromptModel):
-            print('Model is of Type SoftPromptModel')
-            for param in self.model.knit5.parameters():
-                param.requires_grad = False
-        elif isinstance(self.model, HyperbolicSoftPromptModel):
-            print('Model is of Type HyperbolicSoftPromptModel')
-            for param in self.model.knit5.parameters():
-                param.requires_grad = False
-        else:
-            print("Model class hierarchy:", self.model.__class__.mro())
-            raise ValueError(f'model is not of type [SoftPromptModel, HyperbolicSoftPromptModel]')
-        for param in self.model.hyperbolic_soft_prompt.parameters():
-            param.requires_grad = True
             
         self.log_dir, self.model_dir = setup_directories(self.training_config)
         if self.tboard_checkpoint_path is not None:
@@ -115,7 +102,8 @@ class SoftPromptTrainer:
                 labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
                 outputs = self.model(inputs, labels=labels)
-                print(f"Logits requires_grad: {outputs.logits.requires_grad}")               
+                for name, param in self.model.named_parameters():
+                    print(f"Parameter {name} requires_grad: {param.requires_grad}")              
                 loss = outputs.loss
                 #print(f"Loss requires_grad: {loss.requires_grad}") 
                 with torch.autograd.set_detect_anomaly(True):
