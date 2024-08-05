@@ -115,7 +115,7 @@ class SoftPromptTrainer:
                 labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
                 outputs = self.model(inputs, labels=labels)
-                print(f"Outputs requires_grad: {outputs.requires_grad}")                
+                print(f"Logits requires_grad: {outputs.logits.requires_grad}")               
                 loss = outputs.loss
                 #print(f"Loss requires_grad: {loss.requires_grad}") 
                 with torch.autograd.set_detect_anomaly(True):
