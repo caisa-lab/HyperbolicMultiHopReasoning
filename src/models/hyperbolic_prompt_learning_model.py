@@ -104,16 +104,16 @@ class HyperbolicSoftPromptModel(nn.Module):
         hyperbolic_soft_prompt_input = self.hyperbolic_soft_prompt.weight.expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
         input_embeddings = self.knit5.shared(inputs['input_ids'])  # Convert input IDs to embeddings
 
+        hyperbolic_soft_prompt_input = expmap0(hyperbolic_soft_prompt_input)
+
         concatenated_embeddings = torch.cat([hyperbolic_soft_prompt_input, input_embeddings], dim=1)
-        
-        hyperbolic_concat_embedding = expmap0(concatenated_embeddings, self.curvature)
         
         #Adjust attention mask (take all of the soft prompt tokens should be attented)
         soft_prompt_attention_mask = torch.ones((inputs['attention_mask'].size(0), hyperbolic_soft_prompt_input.size(1)), device=self.device)
         concatenated_attention_mask = torch.cat((soft_prompt_attention_mask, inputs['attention_mask']), dim=1)
         
         
-        outputs = self.knit5(inputs_embeds=hyperbolic_concat_embedding, attention_mask=concatenated_attention_mask, labels=labels)
+        outputs = self.knit5(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, labels=labels)
         return outputs
     """
     def generate(self, inputs, max_length=50, num_beams = 5, early_stopping=True):
