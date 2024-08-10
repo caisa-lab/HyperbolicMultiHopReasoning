@@ -104,7 +104,7 @@ class HyperbolicSoftPromptModel(nn.Module):
         hyperbolic_soft_prompt_input = self.hyperbolic_soft_prompt.weight.expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
         input_embeddings = self.knit5.shared(inputs['input_ids'])  # Convert input IDs to embeddings
 
-        hyperbolic_soft_prompt_input = expmap0(hyperbolic_soft_prompt_input)
+        hyperbolic_soft_prompt_input = expmap0(hyperbolic_soft_prompt_input, self.curvature)
 
         concatenated_embeddings = torch.cat([hyperbolic_soft_prompt_input, input_embeddings], dim=1)
         

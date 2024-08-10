@@ -42,7 +42,7 @@ def objective(trial):
     print("Optimizing learning_rate with optuna")
     
     learning_rate = trial.suggest_float('lr', 0.01, 1.0)
-    c = trial.suggest_float('c', 0.1, 2.0)
+    c = 1.0#trial.suggest_float('c', 0.1, 2.0)
     #google/t5-large-lm-adapt
     model_name = config.t5_model.model_name
     print("Loading Tokenizer...")
@@ -94,7 +94,7 @@ def _train_random_walk(hyperbolic : bool):
     if hyperbolic:
         #hyperbolic_knit5_model = HyperbolicT5MapEmbeddings()
         print("Train with hyperbolic Soft Prompt Model.")
-        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=True)   
+        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False)   
     else:
         model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt')
 
