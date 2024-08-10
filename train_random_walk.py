@@ -126,7 +126,7 @@ def _train_random_walk(hyperbolic : bool):
 
 if __name__ == '__main__':    
     
-    parser = argparse.ArgumentParser(description='Knowledge Integration Training')
+    parser = argparse.ArgumentParser(description='Random Walk Training Training')
     parser.add_argument('--hyperbolic', action='store_true', help='Train with hyperbolic representation')
     parser.add_argument('--optuna', action='store_true', help='Optimizes learning rate of Soft Prompting for Random Walk')
     args = parser.parse_args()
