@@ -17,7 +17,23 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 
-
+def get_n_hops_from_node(knowledge_graph : nx.DiGraph, start_node, n_hops : int):
+    paths = [(start_node, "")]
+    
+    for _ in range(n_hops):
+        new_paths = []
+        for current_path, path_str in paths:
+            # Get successors of the last node in the current path
+            for successor in knowledge_graph.successors(current_path):
+                relation = knowledge_graph[current_path][successor].get('relation', 'related_to')
+                # Create new path string
+                new_path_str = f"{path_str} ; {relation} ; {successor}" if path_str else f"{current_path} ; {relation} ; {successor}"
+                # Append the new path to the new_paths list
+                new_paths.append((successor, new_path_str))
+        paths = new_paths
+    
+    # Return only the path strings
+    return [path_str for _, path_str in paths]
 
 #We fix it
 def correct_wrong_evidences(df : pd.DataFrame):
