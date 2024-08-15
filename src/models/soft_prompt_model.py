@@ -1,21 +1,23 @@
 import torch
 import torch.nn as nn
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, T5Model
 from utils.util import get_top_token_embeddings
+from utils.trainer_utils import load_model_checkpoint
 from config import Config
 
 class SoftPromptModel(nn.Module):
     def __init__(self,
-                 knit5 : nn.Module,
+                 knit5 : T5Model,
                  knit5_checkpoint_path : str,
                  model_name : str,
-                 soft_prompt = None):
+                 soft_prompt = None,
+                 with_model_state_dict = True):
         super(SoftPromptModel, self).__init__()
         self.knit5 = knit5
         self.model_name = model_name
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if knit5_checkpoint_path is not None:
-            self.load_checkpoint(knit5, knit5_checkpoint_path)
+            load_model_checkpoint(knit5, knit5_checkpoint_path, with_model_state_dict=with_model_state_dict)
         
         self.config = Config()
         
@@ -25,10 +27,6 @@ class SoftPromptModel(nn.Module):
             self.soft_prompt = soft_prompt
             
     
-    def load_checkpoint(self, knit5 : nn.Module, checkpoint_path):
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        knit5.load_state_dict(checkpoint)
-        print(f"Loaded KNIT5 checkpoint from {checkpoint_path}")
         
         
     def init_soft_prompt(self):
