@@ -93,4 +93,21 @@ def load_optimizer_and_start_epoch(optimizer : optim.Optimizer,
         return optimizer, 0
     
     
+def geodesic_distance(u, v, c=1.0):
+    norm_u = torch.norm(u, p=2, dim=-1)
+    norm_v = torch.norm(v, p=2, dim=-1)
+    numerator = torch.norm(u - v, p=2, dim=-1)**2
+    denominator = (1 - c * norm_u**2) * (1 - c * norm_v**2)
+    distance = torch.acosh(1 + 2 * c * numerator / denominator)
+    return distance
+
+def geodesic_regularization(soft_prompt_input, min_distance=1.0, c=1.0):
+    loss = 0
+    num_components = soft_prompt_input.size(1)
+    for i in range(num_components):
+        for j in range(i+1, num_components):
+            distance = geodesic_distance(soft_prompt_input[:, i], soft_prompt_input[:, j], c)
+            loss += torch.clamp(min_distance - distance, min=0).mean()
+    return loss
+    
     

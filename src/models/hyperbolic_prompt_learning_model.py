@@ -2,59 +2,12 @@ from typing import Union
 import torch
 import torch.nn as nn
 from utils.util import get_top_token_embeddings, expmap0, logmap0
-from utils.trainer_utils import load_model_checkpoint
+from utils.trainer_utils import load_model_checkpoint, geodesic_regularization
 from .hyperbolic_t5_model import HyperbolicT5Model, HyperbolicT5MapEmbeddings
 from transformers import AutoTokenizer, T5ForConditionalGeneration, T5Model
 from src.config import Config
 from .hyperbolic_model_utils import HyperbolicSoftPrompts
 
-#TODO Implement with Hyperbolic Embeddings, Try like this 
-
-"""
-import torch
-import geoopt
-import geoopt.manifolds.poincare as poincare
-from geoopt.optim import RiemannianSGD
-
-# Initialize the Poincaré ball manifold
-manifold = poincare.PoincareBall()
-
-# Define hyperbolic soft prompts
-soft_prompt_dim = 50  # Example dimension of the soft prompt
-n_prompts = 10  # Number of soft prompts
-hyperbolic_soft_prompt = torch.nn.Parameter(manifold.random_normal(size=(n_prompts, soft_prompt_dim), mean=0, std=1e-3))
-
-# Move the soft prompt to the appropriate device
-hyperbolic_soft_prompt = hyperbolic_soft_prompt.to(device)
-
-# Define an optimizer for the hyperbolic soft prompts
-optimizer = RiemannianSGD([hyperbolic_soft_prompt], lr=0.01)
-
-# Assuming 'inputs' and 'labels' are your training data and the model is already loaded and frozen
-model.eval()  # Freeze the model parameters
-
-for input_str, label in training_data:
-    optimizer.zero_grad()
-
-    # Encode the input as usual
-    input_ids = tokenizer(input_str, return_tensors='pt')['input_ids'].to(device)
-    input_embeddings = model.shared(input_ids)
-
-    # Concatenate the hyperbolic soft prompts with the input embeddings
-    concatenated_embeddings = torch.cat([hyperbolic_soft_prompt.expand(input_embeddings.size(0), -1, -1), input_embeddings], dim=1)
-
-    # Perform the forward pass through the model (while keeping the model frozen)
-    outputs = model(inputs_embeds=concatenated_embeddings)
-    
-    # Compute the loss (use a loss function suitable for your task, assuming it's compatible with the model's frozen state)
-    loss = loss_function(outputs, labels)
-
-    # Backpropagation and optimization in hyperbolic space
-    loss.backward()
-    optimizer.step()
-
-    print(f'Loss: {loss.item()}')
-"""
 class HyperbolicSoftPromptModel(nn.Module):
     def __init__(self,
                  hyperbolic_knit5 : Union[HyperbolicT5MapEmbeddings, T5ForConditionalGeneration, HyperbolicT5Model],
@@ -101,10 +54,10 @@ class HyperbolicSoftPromptModel(nn.Module):
     
     
     def forward(self, inputs, labels):
-        hyperbolic_soft_prompt_input = self.hyperbolic_soft_prompt.weight.expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+        soft_prompt_input = self.hyperbolic_soft_prompt.weight.expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
         input_embeddings = self.knit5.shared(inputs['input_ids'])  # Convert input IDs to embeddings
 
-        hyperbolic_soft_prompt_input = expmap0(hyperbolic_soft_prompt_input, self.curvature)
+        hyperbolic_soft_prompt_input = expmap0(soft_prompt_input, self.curvature)
 
         concatenated_embeddings = torch.cat([hyperbolic_soft_prompt_input, input_embeddings], dim=1)
         
@@ -114,21 +67,27 @@ class HyperbolicSoftPromptModel(nn.Module):
         
         
         outputs = self.knit5(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, labels=labels)
-        return outputs
-    """
+        
+        #Try some regularization to ensure that different parts of the soft prompt remain sufficiently distinct even within hyperbolic space 
+        geodesic_reg_loss = geodesic_regularization(hyperbolic_soft_prompt_input, min_distance=1.0, c=self.curvature)
+        
+        penalized_loss = outputs.loss + geodesic_reg_loss
+        return outputs, penalized_loss
+    
     def generate(self, inputs, max_length=50, num_beams = 5, early_stopping=True):
-        soft_prompt_input = self.hyperbolic_soft_prompt.soft_prompts.weight.unsqueeze(0).expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+        soft_prompt_input = self.hyperbolic_soft_prompt.weight.expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
         input_embeddings = self.knit5.shared(inputs['input_ids'])  # Convert input IDs to embeddings
 
-        concatenated_embeddings = torch.cat([hyperbolic_soft_prompt_embeddings, hyperbolic_input_embeddings], dim=1)
+
+        hyperbolic_soft_prompt_input = expmap0(soft_prompt_input, self.curvature)
+        concatenated_embeddings = torch.cat([hyperbolic_soft_prompt_input, input_embeddings], dim=1)
         
-        hyperbolic_concat_embedding = expmap0(concatenated_embeddings, self.curvature)
         
         #Adjust attention mask (take all of the soft prompt tokens should be attented)
         pp_attention_mask = torch.ones((inputs['attention_mask'].size(0), soft_prompt_input.size(1)), device=self.device)
         concatenated_attention_mask = torch.cat((pp_attention_mask, inputs['attention_mask']), dim=1)
 
-        outputs = self.knit5.generate(inputs_embeds=hyperbolic_concat_embedding, attention_mask=concatenated_attention_mask, max_length=max_length, num_beams=num_beams, early_stopping=early_stopping)
+        outputs = self.knit5.generate(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, max_length=max_length, num_beams=num_beams, early_stopping=early_stopping)
         return outputs
     
-    """
+    

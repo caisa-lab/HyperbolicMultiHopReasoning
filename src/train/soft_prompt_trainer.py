@@ -101,8 +101,12 @@ class SoftPromptTrainer:
                 inputs = self.tokenizer(input_batch, padding=True, truncation=True, return_tensors = 'pt').to(self.device)
                 labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
-                outputs = self.model(inputs, labels=labels)       
-                loss = outputs.loss
+                outputs, penalized_loss = self.model(inputs, labels=labels)      
+
+                loss = penalized_loss #outputs.loss
+                
+                
+                
                 loss.backward()
 		        
                 self.optimizer.step()
@@ -135,8 +139,8 @@ class SoftPromptTrainer:
                 labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
                 
-                outputs = self.model(inputs, labels=labels)
-                loss = outputs.loss
+                outputs, penalized_loss = self.model(inputs, labels=labels)
+                loss = penalized_loss#outputs.loss
                 
                 total_loss += loss.item()
                 
