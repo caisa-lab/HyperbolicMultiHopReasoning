@@ -17,19 +17,21 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 
-def get_n_hops_from_node(knowledge_graph : nx.DiGraph, start_node, n_hops : int):
+def get_n_hops_from_node(knowledge_graph: nx.MultiDiGraph, start_node, n_hops: int):
     paths = [(start_node, "")]
-    
+
     for _ in range(n_hops):
         new_paths = []
-        for current_path, path_str in paths:
-            # Get successors of the last node in the current path
-            for successor in knowledge_graph.successors(current_path):
-                relation = knowledge_graph[current_path][successor].get('relation', 'related_to')
-                # Create new path string
-                new_path_str = f"{path_str} ; {relation} ; {successor}" if path_str else f"{current_path} ; {relation} ; {successor}"
-                # Append the new path to the new_paths list
-                new_paths.append((successor, new_path_str))
+        for current_node, path_str in paths:
+            # Get all successors of the current node
+            for successor in knowledge_graph.successors(current_node):
+                # Get all edges (relations) between current_node and successor
+                for key, edge_data in knowledge_graph[current_node][successor].items():
+                    relation = edge_data.get('relation', 'related_to')
+                    # Create new path string
+                    new_path_str = f"{path_str} ; {relation} ; {successor}" if path_str else f"{current_node} ; {relation} ; {successor}"
+                    # Append the new path to the new_paths list
+                    new_paths.append((successor, new_path_str))
         paths = new_paths
     
     # Return only the path strings

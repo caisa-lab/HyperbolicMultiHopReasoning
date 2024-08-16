@@ -3,15 +3,15 @@ import matplotlib.pyplot as plt
 
 def create_knowledge_graph(data, iterations = 0):
     index = 0
-    G = nx.DiGraph()
+    G = nx.MultiDiGraph()
     for entry in data['evidences']:
         if index > iterations:
                 return G
         for triples in entry:
-            head = triples[0]
-            relation = triples[1]
-            tail = triples[2]
-            G.add_edge(head, tail, relation= relation)
+            head = triples[0].strip()
+            relation = triples[1].strip()
+            tail = triples[2].strip()
+            G.add_edge(head, tail, key=relation, relation=relation)
         if iterations > 0:
             index += 1
             

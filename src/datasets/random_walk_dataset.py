@@ -49,8 +49,10 @@ class RandomWalkDataset(Dataset):
             if not neighbors:
                 break  # Restart the walk if dead-end is reached
             next_node = random.choice(neighbors)
-            edge = self.kg.get_edge_data(current_node, next_node)['relation']
-            path.append(edge)
+            # Randomly select one of the edges (relations) if multiple exist between the nodes
+            edge_data = self.kg.get_edge_data(current_node, next_node)
+            relation = random.choice(list(edge_data.values()))['relation']
+            path.append(relation)
             path.append(next_node)
             current_node = next_node
         return path
@@ -67,7 +69,6 @@ class RandomWalkDataset(Dataset):
                     if path and len(path) == 2*walk_length - 1:  # Ensure path is exactly of the required length
                         walks.add(tuple(path))
                 all_paths.update(walks)
-            #print(len(list(all_paths)))
         return all_paths
     
     
@@ -77,7 +78,6 @@ class RandomWalkDataset(Dataset):
     def __getitem__(self, idx):
         random_walk = self.data[idx]
         
-        
         complete_path = f"{random_walk[0]}"
         incomplete_path = f"{random_walk[0]}"
         for i in range(1, len(random_walk)):
@@ -85,5 +85,4 @@ class RandomWalkDataset(Dataset):
             if i % 2 != 0:
                 incomplete_path += f" ; {random_walk[i]}"
 
-        
         return incomplete_path, complete_path
