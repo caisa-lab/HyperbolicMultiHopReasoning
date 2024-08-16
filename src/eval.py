@@ -51,7 +51,7 @@ def f1_score(prediction, ground_truth):
 def exact_match_score(prediction, ground_truth):
     return (normalize_answer(prediction) == normalize_answer(ground_truth))
 
-
+from torch.cuda.amp import autocast
 #-------------------------------------------------------------------------------------------------
 import torch.nn as nn
 from src.utils.trainer_utils import load_model_checkpoint, load_soft_prompt
@@ -95,23 +95,21 @@ def evaluate_one_hop_wiki(model : Union[nn.Module, HyperbolicT5MapEmbeddings],
         avg_em_perc = total_em / len(test_dataloader.dataset)
         avg_f1_perc = total_f1 / len(test_dataloader.dataset)
     print(f"Test - AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
-    random_numbers = [random.randint(0, len(prediction_vs_label)) for _ in range(10)]
-    for i in range(random_numbers):
-        print(prediction_vs_label[i])
-from models import SoftPromptModel
+    return prediction_vs_label
+from models import SoftPromptModel, HyperbolicSoftPromptModel
 
-def evaluate_random_walk_training(model : SoftPromptModel,
+def evaluate_random_walk_training(finetuned_model : SoftPromptModel,
                                   tokenizer,
                                   test_dataloader : DataLoader,
-                                  model_checkpoint_path : str,
-                                  hopping_soft_prompt_checkpoint_path : str,
+                                  #model_checkpoint_path : str,
+                                  #hopping_soft_prompt_checkpoint_path : str,
                                   device = 'cuda' if torch.cuda.is_available() else 'cpu'):
-    model.knit5 = load_model_checkpoint(model.knit5, model_checkpoint_path, device)
-    model.soft_prompt = load_soft_prompt(model.soft_prompt, hopping_soft_prompt_checkpoint_path, device)
+    #model.knit5 = load_model_checkpoint(model.knit5, model_checkpoint_path, device)
+    #model.soft_prompt = load_soft_prompt(model.soft_prompt, hopping_soft_prompt_checkpoint_path, device)
     
     
-    model.to(device)
-    model.eval()
+    finetuned_model.to(device)
+    finetuned_model.eval()
     total_em = 0
     total_f1 = 0
     prediction_vs_label = {}
@@ -120,28 +118,40 @@ def evaluate_random_walk_training(model : SoftPromptModel,
         for batch_idx, batch in enumerate(progress_bar):
             incomplete_sequence, complete_sequence = batch
             inputs = tokenizer(incomplete_sequence, padding=True, truncation=True, return_tensors = 'pt').to(device)
-
-            outputs = model.generate(input_ids=inputs['input_ids'],
-                                    attention_mask=inputs['attention_mask'],
-                                    max_length=50,
-                                    num_beams = 5,
-                                    early_stopping=True)
+           
+            outputs = finetuned_model.generate(inputs=inputs,
+                                        max_length=50,
+                                        num_beams = 5,
+                                        early_stopping=True)
             
             decoded_predictions = tokenizer.batch_decode(outputs, skip_special_tokens=True) 
+            
+
+            
 
             _f1_score = sum([f1_score(pred, truth)[0] for pred, truth, in zip(decoded_predictions, complete_sequence)])
             em_score = sum([1 if exact_match_score(pred, truth) else 0 for pred, truth in zip(decoded_predictions, complete_sequence)])
             
+            
             total_em += em_score
             total_f1 += _f1_score
-            prediction_vs_label[batch_idx] = f'Prediction: {decoded_predictions[0]} \n Label: {complete_sequence[0]}'
+            
+            for idx, (pred, label) in enumerate(zip(decoded_predictions, complete_sequence)):
+                index = batch_idx*test_dataloader.batch_size+idx
+                prediction_vs_label[index] = {}
+                prediction_vs_label[index]['prediction'] = pred
+                prediction_vs_label[index]['label'] = label
+            if batch_idx <= 5:
+                print('\n', f'Prediction: {decoded_predictions[0]} \n Label: {complete_sequence[0]}')
             
         avg_em_perc = total_em / len(test_dataloader.dataset)
         avg_f1_perc = total_f1 / len(test_dataloader.dataset)
+        
+        
+        
         print(f"Test - AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
-        random_numbers = [random.randint(0, len(prediction_vs_label)) for _ in range(10)]
-        for i in range(random_numbers):
-            print(prediction_vs_label[i])
+        
+        return prediction_vs_label
         
 import random
 def evaluate_parse_then_hop_training(parsing_model: SoftPromptModel,
@@ -169,6 +179,13 @@ def evaluate_parse_then_hop_training(parsing_model: SoftPromptModel,
     with torch.no_grad():
         for batch_idx, batch in enumerate(progress_bar):
             question, complete_sequence = batch
+            
+            parts = complete_sequence.split(' ; ') # Strip each part to remove extra spaces
+            if len(parts) > 5:
+                parts[0] = '| '.join([parts[0], parts[1]]) # Some parts have ; in the first entity we replace it with a | 
+            parts = [part.strip() for part in parts] #Some have double whitespaces we remove them and join with one whitespace
+            complete_sequence = ' ; '.join(parts) 
+            
             inputs_question = tokenizer(question, padding=True, truncation=True, return_tensors = 'pt').to(device)
 
             incomplete_sequence = parsing_model.generate(inputs=inputs_question)
@@ -191,7 +208,7 @@ def evaluate_parse_then_hop_training(parsing_model: SoftPromptModel,
         avg_em_perc = total_em / len(test_dataloader.dataset)
         avg_f1_perc = total_f1 / len(test_dataloader.dataset)
         print(f"Test - AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
-        random_numbers = [random.randint(0, len(prediction_vs_label)) for _ in range(10)]
-        for i in range(random_numbers):
-            print(prediction_vs_label[i])
+
+            
+        return prediction_vs_label
 
