@@ -41,8 +41,8 @@ random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_m
 def objective(trial):
     print("Optimizing learning_rate with optuna")
     
-    learning_rate = trial.suggest_float('lr', 0.01, 1.0)
-    c = 1.0#trial.suggest_float('c', 0.1, 2.0)
+    learning_rate = 0.3#trial.suggest_float('lr', 0.003, 0.3, log=True)
+    c = trial.suggest_float('c', 0.1, 2.0)
     #google/t5-large-lm-adapt
     model_name = config.t5_model.model_name
     print("Loading Tokenizer...")
@@ -56,6 +56,7 @@ def objective(trial):
     print("Train with hyperbolic Soft Prompt Model.")
     model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False, curvature=c)   
     print("Using curvature", c)
+    print("Using Learning Rate", learning_rate)
 
     trainer = SoftPromptTrainer(model,
                       tokenizer,

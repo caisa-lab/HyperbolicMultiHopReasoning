@@ -33,11 +33,6 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f'Training on device: {device}')
 
 #google/t5-large-lm-adapt
-model_name = config.t5_model.model_name
-print("Loading Tokenizer...")
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-print("Loading Model...")
-t5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 parse_then_hop_dataloader_train = DataLoader(parse_then_hop_train, batch_size=config.t5_model.batch_size, shuffle=True)
 parse_then_hop_dataloader_dev = DataLoader(parse_then_hop_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
 
@@ -49,9 +44,9 @@ def _train_parse_then_hop(hyperbolic: bool):
     knit5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     
     if hyperbolic:
-        hyperbolic_knit5_model = HyperbolicT5Model(knit5_model, 'hyperbolic_knit5')
+        #hyperbolic_knit5_model = HyperbolicT5Model(knit5_model)
         print("Train with hyperbolic Soft Prompt Model.")
-        model = HyperbolicSoftPromptModel(hyperbolic_knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_parsing_prompt', with_model_state_dict=True)   
+        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_parsing_prompt', with_model_state_dict=False)   
     else:
         model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'parsing_prompt')
 
