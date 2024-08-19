@@ -25,7 +25,8 @@ class SoftPromptTrainer:
                  checkpoint_path : str = None,
                  tboard_checkpoint_path : str = None,
                  validation_step : int = 1,
-                 method : str = 'random_walk_training'):
+                 method : str = 'random_walk_training',
+                 retrain : bool = False):
         self.model = model.to(device)
         self.tokenizer = tokenizer
         self.tokenizer.model_max_length = config.t5_model.tokenizer_max_length
@@ -60,15 +61,15 @@ class SoftPromptTrainer:
             
             
             
-        self.optimizer = get_optimizer(self.model.hyperbolic_soft_prompt.parameters(), self.training_config)
+        self.optimizer = get_optimizer(self.model.soft_prompt.parameters(), self.training_config)
             
         self.log_dir, self.model_dir = setup_directories(self.training_config)
         if self.tboard_checkpoint_path is not None:
             self.log_dir = tboard_checkpoint_path
             print(f"Continue writing to {tboard_checkpoint_path}")
         self.writer = SummaryWriter(log_dir=self.log_dir)
-        if self.checkpoint_path is not None:
-            self.model.hyperbolic_soft_prompt = load_soft_prompt(self.model.hyperbolic_soft_prompt, checkpoint_path)
+        if self.checkpoint_path is not None and retrain:
+            self.model.soft_prompt = load_soft_prompt(self.model.soft_prompt, checkpoint_path)
             self.optimizer, self.start_epoch = load_optimizer_and_start_epoch(self.optimizer, checkpoint_path)
         
             
@@ -101,9 +102,8 @@ class SoftPromptTrainer:
                 inputs = self.tokenizer(input_batch, padding=True, truncation=True, return_tensors = 'pt').to(self.device)
                 labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
-                outputs, penalized_loss = self.model(inputs, labels=labels)      
-
-                loss = penalized_loss #outputs.loss
+                outputs = self.model(inputs, labels=labels)
+                loss = outputs.loss
                 
                 
                 
@@ -139,8 +139,8 @@ class SoftPromptTrainer:
                 labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
                 
-                outputs, penalized_loss = self.model(inputs, labels=labels)
-                loss = penalized_loss#outputs.loss
+                outputs = self.model(inputs, labels=labels)
+                loss = outputs.loss
                 
                 total_loss += loss.item()
                 
@@ -174,7 +174,7 @@ class SoftPromptTrainer:
             self.early_stop_counter = 0
             self.best_model_path = soft_prompt_path
             torch.save({
-                'soft_prompt_state_dict': self.model.hyperbolic_soft_prompt.state_dict(),
+                'soft_prompt_state_dict': self.model.soft_prompt.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'epoch': epoch}, soft_prompt_path)
         else:

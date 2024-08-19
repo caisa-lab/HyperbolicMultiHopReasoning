@@ -33,8 +33,8 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f'Training on device: {device}')
 
 #google/t5-large-lm-adapt
-parse_then_hop_dataloader_train = DataLoader(parse_then_hop_train, batch_size=config.t5_model.batch_size, shuffle=True)
-parse_then_hop_dataloader_dev = DataLoader(parse_then_hop_dev,  batch_size=config.t5_model.batch_size, shuffle=False)
+parse_then_hop_dataloader_train = DataLoader(parse_then_hop_train, batch_size=config.t5_model.batch_size, shuffle=True, num_workers=config.parse_then_hop_training.num_workers)
+parse_then_hop_dataloader_dev = DataLoader(parse_then_hop_dev,  batch_size=config.t5_model.batch_size, shuffle=False, num_workers=config.parse_then_hop_training.num_workers)
 
 def _train_parse_then_hop(hyperbolic: bool):
     model_name = config.t5_model.model_name

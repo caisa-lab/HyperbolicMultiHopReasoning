@@ -50,9 +50,9 @@ def _knowledge_integration_with_c4(hyperbolic):
     C4_train = C4Dataset(c4_dataset ,tokenizer=tokenizer, objective=objective)
         
 
-    c4_dataloader_train = DataLoader(C4_train, batch_size=config.t5_model.batch_size, shuffle=True)
-    single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_model.batch_size, shuffle=True)
-    single_hop_dataloader_dev = DataLoader(ki_train,  batch_size=config.t5_model.batch_size, shuffle=False)
+    c4_dataloader_train = DataLoader(C4_train, batch_size=config.t5_model.batch_size, shuffle=True, num_workers=config.single_hop_training.num_workers)
+    single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_model.batch_size, shuffle=True, num_workers=config.single_hop_training.num_workers)
+    single_hop_dataloader_dev = DataLoader(ki_train,  batch_size=config.t5_model.batch_size, shuffle=False, num_workers=config.single_hop_training.num_workers)
 
     trainer = ModelTrainer(model,
                         tokenizer,

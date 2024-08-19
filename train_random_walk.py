@@ -35,8 +35,8 @@ config = Config()
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(f'Training on device: {device}')
 
-random_walk_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_model.batch_size, shuffle=True, num_workers=4)
-random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_model.batch_size, shuffle=False, num_workers=4)
+random_walk_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_model.batch_size, shuffle=True, num_workers=config.random_walk_training.num_workers)
+random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_model.batch_size, shuffle=False, num_workers=config.random_walk_training.num_workers)
 
 def objective(trial):
     print("Optimizing learning_rate with optuna")
@@ -91,13 +91,21 @@ def _train_random_walk(hyperbolic : bool):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")
     knit5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    import torch.nn as nn
+    from src.utils.trainer_utils import load_soft_prompt
+    
+    if config.random_walk_training.hopping_prompt_checkpoint_path is not None:
+        soft_prompt = nn.Embedding(100, 1024)
+        load_soft_prompt(soft_prompt, config.random_walk_training.hopping_prompt_checkpoint_path)
+    else:
+        soft_prompt = None
     
     if hyperbolic:
         #hyperbolic_knit5_model = HyperbolicT5MapEmbeddings()
         print("Train with hyperbolic Soft Prompt Model.")
-        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False)   
+        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt)   
     else:
-        model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt')
+        model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt)
 
     print("Model type before passing to SoftPromptTrainer:", type(model))
 
@@ -110,6 +118,7 @@ def _train_random_walk(hyperbolic : bool):
                       method='random_walk_training',
                       checkpoint_path=config.random_walk_training.hopping_prompt_checkpoint_path,
                       tboard_checkpoint_path=config.random_walk_training.tboard_checkpoint_path,
+                      retrain = False
                       )
 
 
