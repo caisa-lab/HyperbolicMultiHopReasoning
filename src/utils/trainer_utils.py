@@ -41,7 +41,11 @@ def get_optimizer(parameters, trainer_config : BaseTrainingConfig):
 
 def setup_directories(trainer_config : BaseTrainingConfig):
     current_time = datetime.now().strftime('%b%d_%H-%M-%S')
-    log_dir = os.path.join(trainer_config.log_dir, current_time)
+    learning_rate = trainer_config.learning_rate
+    curvature = trainer_config.curvature
+    optimizer = trainer_config.optimizer
+    final_string = f"{current_time}_{optimizer}_{learning_rate}_{curvature}"
+    log_dir = os.path.join(trainer_config.log_dir, final_string)
     model_dir = os.path.join(trainer_config.model_save_path, current_time) 
     os.makedirs(log_dir, exist_ok=True)
     os.makedirs(model_dir, exist_ok=True)  

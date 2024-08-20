@@ -1,7 +1,8 @@
 class BaseTrainingConfig:
-        def __init__(self, optimizer = 'AdaFactor',
+        def __init__(self, optimizer = 'Hyperbolic',
                      learning_rate = 0.001,
                      optimizer_param = 1e-5,
+                     curvature = 1.0,
                      epochs = 50,
                      scheduler = None,
                      scheduler_factor = 1,
@@ -9,7 +10,8 @@ class BaseTrainingConfig:
                      model_save_path = 'default_model_save',
                      tboard_checkpoint_path = None,
                      model_checkpoint_path = None,
-                     load_optimizer = False):
+                     load_optimizer = False,
+                     num_workers = 4):
             self.optimizer = optimizer #[Adam, AdamW, AdaFactor, Hyperbolic]
             self.learning_rate = learning_rate #Same as in the paper
             self.optimizer_param = optimizer_param #weight_decay for AdamW Check which Optimizer
@@ -21,6 +23,8 @@ class BaseTrainingConfig:
             self.tboard_checkpoint_path = tboard_checkpoint_path
             self.model_checkpoint_path = model_checkpoint_path
             self.load_optimizer = load_optimizer
+            self.num_workers = num_workers
+            self.curvature = curvature
             
 class Config:  
     class SingleHopTraining(BaseTrainingConfig):
@@ -28,7 +32,8 @@ class Config:
             super().__init__(log_dir='tboard_logs/knowledge_integration',
                              model_save_path='checkpoints/knowledge_integration',
                              model_checkpoint_path= None,
-                             tboard_checkpoint_path=None)
+                             tboard_checkpoint_path=None,
+                             num_workers=4)
 
                 
     class OneHopWikiTraining(BaseTrainingConfig):
@@ -37,7 +42,8 @@ class Config:
                              model_save_path='checkpoints/one_hop_wiki_finetuning',
                              epochs=160,
                              model_checkpoint_path= None,
-                             tboard_checkpoint_path=None)
+                             tboard_checkpoint_path=None,
+                             num_workers=4)
 
     class RandomWalkTraining(BaseTrainingConfig):
         def __init__(self):
@@ -46,7 +52,8 @@ class Config:
                              log_dir='tboard_logs/random_walk_training',
                              model_save_path='checkpoints/random_walk_training',
                              model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth',
-                             tboard_checkpoint_path=None
+                             tboard_checkpoint_path=None,
+                             num_workers=16
                              )
             self.prompt_length = 100
             self.hopping_prompt_checkpoint_path = None
@@ -58,10 +65,11 @@ class Config:
                              log_dir='tboard_logs/parse_then_hop_training',
                              model_save_path='checkpoints/parse_then_hop_training',
                              model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth',
-                             tboard_checkpoint_path=None
+                             tboard_checkpoint_path=None,
+                             num_workers=16
                              )
             self.prompt_length = 100
-            self.hopping_prompt_checkpoint_path = 'checkpoints/random_walk_training/large_adapt_bsize64_c4_part2/hopping_soft_prompt_epoch_25_val_loss_0.2434.pth'
+            self.hopping_prompt_checkpoint_path = None
             self.parsing_prompt_checkpoint_path = None
                 
     class T5_Model:

@@ -41,8 +41,9 @@ random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_m
 def objective(trial):
     print("Optimizing learning_rate with optuna")
     
-    learning_rate = 0.3#trial.suggest_float('lr', 0.003, 0.3, log=True)
-    c = trial.suggest_float('c', 0.1, 2.0)
+    learning_rate = trial.suggest_categorical('lr', [3e-5, 3e-4, 3e-3, 3e-2, 3e-1])
+    c = trial.suggest_categorical('c', [-1, 0, 0.1, 0.5, 1, 2, 4])
+    optimizer_choice = trial.suggest_categorical('optimizer', ['AdaFactor', 'Hyperbolic'])
     #google/t5-large-lm-adapt
     model_name = config.t5_model.model_name
     print("Loading Tokenizer...")
@@ -51,12 +52,14 @@ def objective(trial):
     knit5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     
     config.random_walk_training.learning_rate = learning_rate
-    config.random_walk_training.epochs = 5
+    config.random_walk_training.epochs = 16
+    config.random_walk_training.optimizer = optimizer_choice
+    config.random_walk_training.curvature = c
  
     print("Train with hyperbolic Soft Prompt Model.")
-    model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False, curvature=c)   
-    print("Using curvature", c)
-    print("Using Learning Rate", learning_rate)
+    model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False, curvature=config.random_walk_training.curvature)   
+    print("Using curvature", config.random_walk_training.curvature)
+    print("Using Learning Rate", config.random_walk_training.learning_rate)
 
     trainer = SoftPromptTrainer(model,
                       tokenizer,
@@ -102,8 +105,9 @@ def _train_random_walk(hyperbolic : bool):
     
     if hyperbolic:
         #hyperbolic_knit5_model = HyperbolicT5MapEmbeddings()
-        print("Train with hyperbolic Soft Prompt Model.")
-        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt)   
+        curvature = 4.0
+        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt, curvature=curvature)   
+        print(f"Train with hyperbolic Soft Prompt Model with curvature {curvature}")
     else:
         model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt)
 
@@ -142,8 +146,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     if args.optuna:
-        study = optuna.create_study(direction='minimize')
-        study.optimize(objective, n_trials=20)
+        sqlite_db_path = "sqlite:///optuna_study.db"
+        study_name = "optimize_curvature_lr"
+        study = optuna.create_study(study_name=study_name, storage=sqlite_db_path, direction='minimize', load_if_exists=True)
+        study.optimize(objective, n_trials=2)
         # Print the best hyperparameters
         print("Best hyperparameters: ", study.best_params)
         print("Best accuracy: ", study.best_value)
