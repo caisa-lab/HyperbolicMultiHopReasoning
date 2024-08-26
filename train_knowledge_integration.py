@@ -31,16 +31,16 @@ def _knowledge_integration_with_c4(hyperbolic):
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(config.t5_model.model_name)
     print(f"Loading Model {config.t5_model.model_name}...")
-    t5_model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
     #Adjust Dropout
-    t5_model.config.dropout_rate = 0.1
-    t5_model.config.hidden_dropout_prob = 0.1
-    t5_model.config.attention_probs_dropout_prob = 0.1
     if hyperbolic:
         print("Train with Hyperbolic model.")
-        model = HyperbolicT5Model(t5_model, 'hyperbolic_knit5')
+        model = HyperbolicT5Model()
     else:
-        model = t5_model
+        model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
+        
+    model.config.dropout_rate = 0.1
+    model.config.hidden_dropout_prob = 0.1
+    model.config.attention_probs_dropout_prob = 0.1
 
 
     base_path = 'c4/en/c4-train.{:05d}-of-01024.json'

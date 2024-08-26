@@ -55,9 +55,8 @@ from torch.cuda.amp import autocast
 #-------------------------------------------------------------------------------------------------
 import torch.nn as nn
 from src.utils.trainer_utils import load_model_checkpoint, load_soft_prompt
-from src.models import HyperbolicT5MapEmbeddings
 from typing import Union
-def evaluate_one_hop_wiki(model : Union[nn.Module, HyperbolicT5MapEmbeddings],
+def evaluate_one_hop_wiki(model : Union[nn.Module],
                           tokenizer,
                           test_dataloader : DataLoader,
                           model_checkpoint_path : str,

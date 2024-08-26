@@ -7,7 +7,7 @@ import torch
 from src.config import Config
 from torch.utils.data import DataLoader
 from src.knowledge_graph import create_knowledge_graph
-from src.models import HyperbolicSoftPromptModel, SoftPromptModel, HyperbolicT5Model, HyperbolicT5MapEmbeddings
+from src.models import HyperbolicSoftPromptModel, SoftPromptModel, HyperbolicT5Model
 import argparse
 import optuna
 

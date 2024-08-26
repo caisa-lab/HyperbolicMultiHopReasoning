@@ -1,62 +1,10 @@
 from utils.util import expmap0, logmap0
 from utils.trainer_utils import load_model_checkpoint
+from utils.model_utils import ModelOutput
 from transformers import T5ForConditionalGeneration, T5Config
 from .hyperbolic_model_utils import HyperbolicEmbedding
-from torch import Tensor, FloatTensor, LongTensor, BoolTensor
-from typing import Tuple
-
-
-class HyperbolicT5MapEmbeddings(T5ForConditionalGeneration):
-    def __init__(self,
-                 model_name : str = 'google/t5-large-lm-adapt',
-                 curvature : float = 1.0):
-        super(HyperbolicT5MapEmbeddings, self).__init__(T5Config.from_pretrained(model_name))
-        print(f"Loaded model: {model_name}")
-        self.curvature = curvature
-        self.model_name = model_name
-        #if checkpoint_path:
-         #   load_model_checkpoint(self.t5, checkpoint_path, with_model_state_dict=True)
-            
-    
-    def forward(self, input_ids: LongTensor = None,
-            attention_mask: FloatTensor = None,
-            decoder_input_ids: LongTensor = None,
-            decoder_attention_mask: BoolTensor = None,
-            head_mask: FloatTensor = None,
-            decoder_head_mask: FloatTensor = None,
-            cross_attn_head_mask: Tensor = None,
-            encoder_outputs: Tuple[Tuple[FloatTensor]] = None,
-            past_key_values: Tuple[Tuple[FloatTensor]] = None,
-            inputs_embeds: Tensor = None,
-            decoder_inputs_embeds: Tensor = None,
-            use_cache: bool = None,
-            output_attentions: bool = None,
-            output_hidden_states: bool = None,
-            return_dict: bool = None,
-            labels = None):
-        if inputs_embeds is None and input_ids is not None:
-            input_embeddings = self.shared(input_ids)  # Convert input IDs to embeddings
-            
-            #Map input embeddings to hyperbolic space
-            input_embeddings = expmap0(input_embeddings, self.curvature)
-        else:
-            input_embeddings = inputs_embeds
-        return super(HyperbolicT5MapEmbeddings, self).forward(input_ids=input_ids,
-                                                            attention_mask=attention_mask,
-                                                            decoder_input_ids=decoder_input_ids,
-                                                            decoder_attention_mask=decoder_attention_mask,
-                                                            head_mask=head_mask,
-                                                            decoder_head_mask=decoder_head_mask,
-                                                            cross_attn_head_mask=cross_attn_head_mask,
-                                                            encoder_outputs=encoder_outputs,
-                                                            past_key_values=past_key_values,
-                                                            decoder_inputs_embeds=decoder_inputs_embeds,
-                                                            use_cache=use_cache,
-                                                            output_attentions=output_attentions,
-                                                            output_hidden_states=output_hidden_states,
-                                                            return_dict=return_dict,
-                                                            inputs_embeds=input_embeddings,  # pass inputs_embeds here
-                                                            labels=labels)
+from typing import Tuple, Optional
+import torch
 
 class HyperbolicT5Model(T5ForConditionalGeneration):
     """
@@ -67,52 +15,81 @@ class HyperbolicT5Model(T5ForConditionalGeneration):
     def __init__(self,
                  model_name : str = 'google/t5-large-lm-adapt',
                  curvature : float = 1.0):
-        config = T5Config.from_pretrained(model_name)
-        super(HyperbolicT5Model, self).__init__(config)
+        super(HyperbolicT5Model, self).__init__(config=T5Config.from_pretrained(model_name))
+        self.load_state_dict(T5ForConditionalGeneration.from_pretrained(model_name).state_dict())
+
         self.curvature = curvature
         self.model_name = model_name
-        num_embeddings = self.shared.num_embeddings
-        embedding_dim = self.shared.embedding_dim
-        self.encoder_embeddings = HyperbolicEmbedding(num_embeddings, embedding_dim, curvature = curvature) #TODO Initialize this with the exponential mapped weights of the shared layers of T5 
 
     
-    
+    #TODO What we try:
+    # Embed after the embeddings 
+    # Embed after the encoder
     def forward(self,
-                input_ids: LongTensor = None,
-    attention_mask: FloatTensor = None,
-    decoder_input_ids: LongTensor = None,
-    decoder_attention_mask: BoolTensor = None,
-    head_mask: FloatTensor = None,
-    decoder_head_mask: FloatTensor = None,
-    cross_attn_head_mask: Tensor = None,
-    encoder_outputs: Tuple[Tuple[FloatTensor]] = None,
-    past_key_values: Tuple[Tuple[FloatTensor]] = None,
-    inputs_embeds: Tensor = None,
-    decoder_inputs_embeds: Tensor = None,
-    use_cache: bool = None,
-    output_attentions: bool = None,
-    output_hidden_states: bool = None,
-    return_dict: bool = None,
-    labels = None):
-        input_embeddings = self.encoder_embeddings(input_ids)  # Convert input IDs to hyperbolic embeddings
+                input_ids: Optional[torch.LongTensor] = None,
+                attention_mask: Optional[torch.FloatTensor] = None,
+                decoder_input_ids: Optional[torch.LongTensor] = None,
+                decoder_attention_mask: Optional[torch.BoolTensor] = None,
+                head_mask: Optional[torch.FloatTensor] = None,
+                decoder_head_mask: Optional[torch.FloatTensor] = None,
+                cross_attn_head_mask: Optional[torch.Tensor] = None,
+                encoder_outputs: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+                past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+                inputs_embeds: Optional[torch.FloatTensor] = None,
+                decoder_inputs_embeds: Optional[torch.FloatTensor] = None,
+                labels: Optional[torch.LongTensor] = None,
+                use_cache: Optional[bool] = None,
+                output_attentions: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                return_dict: Optional[bool] = None):
+    
+    
+        inputs_embeds = expmap0(inputs_embeds)
         
-        input_embeddings = logmap0(input_embeddings, c = self.curvature)
-            
+        encoder_outputs = self.encoder(input_ids = input_ids,
+                                        inputs_embeds = inputs_embeds,
+                                        attention_mask=attention_mask,
+                                        head_mask = head_mask,
+                                        output_attentions = output_attentions,
+                                        output_hidden_states = output_hidden_states,
+                                        return_dict = return_dict)
 
+        hidden_states = encoder_outputs[0]
+        
+        #hidden_states = expmap0(hidden_states, self.curvature)
+        
+        if labels is not None and decoder_input_ids is None and decoder_inputs_embeds is None:
+            decoder_input_ids = self._shift_right(labels)
 
-        return super(HyperbolicT5Model, self).forward(input_ids=input_ids,
-    attention_mask=attention_mask,
-    decoder_input_ids=decoder_input_ids,
-    decoder_attention_mask=decoder_attention_mask,
-    head_mask=head_mask,
-    decoder_head_mask=decoder_head_mask,
-    cross_attn_head_mask=cross_attn_head_mask,
-    encoder_outputs=encoder_outputs,
-    past_key_values=past_key_values,
-    decoder_inputs_embeds=decoder_inputs_embeds,
-    use_cache=use_cache,
-    output_attentions=output_attentions,
-    output_hidden_states=output_hidden_states,
-    return_dict=return_dict,
-    inputs_embeds=input_embeddings,  
-    labels=labels)
+        decoder_outputs = self.decoder(input_ids = decoder_input_ids,
+                                             encoder_attention_mask = attention_mask,
+                                             encoder_hidden_states = hidden_states,
+                                             attention_mask = decoder_attention_mask,
+                                             inputs_embeds = decoder_inputs_embeds,
+                                             past_key_values = past_key_values,
+                                             head_mask = head_mask,
+                                             cross_attn_head_mask = cross_attn_head_mask,
+                                             use_cache = use_cache,
+                                             output_attentions=output_attentions,
+                                             output_hidden_states=output_hidden_states,
+                                             return_dict = return_dict)
+
+        lm_logits = self.lm_head(decoder_outputs[0])
+
+        loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100)
+
+        loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
+        
+        print(loss)
+        # return (lm_logits, loss) if loss is not None else lm_logits
+        return ModelOutput(
+            loss=loss,
+            logits=lm_logits,
+            past_key_values=decoder_outputs.past_key_values,
+            decoder_hidden_states=decoder_outputs.hidden_states,
+            decoder_attentions=decoder_outputs.attentions,
+            cross_attentions=decoder_outputs.cross_attentions,
+            encoder_last_hidden_state=encoder_outputs.last_hidden_state,
+            encoder_hidden_states=encoder_outputs.hidden_states,
+            encoder_attentions=encoder_outputs.attentions
+        )
