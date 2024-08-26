@@ -98,12 +98,10 @@ class ModelTrainer:
             self._train_without_c4(epochs)
         else:
             print(f"Training with C4...")
-            self._train_with_c4(epochs, hyperbolic)
+            self._train_with_c4(epochs)
                 
                     
-    def _train_with_c4(self, epochs : int, hyperbolic : bool):
-        hyperbolic_optimizer = get_optimizer(self.model.t5.shared.parameters(), self.training_config)
-        
+    def _train_with_c4(self, epochs : int):
         self.model.train()
         for epoch in range(epochs):
             total_c4_loss = 0
@@ -139,7 +137,7 @@ class ModelTrainer:
                 if batch_idx % 2 == 0:
                     outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels)
                 else:
-                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels, hyperbolic = False)
+                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels)
                 loss = outputs.loss   
 
                 

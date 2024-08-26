@@ -44,7 +44,7 @@ class HyperbolicT5Model(T5ForConditionalGeneration):
                 return_dict: Optional[bool] = None):
     
     
-        inputs_embeds = expmap0(inputs_embeds)
+        inputs_embeds = expmap0(inputs_embeds, self.curvature)
         
         encoder_outputs = self.encoder(input_ids = input_ids,
                                         inputs_embeds = inputs_embeds,

@@ -26,10 +26,10 @@ class C4Dataset(Dataset):
         
         
     def _cleanup_dataset(self, dataset):
-               
+        count_removed = 0   
+        cleaned_dataset = []     
         if self.objective == 'span_corruption':
-            cleaned_dataset = []
-            for text in tqdm(cleaned_dataset, desc=f'Cleanup Dataset: Remove texts with < {self.average_length_of_spans} corrupted tokens', file=sys.stdout):
+            for text in tqdm(dataset, desc=f'Cleanup Dataset: Remove texts with < {self.average_length_of_spans} corrupted tokens', file=sys.stdout):
             
                 if len(text.split()) * self.corruption_rate < self.average_length_of_spans:
                     count_removed += 1
@@ -37,16 +37,12 @@ class C4Dataset(Dataset):
                 cleaned_dataset.append(text)
                 
         else:
-            cleaned_dataset = []
-            count_removed = 0
             for text in tqdm(dataset, desc=f"Cleanup Dataset: Remove texts with > {self.config.t5_model.tokenizer_max_length} tokens", file=sys.stdout):
                 if len(text.split()) > self.config.t5_model.tokenizer_max_length:
                     count_removed += 1
                     continue
                 cleaned_dataset.append(text)
         print(f'Cleaned {count_removed} Datapoints remaining {len(cleaned_dataset)} Datapoints')
-        
-        
         
         
         return cleaned_dataset
@@ -116,6 +112,8 @@ class C4Dataset(Dataset):
             #print(f'Output IDs: {output_ids}')
             sentinel_counter += 1
             sum_lengths += length-1
+        sentinel_token = self.tokenizer.convert_tokens_to_ids([f'<extra_id_{sentinel_counter}>'])[0]
+        corrupted_tokens.append(sentinel_token)
         input_ids = output_ids
         target_ids = corrupted_tokens
         #print(f"Length of Target IDs: {len(target_ids)}")

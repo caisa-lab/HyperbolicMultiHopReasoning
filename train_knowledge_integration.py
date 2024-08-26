@@ -101,14 +101,16 @@ def _knowledge_integration_without_c4(hyperbolic):
     print(f"Loading Model {config.t5_model.batch_size}...")
     t5_model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
     #Adjust Dropout
-    t5_model.config.dropout_rate = 0.1
-    t5_model.config.hidden_dropout_prob = 0.1
-    t5_model.config.attention_probs_dropout_prob = 0.1
+    
     if hyperbolic:
         print("Train with Hyperbolic Model.")
         model = HyperbolicT5Model(t5_model, 'hyperbolic_knit5')
     else:
-        model = t5_model
+        model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
+        
+    model.config.dropout_rate = 0.1
+    model.config.hidden_dropout_prob = 0.1
+    model.config.attention_probs_dropout_prob = 0.1
 
     single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_model.batch_size, shuffle=True)
     single_hop_dataloader_dev = DataLoader(ki_train,  batch_size=config.t5_model.batch_size, shuffle=False)
