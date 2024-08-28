@@ -43,10 +43,13 @@ class HyperbolicT5Model(T5ForConditionalGeneration):
                 output_hidden_states: Optional[bool] = None,
                 return_dict: Optional[bool] = None):
     
-    
+        if inputs_embeds is None:
+            inputs_embeds = self.shared(input_ids)
+
         inputs_embeds = expmap0(inputs_embeds, self.curvature)
+
         
-        encoder_outputs = self.encoder(input_ids = input_ids,
+        encoder_outputs = self.encoder(
                                         inputs_embeds = inputs_embeds,
                                         attention_mask=attention_mask,
                                         head_mask = head_mask,
@@ -80,7 +83,6 @@ class HyperbolicT5Model(T5ForConditionalGeneration):
 
         loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
         
-        print(loss)
         # return (lm_logits, loss) if loss is not None else lm_logits
         return ModelOutput(
             loss=loss,
