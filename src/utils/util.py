@@ -205,4 +205,51 @@ def project(x : torch.Tensor, c : float):
     projected = x / norm * maxnorm
     return torch.where(cond, projected, x)
 
+def mobius_add(x, y, *, c=1.0):
+    r"""
+    Mobius addition is a special operation in a hyperbolic space.
+    .. math::
+        x \oplus_c y = \frac{
+            (1 + 2 c \langle x, y\rangle + c \|y\|^2_2) x + (1 - c \|x\|_2^2) y
+            }{
+            1 + 2 c \langle x, y\rangle + c^2 \|x\|^2_2 \|y\|^2_2
+        }
+    In general this operation is not commutative:
+    .. math::
+        x \oplus_c y \ne y \oplus_c x
+    But in some cases this property holds:
+    * zero vector case
+    .. math::
+        \mathbf{0} \oplus_c x = x \oplus_c \mathbf{0}
+    * zero negative curvature case that is same as Euclidean addition
+    .. math::
+        x \oplus_0 y = y \oplus_0 x
+    Another usefull property is so called left-cancellation law:
+    .. math::
+        (-x) \oplus_c (x \oplus_c y) = y
+    Parameters
+    ----------
+    x : tensor
+        point on the Poincare ball
+    y : tensor
+        point on the Poincare ball
+    c : float|tensor
+        ball negative curvature
+    Returns
+    -------
+    tensor
+        the result of mobius addition
+    """
+    c = torch.as_tensor(c).type_as(x)
+    return _mobius_add(x, y, c)
+
+
+def _mobius_add(x, y, c):
+    x2 = x.pow(2).sum(dim=-1, keepdim=True)
+    y2 = y.pow(2).sum(dim=-1, keepdim=True)
+    xy = (x * y).sum(dim=-1, keepdim=True)
+    num = (1 + 2 * c * xy + c * y2) * x + (1 - c * x2) * y
+    denom = 1 + 2 * c * xy + c ** 2 * x2 * y2
+    return num / (denom + 1e-5)
+
 #----------------------------------------------------------

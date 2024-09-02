@@ -41,10 +41,10 @@ def _knowledge_integration_with_c4(hyperbolic):
     model.config.dropout_rate = 0.1
     model.config.hidden_dropout_prob = 0.1
     model.config.attention_probs_dropout_prob = 0.1
-
+    model.config.classifier_dropout = 0.1
 
     base_path = 'c4/en/c4-train.{:05d}-of-01024.json'
-    c4_dataset = load_c4_dataset(base_path, number_of_files=15)
+    c4_dataset = load_c4_dataset(base_path, number_of_files=2)
 
     objective = 'prefix_language_modeling'
     C4_train = C4Dataset(c4_dataset ,tokenizer=tokenizer, objective=objective)

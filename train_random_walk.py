@@ -10,6 +10,8 @@ from src.knowledge_graph import create_knowledge_graph
 from src.models import HyperbolicSoftPromptModel, SoftPromptModel, HyperbolicT5Model
 import argparse
 import optuna
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
 
@@ -99,15 +101,14 @@ def _train_random_walk(hyperbolic : bool):
     
     if config.random_walk_training.hopping_prompt_checkpoint_path is not None:
         soft_prompt = nn.Embedding(100, 1024)
-        load_soft_prompt(soft_prompt, config.random_walk_training.hopping_prompt_checkpoint_path)
+        soft_prompt = load_soft_prompt(soft_prompt, config.random_walk_training.hopping_prompt_checkpoint_path)
     else:
         soft_prompt = None
     
     if hyperbolic:
-        #hyperbolic_knit5_model = HyperbolicT5MapEmbeddings()
-        curvature = 4.0
-        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt, curvature=curvature)   
-        print(f"Train with hyperbolic Soft Prompt Model with curvature {curvature}")
+        knit5_model = HyperbolicT5Model(curvature=config.random_walk_training.curvature)
+        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=True, soft_prompt=soft_prompt, curvature=config.random_walk_training.curvature)   
+        print(f"Train with hyperbolic Soft Prompt Model with curvature {config.random_walk_training.curvature}")
     else:
         model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt)
 
@@ -122,7 +123,7 @@ def _train_random_walk(hyperbolic : bool):
                       method='random_walk_training',
                       checkpoint_path=config.random_walk_training.hopping_prompt_checkpoint_path,
                       tboard_checkpoint_path=config.random_walk_training.tboard_checkpoint_path,
-                      retrain = False
+                      retrain = True
                       )
 
 

@@ -46,7 +46,7 @@ def setup_directories(trainer_config : BaseTrainingConfig):
     optimizer = trainer_config.optimizer
     final_string = f"{current_time}_{optimizer}_{learning_rate}_{curvature}"
     log_dir = os.path.join(trainer_config.log_dir, final_string)
-    model_dir = os.path.join(trainer_config.model_save_path, current_time) 
+    model_dir = os.path.join(trainer_config.model_save_path, final_string) 
     os.makedirs(log_dir, exist_ok=True)
     os.makedirs(model_dir, exist_ok=True)  
     return log_dir, model_dir

@@ -35,6 +35,7 @@ class ModelTrainer:
         self.model = model.to(device)
         self.tokenizer = tokenizer
         self.tokenizer.model_max_length = config.t5_model.tokenizer_max_length
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
         self.train_dataloader = None
         if len(list_train_dataloader) == 1:
             self.train_dataloader = list_train_dataloader[0]

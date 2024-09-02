@@ -30,6 +30,7 @@ class SoftPromptTrainer:
         self.model = model.to(device)
         self.tokenizer = tokenizer
         self.tokenizer.model_max_length = config.t5_model.tokenizer_max_length
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
         self.device = device
@@ -102,7 +103,7 @@ class SoftPromptTrainer:
                 inputs = self.tokenizer(input_batch, padding=True, truncation=True, return_tensors = 'pt').to(self.device)
                 labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
-                outputs = self.model(inputs, labels=labels)
+                outputs = self.model(input_ids=inputs.input_ids, attention_mask=inputs.attention_mask, labels=labels)
                 loss = outputs.loss
                 
                 
@@ -139,7 +140,7 @@ class SoftPromptTrainer:
                 labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 
                 
-                outputs = self.model(inputs, labels=labels)
+                outputs = self.model(input_ids=inputs.input_ids, attention_mask=inputs.attention_mask, labels=labels)
                 loss = outputs.loss
                 
                 total_loss += loss.item()
