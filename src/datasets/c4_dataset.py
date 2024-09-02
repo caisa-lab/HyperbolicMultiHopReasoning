@@ -25,23 +25,22 @@ class C4Dataset(Dataset):
         
         
         
-    def _cleanup_dataset(self, dataset):
-        count_removed = 0   
+    def _cleanup_dataset(self, dataset): 
         cleaned_dataset = []     
         if self.objective == 'span_corruption':
-            for text in tqdm(dataset, desc=f'Cleanup Dataset: Remove texts with < {self.average_length_of_spans} corrupted tokens', file=sys.stdout):
-            
-                if len(text.split()) * self.corruption_rate < self.average_length_of_spans:
-                    count_removed += 1
-                    continue
-                cleaned_dataset.append(text)
+            cleaned_dataset = [
+                text for text in tqdm(dataset, desc=f'Cleanup Dataset: Remove texts with < {self.average_length_of_spans} corrupted tokens', file=sys.stdout)
+                if len(self.tokenizer.encode(text, add_special_tokens=False)) * self.corruption_rate >= self.average_length_of_spans
+            ]
                 
         else:
-            for text in tqdm(dataset, desc=f"Cleanup Dataset: Remove texts with > {self.config.t5_model.tokenizer_max_length} tokens", file=sys.stdout):
-                if len(text.split()) > self.config.t5_model.tokenizer_max_length:
-                    count_removed += 1
-                    continue
-                cleaned_dataset.append(text)
+            cleaned_dataset = [
+                text for text in tqdm(dataset, 
+                                    desc=f"Cleanup Dataset: Remove texts with > {self.config.t5_model.tokenizer_max_length} tokens", 
+                          file=sys.stdout) 
+                    if len(self.tokenizer.encode(text, add_special_tokens=False)) <= self.config.t5_model.tokenizer_max_length
+                ]
+        count_removed = len(dataset) - len(cleaned_dataset)
         print(f'Cleaned {count_removed} Datapoints remaining {len(cleaned_dataset)} Datapoints')
         
         
