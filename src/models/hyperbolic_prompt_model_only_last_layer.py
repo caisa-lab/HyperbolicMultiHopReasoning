@@ -306,27 +306,30 @@ class T5Stack(T5PreTrainedModel):
             cross_attentions=all_cross_attentions,
         )
 
-class HyperbolicSoftPromptT5Model(T5ForConditionalGeneration):
+class HyperbolicSoftPromptLastLayerT5Model(T5ForConditionalGeneration):
     def __init__(self,
                  soft_prompt,
                  model_name : str = 'google/t5-large-lm-adapt',
+                 checkpoint_hyperbolic_knit5 : str = None,
                  curvature : float = 1.0):
         config = T5Config.from_pretrained(model_name)
                 
-        super(HyperbolicSoftPromptT5Model, self).__init__(config=config)
+        super(HyperbolicSoftPromptLastLayerT5Model, self).__init__(config=config)
         
         self.model_name = model_name
-        
-        pretrained_model = T5ForConditionalGeneration.from_pretrained(model_name)
-        self.load_state_dict(pretrained_model.state_dict())
-
         encoder_config = copy.deepcopy(config)
         encoder_config.is_decoder = False
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
         self.encoder = T5Stack(soft_prompt=soft_prompt, config=encoder_config, embed_tokens=self.shared)
-
-        missing, unexpected = self.encoder.load_state_dict(pretrained_model.encoder.state_dict(), strict=False)
+        
+        if checkpoint_hyperbolic_knit5 is None:
+            pretrained_model = T5ForConditionalGeneration.from_pretrained(model_name)
+            self.load_state_dict(pretrained_model.state_dict())
+            missing, unexpected = self.encoder.load_state_dict(pretrained_model.encoder.state_dict(), strict=False)
+        else:
+            checkpoint = torch.load(checkpoint_hyperbolic_knit5)
+            self.load_state_dict(checkpoint)
         if soft_prompt is None:
             self.encoder.soft_prompt = self.init_soft_prompt()
             self.soft_prompt = self.encoder.soft_prompt
@@ -338,8 +341,8 @@ class HyperbolicSoftPromptT5Model(T5ForConditionalGeneration):
         # Model parallel
         self.model_parallel = False
         self.device_map = None
-        
-        del pretrained_model
+        if checkpoint_hyperbolic_knit5 is None:
+            del pretrained_model
         
         self.curvature = curvature
     def init_soft_prompt(self):
