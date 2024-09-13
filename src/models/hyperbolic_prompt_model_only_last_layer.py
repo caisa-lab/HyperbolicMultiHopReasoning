@@ -33,7 +33,6 @@ class T5Stack(T5PreTrainedModel):
         self.model_parallel = False
         self.device_map = None
         self.gradient_checkpointing = False
-
         self.soft_prompt = soft_prompt
 
     def parallelize(self, device_map=None):
@@ -315,27 +314,29 @@ class HyperbolicSoftPromptLastLayerT5Model(T5ForConditionalGeneration):
         config = T5Config.from_pretrained(model_name)
                 
         super(HyperbolicSoftPromptLastLayerT5Model, self).__init__(config=config)
-        
+        if soft_prompt is None:
+            self.soft_prompt = self.init_soft_prompt()
+        else:
+            self.soft_prompt = soft_prompt
         self.model_name = model_name
+        
         encoder_config = copy.deepcopy(config)
         encoder_config.is_decoder = False
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
-        self.encoder = T5Stack(soft_prompt=soft_prompt, config=encoder_config, embed_tokens=self.shared)
+        self.encoder = T5Stack(soft_prompt=self.soft_prompt, config=encoder_config, embed_tokens=self.shared)
         
         if checkpoint_hyperbolic_knit5 is None:
+            print("Initializing T5 Model...")
             pretrained_model = T5ForConditionalGeneration.from_pretrained(model_name)
             self.load_state_dict(pretrained_model.state_dict())
             missing, unexpected = self.encoder.load_state_dict(pretrained_model.encoder.state_dict(), strict=False)
         else:
-            checkpoint = torch.load(checkpoint_hyperbolic_knit5)
+            print(f"Loading Checkpoint from {checkpoint_hyperbolic_knit5}")
+            checkpoint = torch.load(checkpoint_hyperbolic_knit5)['model_state_dict']
             self.load_state_dict(checkpoint)
-        if soft_prompt is None:
-            self.encoder.soft_prompt = self.init_soft_prompt()
-            self.soft_prompt = self.encoder.soft_prompt
-        else:
-            self.soft_prompt = soft_prompt
-            self.encoder.soft_prompt = soft_prompt
+
+        
         self.post_init()
         
         # Model parallel
