@@ -1,5 +1,5 @@
 class BaseTrainingConfig:
-        def __init__(self, optimizer = 'Hyperbolic',
+        def __init__(self, optimizer = 'AdaFactor',
                      learning_rate = 0.001,
                      optimizer_param = 1e-5,
                      curvature = 1.0,
@@ -53,7 +53,8 @@ class Config:
                              model_save_path='checkpoints/random_walk_training',
                              model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth',
                              tboard_checkpoint_path=None,
-                             num_workers=16
+                             num_workers=16,
+                             curvature=1e-10
                              )
             self.prompt_length = 100
             self.hopping_prompt_checkpoint_path = None

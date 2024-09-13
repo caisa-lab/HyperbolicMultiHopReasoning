@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, T5Model
-from utils.util import get_top_token_embeddings
-from utils.trainer_utils import load_model_checkpoint
+from src.utils.util import get_top_token_embeddings
+from src.utils.trainer_utils import load_model_checkpoint
 from config import Config
 
 class SoftPromptModel(nn.Module):

@@ -1,8 +1,8 @@
 from utils.util import expmap0, logmap0
 from utils.trainer_utils import load_model_checkpoint
-from utils.model_utils import ModelOutput
 from transformers import T5ForConditionalGeneration, T5Config
 from .hyperbolic_model_utils import HyperbolicEmbedding
+from transformers.modeling_outputs import Seq2SeqLMOutput
 from typing import Tuple, Optional
 import torch
 
@@ -77,7 +77,7 @@ class HyperbolicT5Model(T5ForConditionalGeneration):
         loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
         
         # return (lm_logits, loss) if loss is not None else lm_logits
-        return ModelOutput(
+        return Seq2SeqLMOutput(
             loss=loss,
             logits=lm_logits,
             past_key_values=decoder_outputs.past_key_values,
@@ -145,7 +145,7 @@ class HyperbolicT5Model(T5ForConditionalGeneration):
         loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
         
         # return (lm_logits, loss) if loss is not None else lm_logits
-        return ModelOutput(
+        return Seq2SeqLMOutput(
             loss=loss,
             logits=lm_logits,
             past_key_values=decoder_outputs.past_key_values,

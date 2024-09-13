@@ -7,7 +7,6 @@ from .hyperbolic_t5_model import HyperbolicT5Model
 from transformers import AutoTokenizer, T5ForConditionalGeneration, T5Model
 from src.config import Config
 from .hyperbolic_model_utils import HyperbolicSoftPrompts, HybridSoftPrompt
-from utils.model_utils import ModelOutput
 from typing import Optional, Tuple
 
 class HyperbolicSoftPromptModel(nn.Module):
@@ -88,14 +87,13 @@ class HyperbolicSoftPromptModel(nn.Module):
         soft_prompt_input = self.soft_prompt.weight.expand(input_ids.size(0), -1, -1).to(self.device)
         input_embeddings = self.knit5.shared(input_ids)  # Convert input IDs to embeddings
 
-        #soft_prompt_input = expmap0(soft_prompt_input, self.curvature)
+        soft_prompt_input = expmap0(soft_prompt_input, self.curvature)
 
         concatenated_embeddings = torch.cat([soft_prompt_input, input_embeddings], dim=1)
         
         #Adjust attention mask (take all of the soft prompt tokens should be attented)
         soft_prompt_attention_mask = torch.ones((attention_mask.size(0), soft_prompt_input.size(1)), device=self.device)
         concatenated_attention_mask = torch.cat((soft_prompt_attention_mask, attention_mask), dim=1)
-        
         
         
         outputs = self.knit5(inputs_embeds=concatenated_embeddings,

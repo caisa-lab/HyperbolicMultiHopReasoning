@@ -106,8 +106,8 @@ def _train_random_walk(hyperbolic : bool):
         soft_prompt = None
     
     if hyperbolic:
-        knit5_model = HyperbolicT5Model(curvature=config.random_walk_training.curvature)
-        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=True, soft_prompt=soft_prompt, curvature=config.random_walk_training.curvature)   
+        #knit5_model = HyperbolicT5Model(curvature=config.random_walk_training.curvature)
+        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt, curvature=config.random_walk_training.curvature)   
         print(f"Train with hyperbolic Soft Prompt Model with curvature {config.random_walk_training.curvature}")
     else:
         model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt)
