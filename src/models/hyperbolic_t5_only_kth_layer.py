@@ -15,7 +15,7 @@ import copy
 from src.config import Config
 
 class T5Stack(T5PreTrainedModel):
-    def __init__(self, config, curvature=1.0, embed_tokens=None, map_kth_layer = 5):
+    def __init__(self, config, embed_tokens=None, curvature = 1.0, map_layers = [], ):
         super().__init__(config)
 
         self.embed_tokens = embed_tokens
@@ -33,9 +33,9 @@ class T5Stack(T5PreTrainedModel):
         self.model_parallel = False
         self.device_map = None
         self.gradient_checkpointing = False
-        self.curvature = curvature
-        self.map_kth_layer = map_kth_layer
         
+        self.curvature = curvature
+        self.map_layers = map_layers
 
     def parallelize(self, device_map=None):
         warnings.warn(
@@ -99,7 +99,7 @@ class T5Stack(T5PreTrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
-    ): 
+    ):
         # Model parallel
         if self.model_parallel:
             torch.cuda.set_device(self.first_device)
@@ -149,6 +149,7 @@ class T5Stack(T5PreTrainedModel):
         # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
         # ourselves in which case we just need to make it broadcastable to all heads.
         extended_attention_mask = self.get_extended_attention_mask(attention_mask, input_shape)
+
         # If a 2D or 3D attention mask is provided for the cross-attention
         # we need to make broadcastable to [batch_size, num_heads, seq_length, seq_length]
         if self.is_decoder and encoder_hidden_states is not None:
@@ -181,12 +182,10 @@ class T5Stack(T5PreTrainedModel):
 
         hidden_states = self.dropout(inputs_embeds)
 
-
         for i, (layer_module, past_key_value) in enumerate(zip(self.block, past_key_values)):
-
-            if i == self.map_kth_layer:
-                hidden_states = expmap0(hidden_states, self.curvature)
-
+            if i in self.map_layers:
+                hidden_states = expmap0(hidden_states, c = self.curvature)
+            
             layer_head_mask = head_mask[i]
             cross_attn_layer_head_mask = cross_attn_head_mask[i]
             # Model parallel
@@ -267,7 +266,8 @@ class T5Stack(T5PreTrainedModel):
                 for k, v in self.device_map.items():
                     if i == v[-1] and "cuda:" + str(k) != self.last_device:
                         hidden_states = hidden_states.to("cuda:" + str(k + 1))
-
+        if len(self.block) in self.map_layers:
+            hidden_states = expmap0(hidden_states, c = self.curvature)
         hidden_states = self.final_layer_norm(hidden_states)
         hidden_states = self.dropout(hidden_states)
 
@@ -300,8 +300,9 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
                  model_name : str = 'google/t5-large-lm-adapt',
                  checkpoint_hyperbolic_knit5 : str = None,
                  curvature : float = 1.0,
-                 map_kth_encoder_layer : int = 5):
-        """
+                 map_encoder_layers : list = [],
+                 map_decoder_layers : list = []):
+        r"""
         params:
         model_name: Pretrained Model name.
         checkpoint_hyperbolic_knit5: If finetuned on knowledge integration give the checkpoint path
@@ -317,21 +318,19 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
         encoder_config.is_decoder = False
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
-        self.encoder = T5Stack(config=encoder_config, embed_tokens=self.shared, curvature=curvature, map_kth_layer=map_kth_encoder_layer)
+        self.encoder = T5Stack(config=encoder_config, embed_tokens=self.shared, curvature=curvature, map_layers=map_encoder_layers)
         
         
         decoder_config = copy.deepcopy(config)
         decoder_config.is_decoder = True
         decoder_config.is_encoder_decoder = False
         decoder_config.num_layers = config.num_decoder_layers
-        self.decoder = T5Stack(config=encoder_config, embed_tokens=self.shared, curvature=curvature, map_kth_layer=map_kth_encoder_layer)
+        self.decoder = T5Stack(config=decoder_config, embed_tokens=self.shared, curvature=curvature, map_layers=map_decoder_layers)
         
         if checkpoint_hyperbolic_knit5 is None:
             print("Initializing T5 Model...")
             pretrained_model = T5ForConditionalGeneration.from_pretrained(model_name)
             self.load_state_dict(pretrained_model.state_dict())
-            missing, unexpected = self.encoder.load_state_dict(pretrained_model.encoder.state_dict())
-            missing, unexpected = self.decoder.load_state_dict(pretrained_model.decoder.state_dict())
         else:
             print(f"Loading Checkpoint from {checkpoint_hyperbolic_knit5}")
             checkpoint = torch.load(checkpoint_hyperbolic_knit5)['model_state_dict']

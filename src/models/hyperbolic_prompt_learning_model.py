@@ -8,11 +8,9 @@ from utils.trainer_utils import load_model_checkpoint, geodesic_regularization
 from transformers import AutoTokenizer, T5ForConditionalGeneration, T5Model
 from src.config import Config
 from typing import Optional, Tuple
-from .hyperbolic_model_utils import HypLinear, HNNLayer
 import torch.nn.functional as F
 
 import geoopt
-from .manifolds.poincare import PoincareBall, ManifoldParameter
 
 class HyperbolicSoftPromptModel(nn.Module):
     def __init__(self,

@@ -62,7 +62,7 @@ class SoftPromptModel(nn.Module):
     def soft_prompt_state_dict(self):
         return self.soft_prompt.state_dict()
     
-    def generate(self, input_ids, attention_mask, max_length=50, num_beams = 5, early_stopping=True):
+    def generate(self, input_ids, attention_mask, **generate_kwargs):
         pp_input = self.soft_prompt.weight.unsqueeze(0).expand(input_ids.size(0), -1, -1).to(self.device)
         input_embeddings = self.knit5.shared(input_ids)  # Convert input IDs to embeddings
 
@@ -72,5 +72,5 @@ class SoftPromptModel(nn.Module):
         pp_attention_mask = torch.ones((attention_mask.size(0), pp_input.size(1)), device=self.device)
         concatenated_attention_mask = torch.cat((pp_attention_mask, attention_mask), dim=1)
 
-        outputs = self.knit5.generate(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, max_length=max_length, num_beams=num_beams, early_stopping=early_stopping)
+        outputs = self.knit5.generate(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, **generate_kwargs)
         return outputs
