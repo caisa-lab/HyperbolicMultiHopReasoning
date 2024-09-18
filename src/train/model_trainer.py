@@ -13,7 +13,6 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from config import Config
 from eval import exact_match_score, f1_score
 from utils.trainer_utils import *
-from models import HyperbolicT5Model
 from typing import Union
 
 """Triggering Multi-Hop Reasoning for Question Answering
@@ -21,7 +20,7 @@ in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/23
 """
 class ModelTrainer:
     def __init__(self,
-                 model : Union[nn.Module, HyperbolicT5Model],
+                 model : Union[nn.Module],
                  tokenizer : AutoTokenizer,
                  list_train_dataloader: list,
                  val_dataloader : DataLoader,

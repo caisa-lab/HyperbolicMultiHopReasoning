@@ -1,63 +1,45 @@
 import torch
 import geoopt
-from geoopt import ManifoldParameter
-from geoopt.manifolds import PoincareBall
 import torch.nn as nn
 from src.utils.util import expmap0
+import torch.nn.init as init
+import math
+import torch.nn.functional as F
 
-class HybridSoftPrompt(nn.Module):
-    def __init__(self, num_prompts, euclidean_dim, hyperbolic_dim, curvature = 1.0):
-        super(HybridSoftPrompt, self).__init__()
-        self.euclidean_prompt = nn.Embedding(num_prompts, euclidean_dim)
-        self.hyperbolic_prompt = nn.Embedding(num_prompts, hyperbolic_dim)
-        self.curvature = curvature
-        
-    @property
-    def weight(self):
-        # Concatenate the weights of both the Euclidean and Hyperbolic prompts
-        euclidean_weights = self.euclidean_prompt.weight
-        hyperbolic_weights = self.hyperbolic_prompt.weight
-        hyperbolic_weights_mapped = expmap0(hyperbolic_weights, self.curvature)
-        return torch.cat([euclidean_weights, hyperbolic_weights_mapped], dim=-1)
-    
-        
-    def forward(self, prompt_ids):
-        euclidean_part = self.euclidean_prompt(prompt_ids)
-        hyperbolic_part = self.hyperbolic_prompt(prompt_ids)
-        
-        hyperbolic_part = expmap0(hyperbolic_part, self.curvature)
-        
-        hybrid_prompt = torch.cat([euclidean_part, hyperbolic_part], dim = -1)
-        return hybrid_prompt
-        
+class ProjectionLayer(nn.Module):
+    def __init__(self, input_dim, output_dim, hidden_dims, activation='relu', dropout_rate=0.0):
+        """
+        Parameters:
+        - input_dim (int): Dimension of hyperbolic embeddings.
+        - output_dim (int): Dimension of Euclidean embeddings.
+        - hidden_dims (list): List containing the size of each hidden layer.
+        - activation (str): Activation function to use ('relu', 'tanh', etc.).
+        - dropout_rate (float): Dropout rate for regularization.
+        """
+        super(ProjectionLayer, self).__init__()
 
-class HyperbolicSoftPrompts(torch.nn.Module):
-    def __init__(self, prompt_length, embedding_dim, c=1.0):
-        super(HyperbolicSoftPrompts, self).__init__()
-        self.manifold = PoincareBall(c=c)
-        self.soft_prompts = ManifoldParameter(torch.randn(prompt_length, embedding_dim) * 1e-3, manifold=self.manifold)
-
-    def forward(self):
-        return self.soft_prompts
-    
-    
-class HyperbolicEmbedding(torch.nn.Module):
-    def __init__(self, num_embeddings, embedding_dim, c=1.0):
-        super(HyperbolicEmbedding, self).__init__()
-        self.num_embeddings = num_embeddings
-        self.embedding_dim = embedding_dim
-        self.c = c  # curvature
-        self.manifold = geoopt.manifolds.PoincareBall(c=c)
-        self.embedding = geoopt.ManifoldParameter(
-            torch.randn(num_embeddings, embedding_dim) * 1e-3, # Start near origin
-            manifold=self.manifold
-        )
-
-    def forward(self, indices):
-        return self.embedding[indices]
-    
-    
-    
+        activations = {
+            'relu': nn.ReLU(),
+            'gelu': nn.GELU(),
+            'leaky_relu': nn.LeakyReLU()
+        }
+        assert activation in activations, f"Activation '{activation}' not supported."
+        self.activation = activations[activation]
+        
+        # Build the network layers
+        layers = []
+        previous_dim = input_dim
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(previous_dim, hidden_dim))
+            layers.append(self.activation)
+            if dropout_rate > 0.0:
+                layers.append(nn.Dropout(p=dropout_rate))
+            previous_dim = hidden_dim
+        # Output layer (without activation)
+        layers.append(nn.Linear(previous_dim, output_dim))
+        self.network = nn.Sequential(*layers)
+    def forward(self, x):
+        return self.network(x)
 #------------------[https://github.com/Graph-and-Geometric-Learning/hyperbolic-transformer/blob/master/large/manifolds/layer.py]------------------------------
 
 # class HypLayerNorm(nn.Module):
@@ -178,14 +160,14 @@ class HyperbolicEmbedding(torch.nn.Module):
 #     """
 #     Hyperbolic Linear Layer
 
-#     Parameters:
-#         manifold (Manifold): The manifold to use for the linear transformation.
-#         in_features (int): The size of each input sample.
-#         out_features (int): The size of each output sample.
-#         bias (bool, optional): If set to False, the layer will not learn an additive bias. Default is True.
-#         dropout (float, optional): The dropout probability. Default is 0.0.
-#         manifold_out (Manifold, optional): The output manifold. Default is None.
-#     """
+# Parameters:
+#     manifold (Manifold): The manifold to use for the linear transformation.
+#     in_features (int): The size of each input sample.
+#     out_features (int): The size of each output sample.
+#     bias (bool, optional): If set to False, the layer will not learn an additive bias. Default is True.
+#     dropout (float, optional): The dropout probability. Default is 0.0.
+#     manifold_out (Manifold, optional): The output manifold. Default is None.
+# """
 
 #     def __init__(self, manifold, in_features, out_features, bias=True, dropout=0.0, manifold_out=None):
 #         super().__init__()

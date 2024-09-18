@@ -15,7 +15,7 @@ import copy
 from src.config import Config
 
 class T5Stack(T5PreTrainedModel):
-    def __init__(self, config, soft_prompt : nn.Embedding, embed_tokens=None):
+    def __init__(self, config, curvature=1.0, embed_tokens=None, map_kth_layer = 5):
         super().__init__(config)
 
         self.embed_tokens = embed_tokens
@@ -33,7 +33,9 @@ class T5Stack(T5PreTrainedModel):
         self.model_parallel = False
         self.device_map = None
         self.gradient_checkpointing = False
-        self.soft_prompt = soft_prompt
+        self.curvature = curvature
+        self.map_kth_layer = map_kth_layer
+        
 
     def parallelize(self, device_map=None):
         warnings.warn(
@@ -97,12 +99,7 @@ class T5Stack(T5PreTrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
-    ):
-        soft_prompt_input = self.soft_prompt.weight.expand(input_ids.size(0), -1, -1).to(self.device)
-        soft_prompt_attention_mask = torch.ones((attention_mask.size(0), soft_prompt_input.size(1)), device=self.device)
-        attention_mask_with_soft_prompt = torch.cat((soft_prompt_attention_mask, attention_mask), dim=1)
-        soft_prompt_input_shape = soft_prompt_input.shape
-        
+    ): 
         # Model parallel
         if self.model_parallel:
             torch.cuda.set_device(self.first_device)
@@ -152,7 +149,6 @@ class T5Stack(T5PreTrainedModel):
         # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
         # ourselves in which case we just need to make it broadcastable to all heads.
         extended_attention_mask = self.get_extended_attention_mask(attention_mask, input_shape)
-        attention_mask_with_soft_prompt_extended = self.get_extended_attention_mask(attention_mask_with_soft_prompt, soft_prompt_input_shape)
         # If a 2D or 3D attention mask is provided for the cross-attention
         # we need to make broadcastable to [batch_size, num_heads, seq_length, seq_length]
         if self.is_decoder and encoder_hidden_states is not None:
@@ -186,16 +182,10 @@ class T5Stack(T5PreTrainedModel):
         hidden_states = self.dropout(inputs_embeds)
 
 
-        #TODO ONLY DO THE until the second to last layer then add soft prompts and then feed to last layer
         for i, (layer_module, past_key_value) in enumerate(zip(self.block, past_key_values)):
-            #TODO test this if it has right dimensions and has same loss
-            # Add Soft Prompt if last layer
-            if i == len(self.block) - 1:
-                hidden_states = torch.cat([soft_prompt_input, hidden_states], dim=1)
-                
-                extended_attention_mask = attention_mask_with_soft_prompt_extended
-                position_bias = None
-                #hidden_states = hidden_states
+
+            if i == self.map_kth_layer:
+                hidden_states = expmap0(hidden_states, self.curvature)
 
             layer_head_mask = head_mask[i]
             cross_attn_layer_head_mask = cross_attn_head_mask[i]
@@ -305,36 +295,49 @@ class T5Stack(T5PreTrainedModel):
             cross_attentions=all_cross_attentions,
         )
 
-class HyperbolicSoftPromptLastLayerT5Model(T5ForConditionalGeneration):
+class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
     def __init__(self,
-                 soft_prompt,
                  model_name : str = 'google/t5-large-lm-adapt',
                  checkpoint_hyperbolic_knit5 : str = None,
-                 curvature : float = 1.0):
+                 curvature : float = 1.0,
+                 map_kth_encoder_layer : int = 5):
+        """
+        params:
+        model_name: Pretrained Model name.
+        checkpoint_hyperbolic_knit5: If finetuned on knowledge integration give the checkpoint path
+        curvature: curvature for exponential mapping
+        map_kth_encoder_layer: maps the output of the kth layer to hyperbolic space. 0 = output of embedding layer, 1 = first encoder layer ...
+        """
         config = T5Config.from_pretrained(model_name)
                 
-        super(HyperbolicSoftPromptLastLayerT5Model, self).__init__(config=config)
-        if soft_prompt is None:
-            self.soft_prompt = self.init_soft_prompt()
-        else:
-            self.soft_prompt = soft_prompt
-        self.model_name = model_name
+        super(HyperbolicKthLayerT5Model, self).__init__(config=config)
+
         
         encoder_config = copy.deepcopy(config)
         encoder_config.is_decoder = False
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
-        self.encoder = T5Stack(soft_prompt=self.soft_prompt, config=encoder_config, embed_tokens=self.shared)
+        self.encoder = T5Stack(config=encoder_config, embed_tokens=self.shared, curvature=curvature, map_kth_layer=map_kth_encoder_layer)
+        
+        
+        decoder_config = copy.deepcopy(config)
+        decoder_config.is_decoder = True
+        decoder_config.is_encoder_decoder = False
+        decoder_config.num_layers = config.num_decoder_layers
+        self.decoder = T5Stack(config=encoder_config, embed_tokens=self.shared, curvature=curvature, map_kth_layer=map_kth_encoder_layer)
         
         if checkpoint_hyperbolic_knit5 is None:
             print("Initializing T5 Model...")
             pretrained_model = T5ForConditionalGeneration.from_pretrained(model_name)
             self.load_state_dict(pretrained_model.state_dict())
-            missing, unexpected = self.encoder.load_state_dict(pretrained_model.encoder.state_dict(), strict=False)
+            missing, unexpected = self.encoder.load_state_dict(pretrained_model.encoder.state_dict())
+            missing, unexpected = self.decoder.load_state_dict(pretrained_model.decoder.state_dict())
         else:
             print(f"Loading Checkpoint from {checkpoint_hyperbolic_knit5}")
             checkpoint = torch.load(checkpoint_hyperbolic_knit5)['model_state_dict']
-            self.load_state_dict(checkpoint)
+            missing, unexpected = self.load_state_dict(checkpoint)
+            print(f"Missing: {missing}")
+            print(f"Unexpected: {unexpected}")
 
         
         self.post_init()
@@ -346,25 +349,7 @@ class HyperbolicSoftPromptLastLayerT5Model(T5ForConditionalGeneration):
             del pretrained_model
         
         self.curvature = curvature
-    def init_soft_prompt(self):
-            config = Config()
-            tokenizer = AutoTokenizer.from_pretrained(config.t5_model.model_name)
-            #HP Soft Prompt will be tuned
-            soft_prompt_length = config.random_walk_training.prompt_length
-
-            soft_prompt_embedding_size = self.config.hidden_size
-
-            soft_prompt_embeddings = nn.Embedding(soft_prompt_length, soft_prompt_embedding_size) 
-            
-            #dont use random use top 100 most common tokens of tokenizer.getvocab
-            top_100_token_embeddings = get_top_token_embeddings(self, tokenizer, 100)
-            
-            
-            with torch.no_grad():
-                soft_prompt_embeddings.weight.data[:top_100_token_embeddings.size(0), :] = top_100_token_embeddings
-
-            print(f"Initializing Soft Prompt with top 100 tokens from pretraining corpus")
-            return soft_prompt_embeddings       
+    
     def _forward_after_encoder(self,
                 input_ids: Optional[torch.LongTensor] = None,
                 attention_mask: Optional[torch.FloatTensor] = None,
@@ -395,6 +380,7 @@ class HyperbolicSoftPromptLastLayerT5Model(T5ForConditionalGeneration):
                 #warnings.warn(__HEAD_MASK_WARNING_MSG, FutureWarning)
                 decoder_head_mask = head_mask
 
+        
         # Encode if needed (training, first prediction pass)
         if encoder_outputs is None:
             # Convert encoder inputs in embeddings if needed
@@ -415,7 +401,6 @@ class HyperbolicSoftPromptLastLayerT5Model(T5ForConditionalGeneration):
             )
 
         hidden_states = encoder_outputs[0]
-        hidden_states = expmap0(hidden_states, c=self.curvature)
 
         if self.model_parallel:
             torch.cuda.set_device(self.decoder.first_device)
@@ -435,10 +420,6 @@ class HyperbolicSoftPromptLastLayerT5Model(T5ForConditionalGeneration):
             if decoder_attention_mask is not None:
                 decoder_attention_mask = decoder_attention_mask.to(self.decoder.first_device)
 
-        soft_prompt_input = self.soft_prompt.weight.unsqueeze(0).expand(input_ids.size(0), -1, -1).to(self.device)
-        #Adjust attention mask (take all of the soft prompt tokens should be attented)
-        soft_prompt_attention_mask = torch.ones((attention_mask.size(0), soft_prompt_input.size(1)), device=self.device)
-        concatenated_attention_mask = torch.cat((soft_prompt_attention_mask, attention_mask), dim=1)
         
         # Decode
         decoder_outputs = self.decoder(
@@ -447,7 +428,7 @@ class HyperbolicSoftPromptLastLayerT5Model(T5ForConditionalGeneration):
             inputs_embeds=decoder_inputs_embeds,
             past_key_values=past_key_values,
             encoder_hidden_states=hidden_states,
-            encoder_attention_mask=concatenated_attention_mask,
+            encoder_attention_mask=attention_mask,
             head_mask=decoder_head_mask,
             cross_attn_head_mask=cross_attn_head_mask,
             use_cache=use_cache,

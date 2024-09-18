@@ -51,10 +51,10 @@ class Config:
                              epochs=250,
                              log_dir='tboard_logs/random_walk_training',
                              model_save_path='checkpoints/random_walk_training',
-                             model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth',
+                             model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth',# 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth' 'checkpoints/knowledge_integration/large_adapt_bsize64_c4_hyperbolic_encoder/knit5_epoch_19_val_loss_0.0234.pth'
                              tboard_checkpoint_path=None,
                              num_workers=16,
-                             curvature=1e-10
+                             curvature=4.0
                              )
             self.prompt_length = 100
             self.hopping_prompt_checkpoint_path = None
@@ -78,6 +78,7 @@ class Config:
             self.batch_size = 64#128 # From the Paper or 32 if xxl
             self.model_name = "google/t5-large-lm-adapt"            
             self.tokenizer_max_length = 128
+            self.map_kth_encoder_layer = 4
 
 
             

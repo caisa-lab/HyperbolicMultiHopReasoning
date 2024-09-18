@@ -25,6 +25,9 @@ class SoftPromptModel(nn.Module):
             self.soft_prompt = self.init_soft_prompt()
         else:
             self.soft_prompt = soft_prompt
+        
+        for param in self.knit5.parameters():
+            param.requires_grad = False
             
     
         

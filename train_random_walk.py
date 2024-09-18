@@ -7,7 +7,7 @@ import torch
 from src.config import Config
 from torch.utils.data import DataLoader
 from src.knowledge_graph import create_knowledge_graph
-from src.models import HyperbolicSoftPromptModel, SoftPromptModel, HyperbolicT5Model
+from src.models import HyperbolicSoftPromptModel, SoftPromptModel, HyperbolicKthLayerT5Model
 import argparse
 import optuna
 import os
@@ -106,9 +106,9 @@ def _train_random_walk(hyperbolic : bool):
         soft_prompt = None
     
     if hyperbolic:
-        #knit5_model = HyperbolicT5Model(curvature=config.random_walk_training.curvature)
-        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt, curvature=config.random_walk_training.curvature)   
-        print(f"Train with hyperbolic Soft Prompt Model with curvature {config.random_walk_training.curvature}")
+        hyperbolic_knit5_model = HyperbolicKthLayerT5Model(checkpoint_hyperbolic_knit5=config.random_walk_training.model_checkpoint_path, curvature=config.random_walk_training.curvature, map_kth_encoder_layer=config.t5_model.map_kth_encoder_layer)
+        model = HyperbolicSoftPromptModel(soft_prompt=soft_prompt, hyperbolic_knit5_checkpoint_path=config.random_walk_training.model_checkpoint_path, curvature=config.random_walk_training.curvature, hyperbolic_knit5=hyperbolic_knit5_model, model_name='hyperbolic_hopping_prompt', with_model_state_dict=False)
+        print(f"Train with hyperbolic Soft Prompt Model with curvature {config.random_walk_training.curvature} and Exponential Mapping at encoder layer {config.t5_model.map_kth_encoder_layer}")
     else:
         model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt)
 
@@ -130,7 +130,7 @@ def _train_random_walk(hyperbolic : bool):
     print(f'Random Walk Training..')
     print(f'with model: {config.t5_model.model_name}')
 
-    print(f'Model Config: {model.knit5.config}')
+    #print(f'Model Config: {model.knit5.config}')
     print(f'for: {config.random_walk_training.epochs} epochs')
     print(f'with batch size: {config.t5_model.batch_size}')
     print(f'with optimizer: {config.random_walk_training.optimizer}')

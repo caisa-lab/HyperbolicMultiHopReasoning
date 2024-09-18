@@ -61,8 +61,9 @@ class SoftPromptTrainer:
             self.training_config = config.parse_then_hop_training
             
             
-            
-        self.optimizer = get_optimizer(self.model.soft_prompt.parameters(), self.training_config)
+        params = [{'params': self.model.projection_layer.parameters(), 'lr': 1e-3},
+                  {'params': [self.model.soft_prompt], 'lr': 0.3}]
+        self.optimizer = get_optimizer(params, self.training_config)
             
         self.log_dir, self.model_dir = setup_directories(self.training_config)
         if self.tboard_checkpoint_path is not None:
@@ -165,7 +166,7 @@ class SoftPromptTrainer:
             self.log_tensorboard(avg_em_perc, epoch, 'Validation', eval_metric='em')
             self.log_tensorboard(avg_f1_perc, epoch, 'Validation', eval_metric='f1')
             print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
-        soft_prompt_path = f"{self.model_dir}/{self.model.model_name}_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
+        soft_prompt_path = f"{self.model_dir}/soft_prompt_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         
         
         if avg_loss < self.best_loss:
@@ -175,7 +176,9 @@ class SoftPromptTrainer:
             self.early_stop_counter = 0
             self.best_model_path = soft_prompt_path
             torch.save({
-                'soft_prompt_state_dict': self.model.soft_prompt.state_dict(),
+                'soft_prompt_state_dict': self.model.soft_prompt.data.cpu(),
+                'projection_layer_state_dict': self.model.projection_layer.state_dict(),
+                'curvature': self.model.curvature,
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'epoch': epoch}, soft_prompt_path)
         else:

@@ -1,14 +1,13 @@
 #!/bin/bash
 
-#SBATCH --partition=A100medium
-#SBATCH --time=1-00:00:00
+#SBATCH --partition=A100devel
+#SBATCH --time=01:00:00
 #SBATCH --gpus=1
-
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --job-name=random_walk_bsize64_c4_hyperbolic_soft_prompt_euclidean_projection_layer
-#SBATCH --output=outputs/output_random_walk_training_bsize64_c4_hyperbolic_soft_prompt_euclidean_projection_layer_%j.txt
-#SBATCH --error=outputs/error_random_walk_training_bsize64_c4_hyperbolic_soft_prompt_euclidean_projection_layer_%j.txt
+#SBATCH --job-name=delta_hyperbolicity_test
+#SBATCH --output=outputs/debug/output_delta_hyperbolicity_knowlede_integration_%j.txt
+#SBATCH --error=outputs/debug/error_delta_hyperbolicity_knowlede_integration_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
@@ -30,4 +29,4 @@ pip install geoopt --quiet
 
 echo "Libraries Installed"
 echo "Starting Training Script...."
-python -u train_random_walk.py --hyperbolic
+python -u delta_hyperbolicity.py 

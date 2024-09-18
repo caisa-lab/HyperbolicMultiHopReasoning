@@ -1,6 +1,7 @@
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import networkx as nx
 import torch
+import torch.nn as nn
 import pandas as pd
 import sys
 import os
@@ -149,6 +150,18 @@ def get_top_token_embeddings(model : AutoModelForSeq2SeqLM, tokenizer : AutoToke
     top_embeddings = token_embeddings[top_tokens_ids]
     return top_embeddings   
 
+def count_learnable_parameters(model: nn.Module):
+    """
+    This function calculates the number of learnable parameters in a PyTorch model.
+    
+    Args:
+    model (nn.Module): The PyTorch model.
+    
+    Returns:
+    int: The total number of learnable parameters in the model.
+    """
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    return total_params
 
 ##---------------------hyperbolic operations ----------------------- CODE TAKEN FROM https://github.com/HazyResearch/KGEmb/blob/master/utils/hyperbolic.py
 import torch
