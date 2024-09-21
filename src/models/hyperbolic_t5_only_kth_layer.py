@@ -331,12 +331,12 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
             print("Initializing T5 Model...")
             pretrained_model = T5ForConditionalGeneration.from_pretrained(model_name)
             self.load_state_dict(pretrained_model.state_dict())
-        else:
-            print(f"Loading Checkpoint from {checkpoint_hyperbolic_knit5}")
-            checkpoint = torch.load(checkpoint_hyperbolic_knit5)['model_state_dict']
-            missing, unexpected = self.load_state_dict(checkpoint)
-            print(f"Missing: {missing}")
-            print(f"Unexpected: {unexpected}")
+        #else:
+            #print(f"Loading Checkpoint from {checkpoint_hyperbolic_knit5}")
+            #checkpoint = torch.load(checkpoint_hyperbolic_knit5)['model_state_dict']
+            #missing, unexpected = self.load_state_dict(checkpoint)
+            #print(f"Missing: {missing}")
+            #print(f"Unexpected: {unexpected}")
 
         
         self.post_init()

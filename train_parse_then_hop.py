@@ -43,12 +43,18 @@ def _train_parse_then_hop(hyperbolic: bool):
     print("Loading Model...")
     knit5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     
-    if hyperbolic:
-        #hyperbolic_knit5_model = HyperbolicT5Model(knit5_model)
-        print("Train with hyperbolic Soft Prompt Model.")
-        model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_parsing_prompt', with_model_state_dict=False)   
+    if config.parse_then_hop_training.hopping_prompt_checkpoint_path is not None:
+        soft_prompt = nn.Embedding(100, 1024)
+        soft_prompt = load_soft_prompt(soft_prompt, config.parse_then_hop_training.hopping_prompt_checkpoint_path)
     else:
-        model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'parsing_prompt')
+        soft_prompt = None
+        
+    if hyperbolic:
+        hyperbolic_knit5_model = HyperbolicKthLayerT5Model(curvature=config.parse_then_hop_training.curvature, map_encoder_layers=config.t5_model.map_encoder_layers, map_decoder_layers=config.t5_model.map_decoder_layers, checkpoint_hyperbolic_knit5=config.parse_then_hop_training.model_checkpoint_path)
+        model = HyperbolicSoftPromptModel(soft_prompt=soft_prompt, hyperbolic_knit5_checkpoint_path=config.parse_then_hop_training.model_checkpoint_path, curvature=config.parse_then_hop_training.curvature, hyperbolic_knit5=hyperbolic_knit5_model, model_name='hyperbolic_parsing_prompt', with_model_state_dict=False)
+        print(f"Train with hyperbolic Soft Prompt Model with curvature {config.parse_then_hop_training.curvature} and Exponential Mapping at encoder layer {config.t5_model.map_encoder_layers} and at decoder layer {config.t5_model.map_decoder_layers}")
+    else:
+        model = SoftPromptModel(knit5_model, config.parse_then_hop_training.model_checkpoint_path, 'parsing_prompt')
 
     print("Model type before passing to SoftPromptTrainer:", type(model))
 
@@ -59,8 +65,8 @@ def _train_parse_then_hop(hyperbolic: bool):
                       config,
                       device=device,
                       method='parse_then_hop_training',
-                      checkpoint_path=config.random_walk_training.hopping_prompt_checkpoint_path,
-                      tboard_checkpoint_path=config.random_walk_training.tboard_checkpoint_path,
+                      checkpoint_path=config.parse_then_hop_training.hopping_prompt_checkpoint_path,
+                      tboard_checkpoint_path=config.parse_then_hop_training.tboard_checkpoint_path,
                       )
 
 
@@ -70,9 +76,9 @@ def _train_parse_then_hop(hyperbolic: bool):
     print(f'with model: {config.t5_model.model_name}')
 
     print(f'Model Config: {model.knit5.config}')
-    print(f'for: {config.random_walk_training.epochs} epochs')
+    print(f'for: {config.parse_then_hop_training.epochs} epochs')
     print(f'with batch size: {config.t5_model.batch_size}')
-    print(f'with optimizer: {config.random_walk_training.optimizer}')   
+    print(f'with optimizer: {config.parse_then_hop_training.optimizer}')   
 
     trainer.train(epochs=config.parse_then_hop_training.epochs)
     

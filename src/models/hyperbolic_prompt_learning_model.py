@@ -32,15 +32,13 @@ class HyperbolicSoftPromptModel(nn.Module):
         self.config = Config()
         
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.manifold = geoopt.PoincareBall(c=self.curvature)
         torch.manual_seed(seed)
         self.soft_prompt = soft_prompt if soft_prompt else self.init_soft_prompt()
-        #self.soft_prompt.requires_grad = True
         
         for param in self.knit5.parameters():
             param.requires_grad = False
-        # for param in self.soft_prompt.parameters():
-        #     param.requires_grad = True
+        for param in self.soft_prompt.parameters():
+            param.requires_grad = True
         
     def init_soft_prompt(self):
         config = Config()
@@ -48,12 +46,12 @@ class HyperbolicSoftPromptModel(nn.Module):
         #HP Soft Prompt will be tuned
         soft_prompt_length = config.random_walk_training.prompt_length
 
-        soft_prompt_embedding_size = self.config.hidden_size
+        soft_prompt_embedding_size = self.knit5.config.hidden_size
 
         soft_prompt_embeddings = nn.Embedding(soft_prompt_length, soft_prompt_embedding_size) 
         
         #dont use random use top 100 most common tokens of tokenizer.getvocab
-        top_100_token_embeddings = get_top_token_embeddings(self, tokenizer, 100)
+        top_100_token_embeddings = get_top_token_embeddings(self.knit5, tokenizer, 100)
         
         
         with torch.no_grad():

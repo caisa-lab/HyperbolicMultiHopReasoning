@@ -29,32 +29,32 @@ class BaseTrainingConfig:
 class Config:  
     class SingleHopTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(log_dir='tboard_logs/knowledge_integration',
-                             model_save_path='checkpoints/knowledge_integration',
+            super().__init__(log_dir='tboard_logs/final_results/knowledge_integration',
+                             model_save_path='checkpoints/final_results/knowledge_integration',
                              model_checkpoint_path= None,
                              tboard_checkpoint_path=None,
-                             num_workers=4)
+                             num_workers=16)
 
                 
     class OneHopWikiTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(log_dir='tboard_logs/one_hop_wiki_finetuning',
-                             model_save_path='checkpoints/one_hop_wiki_finetuning',
+            super().__init__(log_dir='tboard_logs/final_results/one_hop_wiki_finetuning',
+                             model_save_path='checkpoints/final_results/one_hop_wiki_finetuning',
                              epochs=160,
                              model_checkpoint_path= None,
                              tboard_checkpoint_path=None,
-                             num_workers=4)
+                             num_workers=16)
 
     class RandomWalkTraining(BaseTrainingConfig):
         def __init__(self):
             super().__init__(learning_rate=0.3,
                              epochs=250,
-                             log_dir='tboard_logs/random_walk_training',
-                             model_save_path='checkpoints/random_walk_training',
-                             model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth',# 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth' 'checkpoints/knowledge_integration/large_adapt_bsize64_c4_hyperbolic_encoder/knit5_epoch_19_val_loss_0.0234.pth'
+                             log_dir='tboard_logs/final_results/random_walk_training',
+                             model_save_path='checkpoints/final_results/random_walk_training',
+                             model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth', #'checkpoints/knowledge_integration/large_adapt_bsize64_c4_hyperbolic_after_decoder/knit5_epoch_10_val_loss_0.0217.pth'
                              tboard_checkpoint_path=None,
                              num_workers=16,
-                             curvature=4.0
+                             curvature=1.0
                              )
             self.prompt_length = 100
             self.hopping_prompt_checkpoint_path = None
@@ -75,10 +75,11 @@ class Config:
                 
     class T5_Model:
         def __init__(self):
-            self.batch_size = 64#128 # From the Paper or 32 if xxl
+            self.batch_size = 64
             self.model_name = "google/t5-large-lm-adapt"            
             self.tokenizer_max_length = 128
-            self.map_kth_encoder_layer = 4
+            self.map_encoder_layers = []
+            self.map_decoder_layers = [24]
 
 
             

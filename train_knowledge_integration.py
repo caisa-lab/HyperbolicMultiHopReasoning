@@ -7,7 +7,7 @@ from src.config import Config
 from torch.utils.data import DataLoader
 from src.train import *
 import argparse
-from src.models import HyperbolicT5Model
+from src.models import HyperbolicKthLayerT5Model
 
 def _knowledge_integration_with_c4(hyperbolic):
     train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=True)
@@ -33,8 +33,9 @@ def _knowledge_integration_with_c4(hyperbolic):
     print(f"Loading Model {config.t5_model.model_name}...")
     #Adjust Dropout
     if hyperbolic:
-        print("Train with Hyperbolic model.")
-        model = HyperbolicT5Model()
+        model = HyperbolicKthLayerT5Model(curvature=config.single_hop_training.curvature, map_encoder_layers=config.t5_model.map_encoder_layers, map_decoder_layers=config.t5_model.map_decoder_layers)
+        print(f"Train with hyperbolic Soft Prompt Model with curvature {config.single_hop_training.curvature} and Exponential Mapping at encoder layer {config.t5_model.map_encoder_layers} and at decoder layer {config.t5_model.map_decoder_layers}")
+
     else:
         model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
         
@@ -44,9 +45,9 @@ def _knowledge_integration_with_c4(hyperbolic):
     model.config.classifier_dropout = 0.1
 
     base_path = 'c4/en/c4-train.{:05d}-of-01024.json'
-    c4_dataset = load_c4_dataset(base_path, number_of_files=2)
+    c4_dataset = load_c4_dataset(base_path, number_of_files=1)
 
-    objective = 'prefix_language_modeling'
+    objective = 'span_corruption'
     C4_train = C4Dataset(c4_dataset ,tokenizer=tokenizer, objective=objective)
         
 
@@ -104,7 +105,7 @@ def _knowledge_integration_without_c4(hyperbolic):
     
     if hyperbolic:
         print("Train with Hyperbolic Model.")
-        model = HyperbolicT5Model(t5_model, 'hyperbolic_knit5')
+        model = HyperbolicKthLayerT5Model(curvature=config.single_hop_training.curvature, map_encoder_layers=config.t5_model.map_encoder_layers, map_decoder_layers=config.t5_model.map_decoder_layers)
     else:
         model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
         

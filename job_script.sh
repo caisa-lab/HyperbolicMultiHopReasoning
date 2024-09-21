@@ -6,9 +6,9 @@
 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --job-name=random_walk_bsize64_c4_hyperbolic_soft_prompt_euclidean_projection_layer
-#SBATCH --output=outputs/output_random_walk_training_bsize64_c4_hyperbolic_soft_prompt_euclidean_projection_layer_%j.txt
-#SBATCH --error=outputs/error_random_walk_training_bsize64_c4_hyperbolic_soft_prompt_euclidean_projection_layer_%j.txt
+#SBATCH --job-name=knowledge_integration_bsize64_c4
+#SBATCH --output=outputs/final_results/output_knowledge_integration_bsize64_c4_%j.txt
+#SBATCH --error=outputs/final_results/error_rknowledge_integration_bsize64_c4_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
@@ -30,4 +30,4 @@ pip install geoopt --quiet
 
 echo "Libraries Installed"
 echo "Starting Training Script...."
-python -u train_random_walk.py --hyperbolic
+python -u train_knowledge_integration.py --c4

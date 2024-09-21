@@ -106,9 +106,9 @@ def _train_random_walk(hyperbolic : bool):
         soft_prompt = None
     
     if hyperbolic:
-        hyperbolic_knit5_model = HyperbolicKthLayerT5Model(checkpoint_hyperbolic_knit5=config.random_walk_training.model_checkpoint_path, curvature=config.random_walk_training.curvature, map_kth_encoder_layer=config.t5_model.map_kth_encoder_layer)
-        model = HyperbolicSoftPromptModel(soft_prompt=soft_prompt, hyperbolic_knit5_checkpoint_path=config.random_walk_training.model_checkpoint_path, curvature=config.random_walk_training.curvature, hyperbolic_knit5=hyperbolic_knit5_model, model_name='hyperbolic_hopping_prompt', with_model_state_dict=False)
-        print(f"Train with hyperbolic Soft Prompt Model with curvature {config.random_walk_training.curvature} and Exponential Mapping at encoder layer {config.t5_model.map_kth_encoder_layer}")
+        hyperbolic_knit5_model = HyperbolicKthLayerT5Model(curvature=config.random_walk_training.curvature, map_encoder_layers=config.t5_model.map_encoder_layers, map_decoder_layers=config.t5_model.map_decoder_layers, checkpoint_hyperbolic_knit5=config.random_walk_training.model_checkpoint_path)
+        model = HyperbolicSoftPromptModel(soft_prompt=soft_prompt, hyperbolic_knit5_checkpoint_path=config.random_walk_training.model_checkpoint_path, hyperbolic_knit5=hyperbolic_knit5_model, model_name='hyperbolic_hopping_prompt', with_model_state_dict=False)
+        print(f"Train with hyperbolic Soft Prompt Model with curvature {config.random_walk_training.curvature} and Exponential Mapping at encoder layer {config.t5_model.map_encoder_layers} and at decoder layer {config.t5_model.map_decoder_layers}")
     else:
         model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt)
 
@@ -129,6 +129,7 @@ def _train_random_walk(hyperbolic : bool):
 
     print(f'Random Walk Training..')
     print(f'with model: {config.t5_model.model_name}')
+    print(f'with lr: {config.random_walk_training.learning_rate}')
 
     #print(f'Model Config: {model.knit5.config}')
     print(f'for: {config.random_walk_training.epochs} epochs')

@@ -61,9 +61,7 @@ class SoftPromptTrainer:
             self.training_config = config.parse_then_hop_training
             
             
-        params = [{'params': self.model.projection_layer.parameters(), 'lr': 1e-3},
-                  {'params': [self.model.soft_prompt], 'lr': 0.3}]
-        self.optimizer = get_optimizer(params, self.training_config)
+        self.optimizer = get_optimizer(model.soft_prompt.parameters(), self.training_config)
             
         self.log_dir, self.model_dir = setup_directories(self.training_config)
         if self.tboard_checkpoint_path is not None:
@@ -103,7 +101,7 @@ class SoftPromptTrainer:
                   
                 inputs = self.tokenizer(input_batch, padding=True, truncation=True, return_tensors = 'pt').to(self.device)
                 labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
-                
+                #labels[labels == self.tokenizer.pad_token_id] = -100
                 outputs = self.model(input_ids=inputs.input_ids, attention_mask=inputs.attention_mask, labels=labels)
                 loss = outputs.loss
                 
@@ -176,8 +174,7 @@ class SoftPromptTrainer:
             self.early_stop_counter = 0
             self.best_model_path = soft_prompt_path
             torch.save({
-                'soft_prompt_state_dict': self.model.soft_prompt.data.cpu(),
-                'projection_layer_state_dict': self.model.projection_layer.state_dict(),
+                'soft_prompt_state_dict': self.model.soft_prompt.state_dict(),
                 'curvature': self.model.curvature,
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'epoch': epoch}, soft_prompt_path)

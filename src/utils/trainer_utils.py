@@ -26,36 +26,17 @@ sys.path.append(train_dir)
 
 
 def get_optimizer(parameters, trainer_config : BaseTrainingConfig):
-    use_config = True
-    for i, param_group in enumerate(parameters):
-        if 'lr' in param_group:
-            use_config = False
-            print(f"Using {trainer_config.optimizer} with learning rate {param_group['lr']}")
-        else:
-            print(f'Using {trainer_config.optimizer} with learning rate {trainer_config.learning_rate}')
-    if use_config:
-        lr = trainer_config.learning_rate
-        if trainer_config.optimizer == 'Adam':
-            optimizer = optim.Adam(parameters, lr= lr)
-        elif  trainer_config.optimizer == 'AdamW':
-            optimizer = optim.AdamW(parameters, lr=lr, weight_decay= trainer_config.optimizer_param)
-        elif  trainer_config.optimizer == 'AdaFactor':
-            optimizer = Adafactor(parameters, lr=lr, weight_decay= trainer_config.optimizer_param, relative_step=False, scale_parameter=False)
-        elif  trainer_config.optimizer == 'Hyperbolic':
-            optimizer = RiemannianAdam(parameters, lr=lr, weight_decay= trainer_config.optimizer_param)
-        else:
-            raise ValueError(f"Unsupported optimizer: {trainer_config.optimizer}")
+    lr = trainer_config.learning_rate
+    if trainer_config.optimizer == 'Adam':
+        optimizer = optim.Adam(parameters, lr= lr)
+    elif  trainer_config.optimizer == 'AdamW':
+        optimizer = optim.AdamW(parameters, lr=lr, weight_decay= trainer_config.optimizer_param)
+    elif  trainer_config.optimizer == 'AdaFactor':
+        optimizer = Adafactor(parameters, lr=lr, weight_decay= trainer_config.optimizer_param, relative_step=False, scale_parameter=False)
+    elif  trainer_config.optimizer == 'Hyperbolic':
+        optimizer = RiemannianAdam(parameters, lr=lr, weight_decay= trainer_config.optimizer_param)
     else:
-        if trainer_config.optimizer == 'Adam':
-            optimizer = optim.Adam(parameters)
-        elif  trainer_config.optimizer == 'AdamW':
-            optimizer = optim.AdamW(parameters, weight_decay= trainer_config.optimizer_param)
-        elif  trainer_config.optimizer == 'AdaFactor':
-            optimizer = Adafactor(parameters, weight_decay= trainer_config.optimizer_param, relative_step=False, scale_parameter=False)
-        elif  trainer_config.optimizer == 'Hyperbolic':
-            optimizer = RiemannianAdam(parameters, weight_decay= trainer_config.optimizer_param)
-        else:
-            raise ValueError(f"Unsupported optimizer: {trainer_config.optimizer}")
+        raise ValueError(f"Unsupported optimizer: {trainer_config.optimizer}")
     return optimizer
 
 def setup_directories(trainer_config : BaseTrainingConfig):

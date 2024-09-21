@@ -83,8 +83,7 @@ class ModelTrainer:
             self.optimizer, self.start_epoch = load_optimizer_and_start_epoch(self.optimizer, checkpoint_path)  
         
     def train(self,
-            epochs : int,
-            hyperbolic : bool = False):
+            epochs : int):
         
         """Trains Knowledge Integration part. Given 'e1 ; r1' predict 'e2'
         """
@@ -129,6 +128,7 @@ class ModelTrainer:
                 
                 tokenized_inputs = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt').to(self.device)
                 tokenized_labels = self.tokenizer(label, padding=True, truncation=True, return_tensors='pt').to(self.device)
+                tokenized_labels[tokenized_labels == self.tokenizer.pad_token_id] = -100
                 input_ids = tokenized_inputs['input_ids']
                 attention_mask = tokenized_inputs['attention_mask']
                 labels = tokenized_labels['input_ids']
