@@ -27,6 +27,7 @@ sys.path.append(train_dir)
 
 def get_optimizer(parameters, trainer_config : BaseTrainingConfig):
     lr = trainer_config.learning_rate
+    print(f"Training with optimizer {trainer_config.optimizer} and Learning Rate {trainer_config.learning_rate}")
     if trainer_config.optimizer == 'Adam':
         optimizer = optim.Adam(parameters, lr= lr)
     elif  trainer_config.optimizer == 'AdamW':
@@ -39,12 +40,12 @@ def get_optimizer(parameters, trainer_config : BaseTrainingConfig):
         raise ValueError(f"Unsupported optimizer: {trainer_config.optimizer}")
     return optimizer
 
-def setup_directories(trainer_config : BaseTrainingConfig):
+def setup_directories(trainer_config : BaseTrainingConfig, t5_config):
     current_time = datetime.now().strftime('%b%d_%H-%M-%S')
     learning_rate = trainer_config.learning_rate
     curvature = trainer_config.curvature
     optimizer = trainer_config.optimizer
-    final_string = f"{current_time}_{optimizer}_{learning_rate}_{curvature}"
+    final_string = f"{current_time}_encoder{t5_config.map_encoder_layers}_decoder{t5_config.map_decoder_layers}_{optimizer}_{learning_rate}_{curvature}"
     log_dir = os.path.join(trainer_config.log_dir, final_string)
     model_dir = os.path.join(trainer_config.model_save_path, final_string) 
     os.makedirs(log_dir, exist_ok=True)
@@ -79,7 +80,7 @@ def load_soft_prompt(soft_prompt : nn.Embedding,
                     device = 'cuda' if torch.cuda.is_available() else 'cpu'):
     checkpoint = torch.load(soft_prompt_path, map_location=device) 
     if soft_prompt is not None:  
-        soft_prompt.load_state_dict(checkpoint['soft_prompt_state_dict'])
+        soft_prompt = checkpoint['soft_prompt_state_dict']
         soft_prompt.to(device)
         print(f'Loading Soft Prompt Checkpoint from {soft_prompt_path}')
     return soft_prompt

@@ -37,8 +37,8 @@ class HyperbolicSoftPromptModel(nn.Module):
         
         for param in self.knit5.parameters():
             param.requires_grad = False
-        for param in self.soft_prompt.parameters():
-            param.requires_grad = True
+            
+        self.soft_prompt.requires_grad = True
         
     def init_soft_prompt(self):
         config = Config()
@@ -48,14 +48,14 @@ class HyperbolicSoftPromptModel(nn.Module):
 
         soft_prompt_embedding_size = self.knit5.config.hidden_size
 
-        soft_prompt_embeddings = nn.Embedding(soft_prompt_length, soft_prompt_embedding_size) 
+        soft_prompt_embeddings = nn.Parameter(soft_prompt_length, soft_prompt_embedding_size) 
         
         #dont use random use top 100 most common tokens of tokenizer.getvocab
         top_100_token_embeddings = get_top_token_embeddings(self.knit5, tokenizer, 100)
         
         
         with torch.no_grad():
-            soft_prompt_embeddings.weight.data[:top_100_token_embeddings.size(0), :] = top_100_token_embeddings
+            soft_prompt_embeddings.data[:top_100_token_embeddings.size(0), :] = top_100_token_embeddings
 
         print(f"Initializing Soft Prompt with top 100 tokens from pretraining corpus")
         return soft_prompt_embeddings           
@@ -79,7 +79,7 @@ class HyperbolicSoftPromptModel(nn.Module):
                     return_dict: Optional[bool] = None):
         
         
-        soft_prompt_input = self.soft_prompt.weight.expand(input_ids.size(0), -1, -1).to(self.device)
+        soft_prompt_input = self.soft_prompt.expand(input_ids.size(0), -1, -1).to(self.device)
         input_embeddings = self.knit5.shared(input_ids)  # Convert input IDs to embeddings
 
         concatenated_embeddings = torch.cat([soft_prompt_input, input_embeddings], dim=1)
@@ -142,11 +142,9 @@ class HyperbolicSoftPromptModel(nn.Module):
                     return_dict)
     
     def generate(self, inputs, max_length=50, num_beams = 5, early_stopping=True):
-        soft_prompt_input = self.soft_prompt.weight.expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
+        soft_prompt_input = self.soft_prompt.expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
         input_embeddings = self.knit5.shared(inputs['input_ids'])  # Convert input IDs to embeddings
 
-
-        soft_prompt_input = expmap0(soft_prompt_input, self.curvature)
         concatenated_embeddings = torch.cat([soft_prompt_input, input_embeddings], dim=1)
         
         

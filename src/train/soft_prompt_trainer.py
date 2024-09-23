@@ -61,9 +61,9 @@ class SoftPromptTrainer:
             self.training_config = config.parse_then_hop_training
             
             
-        self.optimizer = get_optimizer(model.soft_prompt.parameters(), self.training_config)
+        self.optimizer = get_optimizer([model.soft_prompt], self.training_config)
             
-        self.log_dir, self.model_dir = setup_directories(self.training_config)
+        self.log_dir, self.model_dir = setup_directories(self.training_config, self.config.t5_model)
         if self.tboard_checkpoint_path is not None:
             self.log_dir = tboard_checkpoint_path
             print(f"Continue writing to {tboard_checkpoint_path}")
@@ -87,7 +87,7 @@ class SoftPromptTrainer:
         """
         Trains soft prompts. Does either the random walk or the parsing step. Concatenating the input with the soft prompt and giving it to the knit5 model.
         """
-        
+        self.model.train()
         if self.start_epoch != 0:
             print(f'Starting training from epoch {self.start_epoch}')
         
@@ -101,7 +101,7 @@ class SoftPromptTrainer:
                   
                 inputs = self.tokenizer(input_batch, padding=True, truncation=True, return_tensors = 'pt').to(self.device)
                 labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
-                #labels[labels == self.tokenizer.pad_token_id] = -100
+                labels[labels == self.tokenizer.pad_token_id] = -100
                 outputs = self.model(input_ids=inputs.input_ids, attention_mask=inputs.attention_mask, labels=labels)
                 loss = outputs.loss
                 
@@ -174,8 +174,8 @@ class SoftPromptTrainer:
             self.early_stop_counter = 0
             self.best_model_path = soft_prompt_path
             torch.save({
-                'soft_prompt_state_dict': self.model.soft_prompt.state_dict(),
-                'curvature': self.model.curvature,
+                'soft_prompt_state_dict': self.model.soft_prompt,
+                'curvature': self.model.knit5.curvature if hasattr(self.model.knit5, 'curvature') else 0.0,
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'epoch': epoch}, soft_prompt_path)
         else:

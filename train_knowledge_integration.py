@@ -45,9 +45,9 @@ def _knowledge_integration_with_c4(hyperbolic):
     model.config.classifier_dropout = 0.1
 
     base_path = 'c4/en/c4-train.{:05d}-of-01024.json'
-    c4_dataset = load_c4_dataset(base_path, number_of_files=1)
+    c4_dataset = load_c4_dataset(base_path, number_of_files=2)
 
-    objective = 'span_corruption'
+    objective = 'prefix_language_modeling'
     C4_train = C4Dataset(c4_dataset ,tokenizer=tokenizer, objective=objective)
         
 

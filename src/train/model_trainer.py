@@ -73,7 +73,7 @@ class ModelTrainer:
         self.optimizer = get_optimizer(self.model.parameters(), self.training_config)
 
         
-        self.log_dir, self.model_dir = setup_directories(self.training_config)
+        self.log_dir, self.model_dir = setup_directories(self.training_config, self.config.t5_model)
         if self.tboard_checkpoint_path is not None:
             self.log_dir = tboard_checkpoint_path
             print(f"Continue writing to {tboard_checkpoint_path}")
@@ -126,12 +126,12 @@ class ModelTrainer:
                         
                 input_str, label = batch[0], batch[1]
                 
-                tokenized_inputs = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt').to(self.device)
-                tokenized_labels = self.tokenizer(label, padding=True, truncation=True, return_tensors='pt').to(self.device)
+                tokenized_inputs = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt')
+                tokenized_labels = self.tokenizer(label, padding=True, truncation=True, return_tensors='pt')
                 tokenized_labels[tokenized_labels == self.tokenizer.pad_token_id] = -100
-                input_ids = tokenized_inputs['input_ids']
-                attention_mask = tokenized_inputs['attention_mask']
-                labels = tokenized_labels['input_ids']
+                input_ids = tokenized_inputs['input_ids'].to(self.device)
+                attention_mask = tokenized_inputs['attention_mask'].to(self.device)
+                labels = tokenized_labels['input_ids'].to(self.device)
                 
                 self.optimizer.zero_grad()
                 if batch_idx % 2 == 0:
@@ -149,10 +149,10 @@ class ModelTrainer:
                 
                 if batch_idx % 2 == 0:
                     total_single_hop_loss += loss.item()
-                    log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx, 'Training/SingleHop', eval_metric='loss')
+                    log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx//2, 'Training/SingleHop', eval_metric='loss')
                 else:
                     total_c4_loss += loss.item() 
-                    log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx, 'Training/C4', eval_metric='loss')
+                    log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx//2, 'Training/C4', eval_metric='loss')
                 
                 progress_bar.set_description(f"Epoch {epoch} - Training - {self.method} - Loss: {loss.item():.4f}")
                 
