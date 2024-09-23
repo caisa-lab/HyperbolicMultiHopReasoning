@@ -7,4 +7,5 @@ notebooks/
 outputs/
 to_try.txt
 *.db
+*.ipynb
 notebooks/

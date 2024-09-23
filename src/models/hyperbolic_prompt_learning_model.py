@@ -141,18 +141,19 @@ class HyperbolicSoftPromptModel(nn.Module):
                     output_hidden_states,
                     return_dict)
     
-    def generate(self, inputs, max_length=50, num_beams = 5, early_stopping=True):
-        soft_prompt_input = self.soft_prompt.expand(inputs['input_ids'].size(0), -1, -1).to(self.device)
-        input_embeddings = self.knit5.shared(inputs['input_ids'])  # Convert input IDs to embeddings
+    def generate(self, input_ids, attention_mask, **generate_kwargs):
+        soft_prompt_input = self.soft_prompt.weight.expand(input_ids.size(0), -1, -1).to(self.device)
+        input_embeddings = self.knit5.shared(input_ids)  # Convert input IDs to embeddings
 
         concatenated_embeddings = torch.cat([soft_prompt_input, input_embeddings], dim=1)
         
-        
         #Adjust attention mask (take all of the soft prompt tokens should be attented)
-        pp_attention_mask = torch.ones((inputs['attention_mask'].size(0), soft_prompt_input.size(1)), device=self.device)
-        concatenated_attention_mask = torch.cat((pp_attention_mask, inputs['attention_mask']), dim=1)
+        soft_prompt_attention_mask = torch.ones((attention_mask.size(0), soft_prompt_input.size(1)), device=self.device)
+        concatenated_attention_mask = torch.cat((soft_prompt_attention_mask, attention_mask), dim=1)
+        
+        
 
-        outputs = self.knit5.generate(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, max_length=max_length, num_beams=num_beams, early_stopping=early_stopping)
+        outputs = self.knit5.generate(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, **generate_kwargs)
         return outputs
     
     

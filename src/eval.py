@@ -118,11 +118,12 @@ def evaluate_random_walk_training(finetuned_model : SoftPromptModel,
             incomplete_sequence, complete_sequence = batch
             inputs = tokenizer(incomplete_sequence, padding=True, truncation=True, return_tensors = 'pt').to(device)
            
-            outputs = finetuned_model.generate(inputs=inputs,
-                                        max_length=50,
-                                        num_beams = 5,
-                                        early_stopping=True)
-            
+            outputs = finetuned_model.generate(input_ids=inputs.input_ids,
+                                               attention_mask=inputs.attention_mask,
+                                                max_length=50,
+                                                num_beams = 5,
+                                                early_stopping=True)
+                
             decoded_predictions = tokenizer.batch_decode(outputs, skip_special_tokens=True) 
             
 
@@ -134,6 +135,8 @@ def evaluate_random_walk_training(finetuned_model : SoftPromptModel,
             
             total_em += em_score
             total_f1 += _f1_score
+            
+            progress_bar.set_description(f'Test - Random Walk Training - EM: {total_em / ((batch_idx+1) * test_dataloader.batch_size)} | F1: {total_f1 / ((batch_idx+1) * test_dataloader.batch_size)}')
             
             for idx, (pred, label) in enumerate(zip(decoded_predictions, complete_sequence)):
                 index = batch_idx*test_dataloader.batch_size+idx

@@ -32,6 +32,7 @@ class SoftPromptModel(nn.Module):
             param.requires_grad = False
         
         self.soft_prompt.requires_grad = True
+        self.decoder_soft_prompt.requires_grad = True
             
     
         
@@ -70,10 +71,14 @@ class SoftPromptModel(nn.Module):
         
         decoder_concat_embeddings = torch.cat([decoder_soft_prompt_input, decoder_embeddings], dim=1)
         if decoder_attention_mask is None:
-            decoder_attention_mask = torch.ones_like(decoder_input_ids,device=self.device)
+            decoder_attention_mask = torch.ones_like(decoder_input_ids, device=self.device)
         decoder_concat_attention_mask = torch.cat([decoder_soft_prompt_attention_mask, decoder_attention_mask], dim=1)
+        # `-100` is the ignore index in CrossEntropyLoss
+        padding = torch.full((attention_mask.size(0), self.config.random_walk_training.prompt_length), -100, dtype=labels.dtype, device=self.device)
 
-        outputs = self.knit5(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, decoder_inputs_embeds = decoder_concat_embeddings, decoder_attention_mask = decoder_concat_attention_mask, **forward_kwargs)
+        # Concatenate padding with labels
+        adjusted_labels = torch.cat([padding, labels], dim=1)
+        outputs = self.knit5(inputs_embeds=concatenated_embeddings, attention_mask=concatenated_attention_mask, decoder_inputs_embeds=decoder_concat_embeddings, labels = adjusted_labels)
         return outputs
     
     
