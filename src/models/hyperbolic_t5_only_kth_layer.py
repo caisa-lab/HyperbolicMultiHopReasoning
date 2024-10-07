@@ -13,6 +13,7 @@ import torch
 from torch.nn import CrossEntropyLoss
 import copy
 from src.config import Config
+import geoopt
 
 class T5Stack(T5PreTrainedModel):
     def __init__(self, config, embed_tokens=None, curvature = 1.0, map_layers = [], ):
@@ -36,6 +37,7 @@ class T5Stack(T5PreTrainedModel):
         
         self.curvature = curvature
         self.map_layers = map_layers
+        self.manifold = geoopt.manifolds.PoincareBall(self.curvature)
 
     def parallelize(self, device_map=None):
         warnings.warn(
@@ -184,8 +186,13 @@ class T5Stack(T5PreTrainedModel):
 
         for i, (layer_module, past_key_value) in enumerate(zip(self.block, past_key_values)):
             if i in self.map_layers:
-                hidden_states = expmap0(hidden_states, c = self.curvature)
-            
+                # x0 = torch.sqrt(1.0 + torch.sum(hidden_states ** 2, dim=-1, keepdim=True))
+
+                # cat_hidden_states = torch.cat([x0, hidden_states], dim=-1)
+                # cat_hidden_states = self.manifold.expmap0(cat_hidden_states)
+                # hidden_states = cat_hidden_states[..., 1:]
+                hidden_states = self.manifold.expmap0(hidden_states)
+                
             layer_head_mask = head_mask[i]
             cross_attn_layer_head_mask = cross_attn_head_mask[i]
             # Model parallel
@@ -267,7 +274,12 @@ class T5Stack(T5PreTrainedModel):
                     if i == v[-1] and "cuda:" + str(k) != self.last_device:
                         hidden_states = hidden_states.to("cuda:" + str(k + 1))
         if len(self.block) in self.map_layers:
-            hidden_states = expmap0(hidden_states, c = self.curvature)
+            # x0 = torch.sqrt(1.0 + torch.sum(hidden_states ** 2, dim=-1, keepdim=True))
+
+            # cat_hidden_states = torch.cat([x0, hidden_states], dim=-1)
+            # cat_hidden_states = self.manifold.expmap0(cat_hidden_states)
+            # hidden_states = cat_hidden_states[..., 1:]
+            hidden_states = self.manifold.expmap0(hidden_states)
         hidden_states = self.final_layer_norm(hidden_states)
         hidden_states = self.dropout(hidden_states)
 

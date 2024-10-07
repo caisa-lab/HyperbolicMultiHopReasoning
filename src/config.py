@@ -11,6 +11,7 @@ class BaseTrainingConfig:
                      tboard_checkpoint_path = None,
                      model_checkpoint_path = None,
                      load_optimizer = False,
+                     additional_log_info = '',
                      num_workers = 4):
             self.optimizer = optimizer #[Adam, AdamW, AdaFactor, Hyperbolic]
             self.learning_rate = learning_rate #Same as in the paper
@@ -25,6 +26,7 @@ class BaseTrainingConfig:
             self.load_optimizer = load_optimizer
             self.num_workers = num_workers
             self.curvature = curvature
+            self.additional_log_info = additional_log_info
             
 class Config:  
     class SingleHopTraining(BaseTrainingConfig):
@@ -51,20 +53,22 @@ class Config:
                              epochs=250,
                              log_dir='tboard_logs/final_results/random_walk_training',
                              model_save_path='checkpoints/final_results/random_walk_training',
-                             model_checkpoint_path= '../checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth', #'checkpoints/knowledge_integration/large_adapt_bsize64_c4_hyperbolic_after_decoder/knit5_epoch_10_val_loss_0.0217.pth'
+                             model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth', #'checkpoints/knowledge_integration/large_adapt_bsize64_c4_hyperbolic_after_decoder/knit5_epoch_10_val_loss_0.0217.pth'
                              tboard_checkpoint_path=None,
                              num_workers=16,
-                             curvature=0.0
+                             optimizer='AdaFactor',
+                             curvature=1.0,
+                             additional_log_info='soft_prompt_lorentz_expmap'
                              )
             self.prompt_length = 100
-            self.hopping_prompt_checkpoint_path = '../checkpoints/random_walk_training/expmap_after_decoder_c1.0_AdaFactor0.3/soft_prompt_epoch_32_val_loss_0.1300.pth'
+            self.hopping_prompt_checkpoint_path = None
 
     class ParseThenHopTraining(BaseTrainingConfig):
         def __init__(self):
             super().__init__(learning_rate=0.3,
                              epochs=250,
-                             log_dir='tboard_logs/parse_then_hop_training',
-                             model_save_path='checkpoints/parse_then_hop_training',
+                             log_dir='tboard_logs/final_results/parse_then_hop_training',
+                             model_save_path='checkpoints/final_results/parse_then_hop_training',
                              model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth',
                              tboard_checkpoint_path=None,
                              num_workers=16
@@ -78,7 +82,7 @@ class Config:
             self.batch_size = 64
             self.model_name = "google/t5-large-lm-adapt"            
             self.tokenizer_max_length = 128
-            self.map_encoder_layers = [0]
+            self.map_encoder_layers = []
             self.map_decoder_layers = []
 
 
