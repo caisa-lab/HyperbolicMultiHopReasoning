@@ -8,7 +8,7 @@ from transformers import AutoTokenizer
 from config import Config
 from eval import exact_match_score, f1_score
 from utils.trainer_utils import *
-from src.models import HyperbolicSoftPromptModel, SoftPromptModel
+from src.models import SoftPromptModel
 from typing import Union
 from utils.util import expmap0, logmap0
 
@@ -17,7 +17,7 @@ in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/23
 """
 class SoftPromptTrainer:
     def __init__(self,
-                 model : Union[SoftPromptModel, HyperbolicSoftPromptModel],
+                 model : Union[SoftPromptModel],
                  tokenizer : AutoTokenizer,
                  train_dataloader: DataLoader,
                  val_dataloader : DataLoader,

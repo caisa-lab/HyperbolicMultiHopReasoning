@@ -7,7 +7,7 @@ import torch
 from src.config import Config
 from torch.utils.data import DataLoader
 from src.knowledge_graph import create_knowledge_graph
-from src.models import HyperbolicSoftPromptModel, SoftPromptModel, HyperbolicKthLayerT5Model
+from src.models import SoftPromptModel, HyperbolicKthLayerT5Model
 import argparse
 import optuna
 import os
@@ -59,7 +59,7 @@ def objective(trial):
     config.random_walk_training.curvature = c
  
     print("Train with hyperbolic Soft Prompt Model.")
-    model = HyperbolicSoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False, curvature=config.random_walk_training.curvature)   
+    model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hyperbolic_hopping_prompt', with_model_state_dict=False, curvature=config.random_walk_training.curvature)   
     print("Using curvature", config.random_walk_training.curvature)
     print("Using Learning Rate", config.random_walk_training.learning_rate)
 

@@ -59,9 +59,11 @@ def load_model_checkpoint(model : nn.Module,
                           ):
     checkpoint = torch.load(checkpoint_path, map_location=device)
     if with_model_state_dict:
-        model.load_state_dict(checkpoint['model_state_dict'])
+        missing, unexpected = model.load_state_dict(checkpoint['model_state_dict'], strict=False)
     else:
-        model.load_state_dict(checkpoint)
+        missing, unexpected = model.load_state_dict(checkpoint, strict=False)
+    print(f"{missing = }")
+    print(f"{unexpected = }")
     print(f"Loaded checkpoint from {checkpoint_path}")
     return model
                     

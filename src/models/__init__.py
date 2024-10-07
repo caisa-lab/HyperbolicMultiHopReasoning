@@ -1,3 +1,2 @@
 from .soft_prompt_model import SoftPromptModel
-from .hyperbolic_prompt_learning_model import HyperbolicSoftPromptModel
 from .hyperbolic_t5_only_kth_layer import HyperbolicKthLayerT5Model
