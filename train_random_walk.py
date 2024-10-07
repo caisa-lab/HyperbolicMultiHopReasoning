@@ -100,7 +100,7 @@ def _train_random_walk(hyperbolic : bool):
     from src.utils.trainer_utils import load_soft_prompt
     
     if config.random_walk_training.hopping_prompt_checkpoint_path is not None:
-        soft_prompt = nn.Parameter(100, 1024)
+        soft_prompt = nn.Parameter(torch.randn(100, 1024))
         soft_prompt = load_soft_prompt(soft_prompt, config.random_walk_training.hopping_prompt_checkpoint_path)
     else:
         soft_prompt = None
@@ -110,7 +110,7 @@ def _train_random_walk(hyperbolic : bool):
         model = SoftPromptModel(knit5=hyperbolic_knit5_model, knit5_checkpoint_path=config.random_walk_training.model_checkpoint_path, model_name='hyperbolic_hopping_prompt', soft_prompt=soft_prompt, with_model_state_dict=False)
         print(f"Train with hyperbolic Soft Prompt Model with curvature {config.random_walk_training.curvature} and Exponential Mapping at encoder layer {config.t5_model.map_encoder_layers} and at decoder layer {config.t5_model.map_decoder_layers}")
     else:
-        model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt)
+        model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt, curvature = config.random_walk_training.curvature)
 
     print("Model type before passing to SoftPromptTrainer:", type(model))
 

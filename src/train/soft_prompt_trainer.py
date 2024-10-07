@@ -10,6 +10,7 @@ from eval import exact_match_score, f1_score
 from utils.trainer_utils import *
 from src.models import HyperbolicSoftPromptModel, SoftPromptModel
 from typing import Union
+from utils.util import expmap0, logmap0
 
 """Triggering Multi-Hop Reasoning for Question Answering
 in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/2306.04009
@@ -61,7 +62,10 @@ class SoftPromptTrainer:
             self.training_config = config.parse_then_hop_training
             
             
-        self.optimizer = get_optimizer([model.soft_prompt], self.training_config)
+        self.optimizer = get_optimizer([{'params': model.soft_prompt, 'lr': 0.3},
+                                        {'params': model.projection_layer.parameters(), 'lr': 1e-3},
+                                         #{'params': model.B, 'lr': 1e-2},
+                                         {'params': model.scaler.parameters(), 'lr': 1e-3}], self.training_config)
             
         self.log_dir, self.model_dir = setup_directories(self.training_config, self.config.t5_model)
         if self.tboard_checkpoint_path is not None:
@@ -99,10 +103,12 @@ class SoftPromptTrainer:
                 
                 input_batch, label_batch = batch
                   
-                inputs = self.tokenizer(input_batch, padding=True, truncation=True, return_tensors = 'pt').to(self.device)
+                inputs = self.tokenizer(input_batch, padding=True, truncation=True, return_tensors = 'pt')
+                input_ids = inputs.input_ids.to(self.device)
+                attention_mask = inputs.attention_mask.to(self.device)
                 labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
                 labels[labels == self.tokenizer.pad_token_id] = -100
-                outputs = self.model(input_ids=inputs.input_ids, attention_mask=inputs.attention_mask, labels=labels)
+                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
                 loss = outputs.loss
                 
                 
@@ -110,7 +116,7 @@ class SoftPromptTrainer:
                 loss.backward()
 		        
                 self.optimizer.step()
-
+            
                 total_loss += loss.item()
                 progress_bar.set_description(f"Epoch {epoch} - Training - {self.method} - Loss: {loss.item():.4f}")
                 self.log_tensorboard(loss.item(), epoch*len(self.train_dataloader) + batch_idx, 'Training')

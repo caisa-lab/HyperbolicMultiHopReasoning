@@ -1,45 +1,12 @@
 import torch
-import geoopt
+# import geoopt
 import torch.nn as nn
 from src.utils.util import expmap0
 import torch.nn.init as init
 import math
 import torch.nn.functional as F
+#UNUSED
 
-class ProjectionLayer(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dims, activation='relu', dropout_rate=0.0):
-        """
-        Parameters:
-        - input_dim (int): Dimension of hyperbolic embeddings.
-        - output_dim (int): Dimension of Euclidean embeddings.
-        - hidden_dims (list): List containing the size of each hidden layer.
-        - activation (str): Activation function to use ('relu', 'tanh', etc.).
-        - dropout_rate (float): Dropout rate for regularization.
-        """
-        super(ProjectionLayer, self).__init__()
-
-        activations = {
-            'relu': nn.ReLU(),
-            'gelu': nn.GELU(),
-            'leaky_relu': nn.LeakyReLU()
-        }
-        assert activation in activations, f"Activation '{activation}' not supported."
-        self.activation = activations[activation]
-        
-        # Build the network layers
-        layers = []
-        previous_dim = input_dim
-        for hidden_dim in hidden_dims:
-            layers.append(nn.Linear(previous_dim, hidden_dim))
-            layers.append(self.activation)
-            if dropout_rate > 0.0:
-                layers.append(nn.Dropout(p=dropout_rate))
-            previous_dim = hidden_dim
-        # Output layer (without activation)
-        layers.append(nn.Linear(previous_dim, output_dim))
-        self.network = nn.Sequential(*layers)
-    def forward(self, x):
-        return self.network(x)
 #------------------[https://github.com/Graph-and-Geometric-Learning/hyperbolic-transformer/blob/master/large/manifolds/layer.py]------------------------------
 
 # class HypLayerNorm(nn.Module):

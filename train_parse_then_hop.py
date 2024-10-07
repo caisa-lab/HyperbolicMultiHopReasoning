@@ -44,7 +44,7 @@ def _train_parse_then_hop(hyperbolic: bool):
     knit5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     
     if config.parse_then_hop_training.hopping_prompt_checkpoint_path is not None:
-        soft_prompt = nn.Embedding(100, 1024)
+        soft_prompt = nn.Parameter(torch.randn(100, 1024))
         soft_prompt = load_soft_prompt(soft_prompt, config.parse_then_hop_training.hopping_prompt_checkpoint_path)
     else:
         soft_prompt = None
@@ -54,7 +54,7 @@ def _train_parse_then_hop(hyperbolic: bool):
         model = HyperbolicSoftPromptModel(soft_prompt=soft_prompt, hyperbolic_knit5_checkpoint_path=config.parse_then_hop_training.model_checkpoint_path, curvature=config.parse_then_hop_training.curvature, hyperbolic_knit5=hyperbolic_knit5_model, model_name='hyperbolic_parsing_prompt', with_model_state_dict=False)
         print(f"Train with hyperbolic Soft Prompt Model with curvature {config.parse_then_hop_training.curvature} and Exponential Mapping at encoder layer {config.t5_model.map_encoder_layers} and at decoder layer {config.t5_model.map_decoder_layers}")
     else:
-        model = SoftPromptModel(knit5_model, config.parse_then_hop_training.model_checkpoint_path, 'parsing_prompt')
+        model = SoftPromptModel(knit5_model, config.parse_then_hop_training.model_checkpoint_path, 'parsing_prompt', with_model_state_dict=False, soft_prompt=soft_prompt)
 
     print("Model type before passing to SoftPromptTrainer:", type(model))
 
@@ -67,6 +67,7 @@ def _train_parse_then_hop(hyperbolic: bool):
                       method='parse_then_hop_training',
                       checkpoint_path=config.parse_then_hop_training.hopping_prompt_checkpoint_path,
                       tboard_checkpoint_path=config.parse_then_hop_training.tboard_checkpoint_path,
+                      retrain = True
                       )
 
 
