@@ -62,10 +62,11 @@ class SoftPromptTrainer:
             self.training_config = config.parse_then_hop_training
             
             
-        self.optimizer = get_optimizer([{'params': model.soft_prompt, 'lr': 0.3},
-                                        {'params': model.projection_layer.parameters(), 'lr': 1e-3},
+        self.optimizer = get_optimizer([{'params': model.soft_prompt, 'lr': 0.3}
+                                        #{'params': model.projection_layer.parameters(), 'lr': 1e-3},
                                          #{'params': model.B, 'lr': 1e-2},
-                                         {'params': model.scaler.parameters(), 'lr': 1e-3}], self.training_config)
+                                         #{'params': model.scaler.parameters(), 'lr': 1e-3}
+                                         ], self.training_config)
             
         self.log_dir, self.model_dir = setup_directories(self.training_config, self.config.t5_model)
         if self.tboard_checkpoint_path is not None:

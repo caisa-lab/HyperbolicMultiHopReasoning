@@ -1,32 +1,57 @@
 #!/bin/bash
 
 #SBATCH --partition=A100devel
-#SBATCH --time=01:00:00
+#SBATCH --time=1:00:00
 #SBATCH --gpus=1
+
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --job-name=delta_hyperbolicity_test
-#SBATCH --output=outputs/debug/output_delta_hyperbolicity_knowlede_integration_%j.txt
-#SBATCH --error=outputs/debug/error_delta_hyperbolicity_knowlede_integration_%j.txt
+#SBATCH --job-name=random_walk_training_lorentz_soft_prompt
+#SBATCH --output=outputs/final_results/output_random_walk_training_lorentz_soft_prompt_%j.txt
+#SBATCH --error=outputs/final_results/error_random_walk_training_lorentz_soft_prompt_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
 module load CUDA/11.8.0
-module load Anaconda3/2022.10
+module load Miniforge3
 module load SQLite/3.45.3-GCCcore-13.3.0
 
 echo "Modules Loaded"
 
-source activate thesis
+# Initialize Conda in the script's shell environment
+eval "$(conda shell.bash hook)"
+
+# Verify Conda is initialized
+echo "Conda base path:"
+conda info --base
+
+echo "Conda executable:"
+which conda
+
+echo "Before conda activate, Python executable:"
+which python
+
+# Activate the 'thesis' environment
+conda activate thesis_env
+
+echo "After conda activate, Python executable:"
+which python
 
 echo "Environment Activated"
+python --version
 
-pip install transformers --quiet
-pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu118 --quiet
-pip install sentencepiece --quiet
-pip install optuna --quiet
-pip install geoopt --quiet
+echo "PATH after activation:"
+echo $PATH
+
+#pip install transformers --quiet
+#pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu118 --quiet
+#pip install sentencepiece --quiet
+#pip install optuna --quiet
+#pip install geoopt --quiet
+#pip install matplotlib --quiet
+#pip install scikit-learn --quiet
+#pip install tensorboard --quiet
 
 echo "Libraries Installed"
 echo "Starting Training Script...."
-python -u delta_hyperbolicity.py 
+python -u train_random_walk.py

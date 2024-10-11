@@ -4,6 +4,11 @@ We will implement and combine the methods of these papers:
 [Triggering Multi-Hop Reasoning for Question Answering in Language Models using Soft Prompts and Random Walks](https://arxiv.org/pdf/2306.04009)
 [Hyperbolic Representations for Prompt Learning](https://aclanthology.org/2024.lrec-main.744.pdf)
 
+## Dataset
+
+You need to download the Dataset from here: [2WikiMultiHopQADataset](https://www.dropbox.com/scl/fi/32t7pv1dyf3o2pp0dl25u/data_ids_april7.zip?rlkey=u868q6h0jojw4djjg7ea65j46&e=1).
+You need to have a directory dataset/2wikimultihop/ where the dev.json, test.json, train.json lies.
+
 ## Content
 
 ### [notebooks](./notebooks)
@@ -21,7 +26,7 @@ Contains the actual code implementations which consist of:
 2. [train](./src/train/) consists of 2 training methods. ModelTraining (for pretraining) and SoftPromptTraining for training the parsing and hopping soft prompt. 
 3. [eval](./src/eval.py) has evaluation functions which capture EM and F1 scores.
 4. [config](./src/config.py) manages hyperparameters
-5. [models](./src/models/) consists of the soft_prompt_model and in future the hyperbolic_soft_prompt_model
+5. [models](./src/models/) consists of the Hyperbolic T5 and Soft Prompt Model. Soft Prompt Model takes a Knit5 Model and a Soft Prompt.
 
 ### [tboard_logs](./tboard_logs)
 

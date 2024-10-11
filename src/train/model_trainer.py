@@ -189,12 +189,7 @@ class ModelTrainer:
                 attention_mask = tokenized_inputs['attention_mask']
                 labels = tokenized_labels['input_ids']
                 
-                if batch_idx % 2 == 0:
-                    print("With hyperbolic")
-                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels)
-                else:
-                    print("Without hyperbolic")
-                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels, hyperbolic = False)
+                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels)
                 loss = outputs.loss
                 loss.backward()         
                 

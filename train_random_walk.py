@@ -98,7 +98,8 @@ def _train_random_walk(hyperbolic : bool):
     knit5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     import torch.nn as nn
     from src.utils.trainer_utils import load_soft_prompt
-    
+
+
     if config.random_walk_training.hopping_prompt_checkpoint_path is not None:
         soft_prompt = nn.Parameter(torch.randn(100, 1024))
         soft_prompt = load_soft_prompt(soft_prompt, config.random_walk_training.hopping_prompt_checkpoint_path)
