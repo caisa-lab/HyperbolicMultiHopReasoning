@@ -61,7 +61,7 @@ def delta_hyp(dismat):
     return np.max(maxmin - XY_p)
 def batched_delta_hyp(X, n_tries=10, batch_size=1500):
     vals = []
-    for i in range(n_tries):
+    for i in tqdm(range(n_tries), total=n_tries):
         idx = np.random.choice(len(X), batch_size)
         X_batch = X[idx]
         distmat = distance_matrix(X_batch, X_batch)

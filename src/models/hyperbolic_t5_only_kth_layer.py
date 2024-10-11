@@ -1,7 +1,8 @@
 import warnings
-from src.utils.util import expmap0, logmap0
+from src.utils.util import expmap0, project, logmap0
 from src.utils.trainer_utils import load_model_checkpoint
 from src.utils.util import get_top_token_embeddings
+from geoopt.manifolds import Lorentz, PoincareBall
 from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
 from transformers import T5ForConditionalGeneration, T5PreTrainedModel, AutoTokenizer, T5Config
 from transformers.models.t5.modeling_t5 import T5Block, T5LayerNorm
@@ -37,6 +38,8 @@ class T5Stack(T5PreTrainedModel):
         self.curvature = curvature
         self.map_layers = map_layers
 
+        #self.manifold = Lorentz(k = self.curvature)
+        self.manifold = PoincareBall(self.curvature)
     def parallelize(self, device_map=None):
         warnings.warn(
             "`T5Stack.parallelize` is deprecated and will be removed in v5 of Transformers, you should load your model"
@@ -183,8 +186,15 @@ class T5Stack(T5PreTrainedModel):
         hidden_states = self.dropout(inputs_embeds)
 
         for i, (layer_module, past_key_value) in enumerate(zip(self.block, past_key_values)):
-            if i in self.map_layers:
-                hidden_states = expmap0(hidden_states, c = self.curvature)
+            if self.map_layers:
+                if i in self.map_layers:
+                    # x0 = torch.sqrt(1.0 + torch.sum(hidden_states ** 2, dim=-1, keepdim=True))
+
+                    # cat_hidden_states = torch.cat([x0, hidden_states], dim=-1)
+                    hidden_states = self.manifold.expmap0(hidden_states)
+                    # hidden_states = cat_hidden_states[..., 1:]
+
+                
             
             layer_head_mask = head_mask[i]
             cross_attn_layer_head_mask = cross_attn_head_mask[i]
@@ -267,7 +277,7 @@ class T5Stack(T5PreTrainedModel):
                     if i == v[-1] and "cuda:" + str(k) != self.last_device:
                         hidden_states = hidden_states.to("cuda:" + str(k + 1))
         if len(self.block) in self.map_layers:
-            hidden_states = expmap0(hidden_states, c = self.curvature)
+            hidden_states = self.manifold.expmap0(hidden_states)
         hidden_states = self.final_layer_norm(hidden_states)
         hidden_states = self.dropout(hidden_states)
 
@@ -330,13 +340,15 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
         if checkpoint_hyperbolic_knit5 is None:
             print("Initializing T5 Model...")
             pretrained_model = T5ForConditionalGeneration.from_pretrained(model_name)
-            self.load_state_dict(pretrained_model.state_dict())
-        #else:
-            #print(f"Loading Checkpoint from {checkpoint_hyperbolic_knit5}")
-            #checkpoint = torch.load(checkpoint_hyperbolic_knit5)['model_state_dict']
-            #missing, unexpected = self.load_state_dict(checkpoint)
-            #print(f"Missing: {missing}")
-            #print(f"Unexpected: {unexpected}")
+            missing, unexpected = self.load_state_dict(pretrained_model.state_dict(), strict = False)
+            print(f"Missing: {missing}")
+            print(f"Unexpected: {unexpected}")
+        else:
+            print(f"Loading Checkpoint from {checkpoint_hyperbolic_knit5}")
+            checkpoint = torch.load(checkpoint_hyperbolic_knit5)['model_state_dict']
+            missing, unexpected = self.load_state_dict(checkpoint)
+            print(f"Missing: {missing}")
+            print(f"Unexpected: {unexpected}")
 
         
         self.post_init()
