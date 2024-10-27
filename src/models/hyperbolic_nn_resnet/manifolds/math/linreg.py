@@ -49,7 +49,7 @@ def poincare_mlr(
             2
             * z_norm
             / c_sqrt
-            * torch.asinh(c_sqrt * lam / z_norm * torch.einsum('bnd,fd->bnf', x, z))
+            * torch.asinh(c_sqrt * lam / z_norm * torch.matmul(x, z))
         )
 
 

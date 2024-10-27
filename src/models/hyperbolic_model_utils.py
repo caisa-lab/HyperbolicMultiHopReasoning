@@ -74,7 +74,7 @@ class HyperbolicLayer(nn.Module):
         if scaled:
             self.scaler = RescaledNormalization()
         self.hyperbolic_linear = nn.Sequential(*[
-            PoincareLinear(in_features=in_features, out_features=out_features, ball=self.manifold, bias=True)
+            PoincareLinear(in_features=in_features, out_features=out_features, ball=self.manifold, bias=False)
         ])
     def forward(self, x):
         if self.scaled:

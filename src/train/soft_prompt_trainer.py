@@ -62,9 +62,9 @@ class SoftPromptTrainer:
             self.training_config = config.parse_then_hop_training
         
             
-        print(f"Curvature learnable: {model.knit5.hyperbolic_layer.manifold.c.requires_grad}")
+        print(f"Curvature learnable: {model.knit5.lm_head.manifold.c.requires_grad}")
         self.optimizer = get_optimizer([{'params': model.soft_prompt, 'lr': 0.3},
-                                        {'params': model.knit5.hyperbolic_layer.parameters(), 'lr': 0.001},
+                                        {'params': model.knit5.lm_head.parameters(), 'lr': 0.001},
                                         #{'params': model.hyperbolic_layer.parameters(), 'lr': 1e-4}
                                          ], self.training_config)
             
@@ -129,7 +129,7 @@ class SoftPromptTrainer:
                 self.writer.add_scalar('VRAM/Training/Allocated', vram_allocated, epoch*len(self.train_dataloader) + batch_idx)
                 self.writer.add_scalar('VRAM/Training/Reserved', vram_reserved, epoch*len(self.train_dataloader) + batch_idx)
                 if hasattr(self.model.knit5, 'curvature'):
-                    c = self.model.knit5.hyperbolic_layer.manifold.c.item()
+                    c = self.model.knit5.lm_head.manifold.c.item()
                 else:
                     c = 0.0
                 self.writer.add_scalar('Training/Curvature', c, epoch*len(self.train_dataloader) + batch_idx)
