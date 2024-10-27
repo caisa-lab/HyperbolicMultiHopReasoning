@@ -50,17 +50,17 @@ class Config:
     class RandomWalkTraining(BaseTrainingConfig):
         def __init__(self):
             super().__init__(learning_rate=0.3,
-                             epochs=250,
+                             epochs=200,
                              log_dir='tboard_logs/final_results/random_walk_training',
                              model_save_path='checkpoints/final_results/random_walk_training',
                              model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth', #'checkpoints/knowledge_integration/large_adapt_bsize64_c4_hyperbolic_after_decoder/knit5_epoch_10_val_loss_0.0217.pth'
                              tboard_checkpoint_path=None,
                              num_workers=16,
                              optimizer='AdaFactor',
-                             curvature=1.0,
-                             additional_log_info='soft_prompt_lorentz_expmap'
+                             curvature=1.0
                              )
             self.prompt_length = 100
+            self.additional_log_info=f'poincare_encoder_curvature_1.0_with_hyperbolic_linear_layers_from_resnet_paper'
             self.hopping_prompt_checkpoint_path = None
 
     class ParseThenHopTraining(BaseTrainingConfig):
@@ -76,6 +76,7 @@ class Config:
             self.prompt_length = 100
             self.hopping_prompt_checkpoint_path = None
             self.parsing_prompt_checkpoint_path = None
+            
                 
     class T5_Model:
         def __init__(self):

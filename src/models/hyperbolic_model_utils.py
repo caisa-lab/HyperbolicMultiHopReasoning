@@ -1,10 +1,91 @@
 import torch
-# import geoopt
+import geoopt
 import torch.nn as nn
 from src.utils.util import expmap0
 import torch.nn.init as init
 import math
 import torch.nn.functional as F
+from .hyperbolic_nn_resnet.modules import PoincareLinear
+from .hyperbolic_nn_resnet.manifolds import PoincareBallStdGrad, PoincareBallCustomAutograd
+class HyperbolicLinearLayer(nn.Module):
+    def __init__(self, in_features, out_features, c):
+        super().__init__()
+        self.weights = nn.Parameter(torch.randn(in_features, out_features,requires_grad=True))
+        self.c = c
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        """Reset layer parameters."""
+        init.xavier_uniform_(self.weights, gain=math.sqrt(2))
+        
+    def forward(self, x):
+        batch_size, seq_length, hidden_dim = x.shape
+        in_features, out_features = self.weights.shape
+
+        assert hidden_dim == in_features, "The input hidden_dim must match the in_features of W."
+
+        # Step 1: Matrix multiplication for each batch and sequence element
+        # Wx shape: (batch_size, seq_length, out_features)
+        Wx = torch.matmul(x, self.weights)
+
+        # Step 2: Compute norms for x and Wx
+        norm_x = torch.norm(x, dim=-1, keepdim=True)  # Shape: (batch_size, seq_length, 1)
+        norm_Wx = torch.norm(Wx, dim=-1, keepdim=True)  # Shape: (batch_size, seq_length, 1)
+
+        # Step 3: Compute the inner term tanh^{-1}(sqrt(kappa) * norm_x)
+        inner_term = torch.atanh(torch.sqrt(torch.tensor(self.c)) * norm_x)  # Shape: (batch_size, seq_length, 1)
+
+        # Step 4: Compute the outer tanh term
+        outer_tanh = torch.tanh((norm_Wx / norm_x) * inner_term)  # Shape: (batch_size, seq_length, 1)
+
+        # Step 5: Final result with scaling and direction Wx / norm_Wx
+        hl_output = (1 / torch.sqrt(torch.tensor(self.c))) * outer_tanh * (Wx / norm_Wx)
+
+        return hl_output
+class RescaledNormalization(nn.Module):
+    def __init__(self):
+        super(RescaledNormalization, self).__init__()
+        # Learnable scaling factor initialized to 1
+        self.norm_scale = nn.Parameter(torch.ones(1, requires_grad=True))
+
+    def forward(self, x):
+        # Perform L2 normalization
+        l2_norm = torch.norm(x, p=2, dim=-1, keepdim=True)  # L2 norm along the last dimension
+        normalized_x = x / l2_norm  # Normalize the vector
+
+        # Rescale with the learnable norm scaling factor
+        scaled_x = self.norm_scale * normalized_x
+
+        return scaled_x
+class HyperbolicLayer(nn.Module):
+    def __init__(self, curvature, hidden_dim, in_features=1024, out_features=1024, type="poincare", learnable=False, scaled=True):
+        super(HyperbolicLayer, self).__init__()
+
+        if type not in ["lorentz", "poincare"]:
+            raise ValueError(f"Unsupported Type: {type}. Supported are lorentz, poincare")
+        print(f"Manifold Type: {type}")
+        self.scaled = scaled
+        self.curvature = curvature
+        if type == 'lorentz':
+            self.manifold = geoopt.manifolds.Lorentz(self.curvature, learnable=learnable)
+        elif type == 'poincare':
+            #self.manifold = geoopt.manifolds.PoincareBall(self.curvature, learnable=learnable)
+            self.manifold = PoincareBallCustomAutograd(c = self.curvature, learnable=learnable)
+        if scaled:
+            self.scaler = RescaledNormalization()
+        self.hyperbolic_linear = nn.Sequential(*[
+            PoincareLinear(in_features=in_features, out_features=out_features, ball=self.manifold, bias=True)
+        ])
+    def forward(self, x):
+        if self.scaled:
+            x = self.scaler(x)
+        #x = self.manifold.expmap0(x)
+        x = self.hyperbolic_linear(x)
+        #x = self.manifold.logmap0(x)
+        return x
+
+
+
 #UNUSED
 
 #------------------[https://github.com/Graph-and-Geometric-Learning/hyperbolic-transformer/blob/master/large/manifolds/layer.py]------------------------------

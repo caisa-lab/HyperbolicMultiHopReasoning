@@ -1,5 +1,5 @@
 import warnings
-from src.utils.util import expmap0, project, logmap0
+#rom src.utils.util import expmap0, logmap0
 from src.utils.trainer_utils import load_model_checkpoint
 from src.utils.util import get_top_token_embeddings
 from geoopt.manifolds import Lorentz, PoincareBall
@@ -16,8 +16,10 @@ import copy
 from src.config import Config
 import geoopt
 
+from .hyperbolic_model_utils import *
+
 class T5Stack(T5PreTrainedModel):
-    def __init__(self, config, embed_tokens=None, curvature = 1.0, map_layers = [], ):
+    def __init__(self, config, hyperbolic_layer : HyperbolicLayer, embed_tokens=None, map_layers = []):
         super().__init__(config)
 
         self.embed_tokens = embed_tokens
@@ -35,13 +37,8 @@ class T5Stack(T5PreTrainedModel):
         self.model_parallel = False
         self.device_map = None
         self.gradient_checkpointing = False
-        
-        self.curvature = curvature
         self.map_layers = map_layers
-        self.manifold = geoopt.manifolds.PoincareBall(self.curvature)
-
-        #self.manifold = Lorentz(k = self.curvature)
-        self.manifold = PoincareBall(self.curvature)
+        self.hyperbolic_layer = hyperbolic_layer
     def parallelize(self, device_map=None):
         warnings.warn(
             "`T5Stack.parallelize` is deprecated and will be removed in v5 of Transformers, you should load your model"
@@ -188,8 +185,9 @@ class T5Stack(T5PreTrainedModel):
         hidden_states = self.dropout(inputs_embeds)
 
         for i, (layer_module, past_key_value) in enumerate(zip(self.block, past_key_values)):
-            if i in self.map_layers:
-                hidden_states = expmap0(hidden_states, c = self.curvature)
+            if self.hyperbolic_layer is not None:
+                if i in self.map_layers:
+                    hidden_states = self.hyperbolic_layer(hidden_states, c = self.curvature)
             
             layer_head_mask = head_mask[i]
             cross_attn_layer_head_mask = cross_attn_head_mask[i]
@@ -271,8 +269,9 @@ class T5Stack(T5PreTrainedModel):
                 for k, v in self.device_map.items():
                     if i == v[-1] and "cuda:" + str(k) != self.last_device:
                         hidden_states = hidden_states.to("cuda:" + str(k + 1))
-        if len(self.block) in self.map_layers:
-            hidden_states = self.manifold.expmap0(hidden_states)
+        if self.hyperbolic_layer is not None:
+            if len(self.block) in self.map_layers:
+                hidden_states = self.hyperbolic_layer(hidden_states)
         hidden_states = self.final_layer_norm(hidden_states)
         hidden_states = self.dropout(hidden_states)
 
@@ -314,47 +313,61 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
         curvature: curvature for exponential mapping
         map_kth_encoder_layer: maps the output of the kth layer to hyperbolic space. 0 = output of embedding layer, 1 = first encoder layer ...
         """
-        config = T5Config.from_pretrained(model_name)
+        config : T5Config = T5Config.from_pretrained(model_name)
                 
         super(HyperbolicKthLayerT5Model, self).__init__(config=config)
+        self.curvature = curvature
 
-        
         encoder_config = copy.deepcopy(config)
         encoder_config.is_decoder = False
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
-        self.encoder = T5Stack(config=encoder_config, embed_tokens=self.shared, curvature=curvature, map_layers=map_encoder_layers)
-        
-        
+
+        in_features = encoder_config.d_model
+        self.hyperbolic_layer= HyperbolicLayer(curvature=self.curvature, type='poincare', scaled=False, learnable=True, in_features=in_features, out_features=in_features, hidden_dim=in_features//2)
+        print(f"Map after the Encoder, after final_layer_norm and dropout")
+        self.encoder = T5Stack(config=encoder_config, embed_tokens=self.shared, map_layers=map_encoder_layers, hyperbolic_layer=None)
+
         decoder_config = copy.deepcopy(config)
         decoder_config.is_decoder = True
         decoder_config.is_encoder_decoder = False
         decoder_config.num_layers = config.num_decoder_layers
-        self.decoder = T5Stack(config=decoder_config, embed_tokens=self.shared, curvature=curvature, map_layers=map_decoder_layers)
+        self.decoder = T5Stack(config=decoder_config, embed_tokens=self.shared, map_layers=map_decoder_layers, hyperbolic_layer=None)
+        
+        #self.lm_head = HyperbolicLayer(curvature=self.curvature, type='poincare', scaled=False, learnable=True, in_features=in_features, out_features=in_features, hidden_dim=in_features//2)
+        
+
         
         if checkpoint_hyperbolic_knit5 is None:
             print("Initializing T5 Model...")
             pretrained_model = T5ForConditionalGeneration.from_pretrained(model_name)
             missing, unexpected = self.load_state_dict(pretrained_model.state_dict(), strict = False)
+
+            # self.lm_head.hyperbolic_linear[0].z.data = pretrained_model.lm_head.weight.data.clone()
+            # if torch.equal(self.lm_head.hyperbolic_linear[0].z.data, pretrained_model.lm_head.weight.data.clone()):
+            #     unexpected.remove('lm_head.weight')
             print(f"Missing: {missing}")
             print(f"Unexpected: {unexpected}")
         else:
             print(f"Loading Checkpoint from {checkpoint_hyperbolic_knit5}")
-            checkpoint = torch.load(checkpoint_hyperbolic_knit5)['model_state_dict']
-            missing, unexpected = self.load_state_dict(checkpoint)
+            checkpoint = torch.load(checkpoint_hyperbolic_knit5)
+            #print(f"{checkpoint['lm_head.weight'] = }")
+            missing, unexpected = self.load_state_dict(checkpoint, strict=False)
+
+            #self.lm_head.hyperbolic_linear[0].z.data = checkpoint['lm_head.weight'].clone()
+            #if ('lm_head.weight' in unexpected) and (torch.equal(self.lm_head.hyperbolic_linear[0].z.data, checkpoint['lm_head.weight'])):
+                #unexpected.remove('lm_head.weight')
             print(f"Missing: {missing}")
             print(f"Unexpected: {unexpected}")
 
         
         self.post_init()
-        
         # Model parallel
         self.model_parallel = False
         self.device_map = None
         if checkpoint_hyperbolic_knit5 is None:
             del pretrained_model
-        
-        self.curvature = curvature
+
     
     def _forward_after_encoder(self,
                 input_ids: Optional[torch.LongTensor] = None,
@@ -408,6 +421,9 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
 
         hidden_states = encoder_outputs[0]
 
+        #print(f"{hidden_states.shape = }")
+        hidden_states = self.hyperbolic_layer(hidden_states)
+
         if self.model_parallel:
             torch.cuda.set_device(self.decoder.first_device)
 
@@ -444,6 +460,7 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
         )
 
         sequence_output = decoder_outputs[0]
+        #sequence_output = self.hyperbolic_layer(sequence_output)
 
         # Set device for model parallelism
         if self.model_parallel:

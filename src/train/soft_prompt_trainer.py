@@ -60,12 +60,12 @@ class SoftPromptTrainer:
             self.training_config = config.random_walk_training
         elif self.method == 'parse_then_hop_training':
             self.training_config = config.parse_then_hop_training
+        
             
-            
-        self.optimizer = get_optimizer([{'params': model.soft_prompt, 'lr': 0.3}
-                                        #{'params': model.projection_layer.parameters(), 'lr': 1e-3},
-                                         #{'params': model.B, 'lr': 1e-2},
-                                         #{'params': model.scaler.parameters(), 'lr': 1e-3}
+        print(f"Curvature learnable: {model.knit5.hyperbolic_layer.manifold.c.requires_grad}")
+        self.optimizer = get_optimizer([{'params': model.soft_prompt, 'lr': 0.3},
+                                        {'params': model.knit5.hyperbolic_layer.parameters(), 'lr': 0.001},
+                                        #{'params': model.hyperbolic_layer.parameters(), 'lr': 1e-4}
                                          ], self.training_config)
             
         self.log_dir, self.model_dir = setup_directories(self.training_config, self.config.t5_model)
@@ -107,9 +107,11 @@ class SoftPromptTrainer:
                 inputs = self.tokenizer(input_batch, padding=True, truncation=True, return_tensors = 'pt')
                 input_ids = inputs.input_ids.to(self.device)
                 attention_mask = inputs.attention_mask.to(self.device)
-                labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')['input_ids'].to(self.device)
-                labels[labels == self.tokenizer.pad_token_id] = -100
-                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+                labels = self.tokenizer(label_batch, padding=True, truncation=True, return_tensors = 'pt')
+                labels_input_ids = labels.input_ids.to(self.device)
+                labels_input_ids[labels_input_ids == self.tokenizer.pad_token_id] = -100
+                #labels_attention_mask = labels.attention_mask.to(self.device)
+                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels_input_ids)
                 loss = outputs.loss
                 
                 
@@ -126,6 +128,11 @@ class SoftPromptTrainer:
                 vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
                 self.writer.add_scalar('VRAM/Training/Allocated', vram_allocated, epoch*len(self.train_dataloader) + batch_idx)
                 self.writer.add_scalar('VRAM/Training/Reserved', vram_reserved, epoch*len(self.train_dataloader) + batch_idx)
+                if hasattr(self.model.knit5, 'curvature'):
+                    c = self.model.knit5.hyperbolic_layer.manifold.c.item()
+                else:
+                    c = 0.0
+                self.writer.add_scalar('Training/Curvature', c, epoch*len(self.train_dataloader) + batch_idx)
             avg_loss = total_loss / len(self.train_dataloader)
             print(f"Epoch {epoch}, Loss: {avg_loss:.4f}")
             if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):

@@ -27,6 +27,7 @@ sys.path.append(train_dir)
 
 def get_optimizer(parameters, trainer_config : BaseTrainingConfig):
     lr = trainer_config.learning_rate
+    print(f"{parameters = }")
     print(f"Training with optimizer {trainer_config.optimizer} and Learning Rate {trainer_config.learning_rate}")
     if trainer_config.optimizer == 'Adam':
         optimizer = optim.Adam(parameters, lr= lr)
