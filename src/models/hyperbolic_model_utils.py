@@ -5,8 +5,9 @@ from src.utils.util import expmap0
 import torch.nn.init as init
 import math
 import torch.nn.functional as F
-from .hyperbolic_nn_resnet.modules import PoincareLinear
+from .hyperbolic_nn_resnet.modules import PoincareLinear, LorentzLinear
 from .hyperbolic_nn_resnet.manifolds import PoincareBallStdGrad, PoincareBallCustomAutograd
+from .hyperbolic_nn_resnet.manifolds.lorentz import Lorentz
 class HyperbolicLinearLayer(nn.Module):
     def __init__(self, in_features, out_features, c):
         super().__init__()
@@ -67,21 +68,17 @@ class HyperbolicLayer(nn.Module):
         self.scaled = scaled
         self.curvature = curvature
         if type == 'lorentz':
-            self.manifold = geoopt.manifolds.Lorentz(self.curvature, learnable=learnable)
+            self.manifold = Lorentz(k = self.curvature, learnable=True)
         elif type == 'poincare':
             #self.manifold = geoopt.manifolds.PoincareBall(self.curvature, learnable=learnable)
             self.manifold = PoincareBallCustomAutograd(c = self.curvature, learnable=learnable)
         if scaled:
             self.scaler = RescaledNormalization()
-        self.hyperbolic_linear = nn.Sequential(*[
-            PoincareLinear(in_features=in_features, out_features=out_features, ball=self.manifold, bias=False)
-        ])
+        self.hyperbolic_linear = PoincareLinear(in_features=in_features, out_features=out_features, ball=self.manifold)
     def forward(self, x):
         if self.scaled:
             x = self.scaler(x)
-        #x = self.manifold.expmap0(x)
-        x = self.hyperbolic_linear(x)
-        #x = self.manifold.logmap0(x)
+        x = self.hyperbolic_linear(x) 
         return x
 
 

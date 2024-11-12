@@ -1,1 +1,1 @@
-from .linear import PoincareLinear
+from .linear import PoincareLinear, LorentzLinear

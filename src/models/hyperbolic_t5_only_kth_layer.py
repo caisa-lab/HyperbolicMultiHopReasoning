@@ -324,8 +324,8 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
         encoder_config.is_encoder_decoder = False
 
         in_features = encoder_config.d_model
-        #self.hyperbolic_layer= HyperbolicLayer(curvature=self.curvature, type='poincare', scaled=False, learnable=True, in_features=in_features, out_features=in_features, hidden_dim=in_features//2)
-        print(f"Map after the Encoder, after final_layer_norm and dropout")
+        self.hyperbolic_layer = HyperbolicLayer(curvature=self.curvature, type='poincare', scaled=False, learnable=True, in_features=in_features, out_features=in_features, hidden_dim=in_features)
+        #print(f"Map after the Encoder, after final_layer_norm and dropout")
         self.encoder = T5Stack(config=encoder_config, embed_tokens=self.shared, map_layers=map_encoder_layers, hyperbolic_layer=None)
 
         decoder_config = copy.deepcopy(config)
@@ -334,32 +334,21 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
         decoder_config.num_layers = config.num_decoder_layers
         self.decoder = T5Stack(config=decoder_config, embed_tokens=self.shared, map_layers=map_decoder_layers, hyperbolic_layer=None)
         
-        self.lm_head = HyperbolicLayer(curvature=self.curvature, type='poincare', scaled=False, learnable=True, in_features=config.d_model, out_features=config.vocab_size, hidden_dim=in_features//2)
-        
 
         
         if checkpoint_hyperbolic_knit5 is None:
             print("Initializing T5 Model...")
             pretrained_model = T5ForConditionalGeneration.from_pretrained(model_name)
             missing, unexpected = self.load_state_dict(pretrained_model.state_dict(), strict = False)
-
-            # self.lm_head.hyperbolic_linear[0].z.data = pretrained_model.lm_head.weight.data.T.clone()
-            # if torch.equal(self.lm_head.hyperbolic_linear[0].z.data, pretrained_model.lm_head.weight.data.clone()):
-            #     unexpected.remove('lm_head.weight')
+            
                 
             print(f"Missing: {missing}")
             print(f"Unexpected: {unexpected}")
         else:
             print(f"Loading Checkpoint from {checkpoint_hyperbolic_knit5}")
             checkpoint = torch.load(checkpoint_hyperbolic_knit5)
-            print(f"{checkpoint['lm_head.weight'].shape = }")
             missing, unexpected = self.load_state_dict(checkpoint, strict=False)
 
-            self.lm_head.hyperbolic_linear[0].z.data = checkpoint['lm_head.weight'].T.clone()
-            print(f"{self.lm_head.hyperbolic_linear[0].z.data.shape = }")
-            if ('lm_head.weight' in unexpected) and (torch.equal(self.lm_head.hyperbolic_linear[0].z.data, checkpoint['lm_head.weight'].T)):
-                print(f"Loaded LM Head Checkpoint")
-                unexpected.remove('lm_head.weight')
             print(f"Missing: {missing}")
             print(f"Unexpected: {unexpected}")
 
@@ -373,6 +362,7 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
 
     
     def _forward_after_encoder(self,
+                soft_prompt: Optional[torch.LongTensor] = None,
                 input_ids: Optional[torch.LongTensor] = None,
                 attention_mask: Optional[torch.FloatTensor] = None,
                 decoder_input_ids: Optional[torch.LongTensor] = None,
@@ -402,7 +392,7 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
                 #warnings.warn(__HEAD_MASK_WARNING_MSG, FutureWarning)
                 decoder_head_mask = head_mask
 
-        
+
         # Encode if needed (training, first prediction pass)
         if encoder_outputs is None:
             # Convert encoder inputs in embeddings if needed
@@ -424,8 +414,19 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
 
         hidden_states = encoder_outputs[0]
 
-        #print(f"{hidden_states.shape = }")
-        #hidden_states = self.hyperbolic_layer(hidden_states)
+        #hidden_states = torch.cat([soft_prompt, hidden_states], dim = 1)
+        hidden_states = self.hyperbolic_layer(hidden_states)
+
+
+        #soft_prompt_attention_mask = torch.ones((attention_mask.size(0), soft_prompt.size(1)), device=self.device)
+        #attention_mask = torch.cat([soft_prompt_attention_mask, attention_mask], dim=1)
+
+        #soft_prompt_hidden_state = hidden_states[:, :100, :]
+        #soft_prompt_hidden_state = self.hyperbolic_layer(soft_prompt_hidden_state)
+
+        #hidden_states = torch.cat([soft_prompt_hidden_state, hidden_states[:, 100:, :]], dim = 1)
+
+        
 
         if self.model_parallel:
             torch.cuda.set_device(self.decoder.first_device)
@@ -503,6 +504,7 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
         )
     
     def forward(self,
+                soft_prompt: Optional[torch.LongTensor] = None,
                 input_ids: Optional[torch.LongTensor] = None,
                 attention_mask: Optional[torch.FloatTensor] = None,
                 decoder_input_ids: Optional[torch.LongTensor] = None,
@@ -521,6 +523,7 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
                 return_dict: Optional[bool] = None):
     
         return self._forward_after_encoder(
+                             soft_prompt = soft_prompt,
                              input_ids = input_ids,
                              inputs_embeds=inputs_embeds,
                              attention_mask=attention_mask,
