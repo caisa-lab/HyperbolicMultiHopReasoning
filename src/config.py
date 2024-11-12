@@ -1,3 +1,4 @@
+from math import exp, log
 class BaseTrainingConfig:
         def __init__(self, optimizer = 'AdaFactor',
                      learning_rate = 0.001,
@@ -35,7 +36,9 @@ class Config:
                              model_save_path='checkpoints/final_results/knowledge_integration',
                              model_checkpoint_path= None,
                              tboard_checkpoint_path=None,
-                             num_workers=16)
+                             num_workers=16,
+                             curvature=1.0)
+            self.additional_log_info=f'poincare_hyperbolic_linear_layer_c1'
 
                 
     class OneHopWikiTraining(BaseTrainingConfig):
@@ -57,10 +60,10 @@ class Config:
                              tboard_checkpoint_path=None,
                              num_workers=16,
                              optimizer='AdaFactor',
-                             curvature=1.0
+                             curvature=log(exp(0.32) - 1)
                              )
             self.prompt_length = 100
-            self.additional_log_info=f'poincare_encoder_curvature_1.0_with_hyperbolic_linear_layers_from_resnet_paper'
+            self.additional_log_info=f'poincare_hyperbolic_linear_layer_soft_prompt_in_linear_layer_c032'
             self.hopping_prompt_checkpoint_path = None
 
     class ParseThenHopTraining(BaseTrainingConfig):
@@ -82,7 +85,7 @@ class Config:
         def __init__(self):
             self.batch_size = 64
             self.model_name = "google/t5-large-lm-adapt"            
-            self.tokenizer_max_length = 128
+            self.tokenizer_max_length = 120
             self.map_encoder_layers = []
             self.map_decoder_layers = []
 
