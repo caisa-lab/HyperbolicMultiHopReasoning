@@ -33,8 +33,8 @@ def _knowledge_integration_with_c4(hyperbolic):
     print(f"Loading Model {config.t5_model.model_name}...")
     #Adjust Dropout
     if hyperbolic:
-        model = HyperbolicKthLayerT5Model(curvature=config.single_hop_training.curvature, map_encoder_layers=config.t5_model.map_encoder_layers, map_decoder_layers=config.t5_model.map_decoder_layers)
-        print(f"Train with hyperbolic Soft Prompt Model with curvature {config.single_hop_training.curvature} and Exponential Mapping at encoder layer {config.t5_model.map_encoder_layers} and at decoder layer {config.t5_model.map_decoder_layers}")
+        model = HyperbolicKthLayerT5Model(curvature=config.single_hop_training.curvature, map_encoder_layers=config.t5_model.map_encoder_layers, map_decoder_layers=config.t5_model.map_decoder_layers, checkpoint_hyperbolic_knit5=config.single_hop_training.model_checkpoint_path)
+        print(f"Train with hyperbolic Soft Prompt Model with curvature {config.single_hop_training.curvature} and Hyperbolic Linear Layer")
 
     else:
         model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)

@@ -46,7 +46,7 @@ def setup_directories(trainer_config : BaseTrainingConfig, t5_config):
     learning_rate = trainer_config.learning_rate
     curvature = trainer_config.curvature
     optimizer = trainer_config.optimizer
-    final_string = f"{current_time}_encoder{t5_config.map_encoder_layers}_decoder{t5_config.map_decoder_layers}_{optimizer}_{learning_rate}_{curvature}_{trainer_config.additional_log_info}"
+    final_string = f"{current_time}_{optimizer}_{learning_rate}_{curvature}_{trainer_config.additional_log_info}"
     log_dir = os.path.join(trainer_config.log_dir, final_string)
     model_dir = os.path.join(trainer_config.model_save_path, final_string) 
     os.makedirs(log_dir, exist_ok=True)

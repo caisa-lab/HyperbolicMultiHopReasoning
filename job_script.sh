@@ -6,9 +6,9 @@
 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --job-name=random_walk_training_lorentz_soft_prompt_poincare_decoder
-#SBATCH --output=outputs/final_results/output_random_walk_training_lorentz_soft_prompt_poincare_decoder_%j.txt
-#SBATCH --error=outputs/final_results/error_random_walk_training_lorentz_soft_prompt_poincare_decoder_%j.txt
+#SBATCH --job-name=parse_training_hyperbolic_layer_c1
+#SBATCH --output=outputs/final_results/output_parse_training_hyperbolic_layer_c1_%j.txt
+#SBATCH --error=outputs/final_results/error_parse_training_hyperbolic_layer_c1_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
@@ -54,4 +54,4 @@ echo $PATH
 
 echo "Libraries Installed"
 echo "Starting Training Script...."
-python -u train_random_walk.py --hyperbolic
+python -u train_parse_then_hop.py --hyperbolic

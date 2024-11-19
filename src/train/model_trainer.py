@@ -134,10 +134,8 @@ class ModelTrainer:
                 labels = tokenized_labels['input_ids'].to(self.device)
                 
                 self.optimizer.zero_grad()
-                if batch_idx % 2 == 0:
-                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels)
-                else:
-                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels)
+             
+                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels)
                 loss = outputs.loss   
 
                 
@@ -253,22 +251,28 @@ class ModelTrainer:
         soft_prompt_path = f"{self.model_dir}/knit5_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         
         
-        if avg_loss < self.best_loss:
-            if self.best_model_path:
-                os.remove(self.best_model_path)
-            self.best_loss = avg_loss
-            self.early_stop_counter = 0
-            self.best_model_path = soft_prompt_path
+
+        if avg_em_perc >= 0.85 or epoch >= 15:
             torch.save({
                 'model_state_dict': self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'epoch': epoch}, soft_prompt_path)
-        else:
-            self.early_stop_counter += 1
-            print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
-            if self.early_stop_counter >= self.patience:
-                print("Early stopping trigered. Stopping training")
-                return True
+        # if avg_loss < self.best_loss:
+        #     if self.best_model_path:
+        #         os.remove(self.best_model_path)
+        #     self.best_loss = avg_loss
+        #     self.early_stop_counter = 0
+        #     self.best_model_path = soft_prompt_path
+        #     torch.save({
+        #         'model_state_dict': self.model.state_dict(),
+        #         'optimizer_state_dict': self.optimizer.state_dict(),
+        #         'epoch': epoch}, soft_prompt_path)
+        # else:
+        #     self.early_stop_counter += 1
+        #     print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
+        #     if self.early_stop_counter >= self.patience:
+        #         print("Early stopping trigered. Stopping training")
+        #         return True
         return False
 
    

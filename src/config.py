@@ -53,30 +53,32 @@ class Config:
     class RandomWalkTraining(BaseTrainingConfig):
         def __init__(self):
             super().__init__(learning_rate=0.3,
-                             epochs=200,
-                             log_dir='tboard_logs/final_results/random_walk_training',
-                             model_save_path='checkpoints/final_results/random_walk_training',
+                             epochs=35,
+                             log_dir='tboard_logs/random_walk_training/euclidean',
+                             model_save_path='checkpoints/random_walk_training/euclidean',
                              model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth', #'checkpoints/knowledge_integration/large_adapt_bsize64_c4_hyperbolic_after_decoder/knit5_epoch_10_val_loss_0.0217.pth'
                              tboard_checkpoint_path=None,
                              num_workers=16,
                              optimizer='AdaFactor',
-                             curvature=log(exp(0.32) - 1)
+                             curvature=log(exp(0.5) - 1)
                              )
             self.prompt_length = 100
-            self.additional_log_info=f'poincare_hyperbolic_linear_layer_soft_prompt_in_linear_layer_c032'
+            self.additional_log_info=f'euclidean_linear_layer_after_encoder'
             self.hopping_prompt_checkpoint_path = None
 
     class ParseThenHopTraining(BaseTrainingConfig):
         def __init__(self):
             super().__init__(learning_rate=0.3,
                              epochs=250,
-                             log_dir='tboard_logs/final_results/parse_then_hop_training',
-                             model_save_path='checkpoints/final_results/parse_then_hop_training',
+                             log_dir='tboard_logs/parse_then_hop_training/euclidean',
+                             model_save_path='checkpoints/parse_then_hop_training/euclidean',
                              model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth',
                              tboard_checkpoint_path=None,
-                             num_workers=16
+                             num_workers=16,
+                             curvature=log(exp(1.0) - 1)
                              )
             self.prompt_length = 100
+            self.additional_log_info=f'hyperbolic_linear_layer_after_encoder_c1'
             self.hopping_prompt_checkpoint_path = None
             self.parsing_prompt_checkpoint_path = None
             

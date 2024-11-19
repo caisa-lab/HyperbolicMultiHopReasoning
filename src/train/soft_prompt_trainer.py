@@ -42,8 +42,9 @@ class SoftPromptTrainer:
         
         
         self.start_epoch = 0
-        self.patience = 5
+        self.patience = 40
         self.best_loss = float('inf')
+        self.best_em = 0
         self.early_stop_counter=0
         self.best_model_path = None
         
@@ -61,11 +62,9 @@ class SoftPromptTrainer:
         elif self.method == 'parse_then_hop_training':
             self.training_config = config.parse_then_hop_training
         
-            
-        print(f"Curvature learnable: {model.knit5.lm_head.manifold.c.requires_grad}")
+        print(f"Hyperbolic Layer learnable: {all(param.requires_grad for param in model.knit5.hyperbolic_layer.parameters())}")
         self.optimizer = get_optimizer([{'params': model.soft_prompt, 'lr': 0.3},
-                                        {'params': model.knit5.lm_head.parameters(), 'lr': 0.001},
-                                        #{'params': model.hyperbolic_layer.parameters(), 'lr': 1e-4}
+                                        {'params': model.knit5.hyperbolic_layer.parameters(), 'lr': 0.001},
                                          ], self.training_config)
             
         self.log_dir, self.model_dir = setup_directories(self.training_config, self.config.t5_model)
@@ -128,8 +127,8 @@ class SoftPromptTrainer:
                 vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
                 self.writer.add_scalar('VRAM/Training/Allocated', vram_allocated, epoch*len(self.train_dataloader) + batch_idx)
                 self.writer.add_scalar('VRAM/Training/Reserved', vram_reserved, epoch*len(self.train_dataloader) + batch_idx)
-                if hasattr(self.model.knit5, 'curvature'):
-                    c = self.model.knit5.lm_head.manifold.c.item()
+                if hasattr(self.model.knit5.hyperbolic_layer, 'manifold'):
+                    c = self.model.knit5.hyperbolic_layer.manifold.c.item()
                 else:
                     c = 0.0
                 self.writer.add_scalar('Training/Curvature', c, epoch*len(self.train_dataloader) + batch_idx)
@@ -178,25 +177,29 @@ class SoftPromptTrainer:
             self.log_tensorboard(avg_em_perc, epoch, 'Validation', eval_metric='em')
             self.log_tensorboard(avg_f1_perc, epoch, 'Validation', eval_metric='f1')
             print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
-        soft_prompt_path = f"{self.model_dir}/soft_prompt_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
+        soft_prompt_path = f"{self.model_dir}/soft_prompt_epoch_{epoch}_val_loss_{avg_loss:.4f}_em_{avg_em_perc:2f}.pth"
         
-        
-        if avg_loss < self.best_loss:
+        if avg_em_perc > self.best_em:
             if self.best_model_path:
                 os.remove(self.best_model_path)
-            self.best_loss = avg_loss
-            self.early_stop_counter = 0
+            self.best_em = avg_em_perc
             self.best_model_path = soft_prompt_path
             torch.save({
                 'soft_prompt_state_dict': self.model.soft_prompt,
+                'additional_linear_layer': self.model.knit5.hyperbolic_layer.state_dict(),
                 'curvature': self.model.knit5.curvature if hasattr(self.model.knit5, 'curvature') else 0.0,
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'epoch': epoch}, soft_prompt_path)
+            print(f"New best model Saved with EM {avg_em_perc:2f} at {soft_prompt_path}")
+
+        if avg_loss < self.best_loss:
+            self.best_loss = avg_loss
+            self.early_stop_counter = 0
         else:
             self.early_stop_counter += 1
             print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
             if self.early_stop_counter >= self.patience:
-                print("Early stopping trigered. Stopping training")
+                print("Early stopping triggered. Stopping training")
                 return True
         return False
 

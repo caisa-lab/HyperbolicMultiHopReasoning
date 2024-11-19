@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#SBATCH --partition=A100devel
-#SBATCH --time=1:00:00
+#SBATCH --partition=A100medium
+#SBATCH --time=4:00:00
 #SBATCH --gpus=1
 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --job-name=random_walk_training_lorentz_soft_prompt
-#SBATCH --output=outputs/final_results/output_random_walk_training_lorentz_soft_prompt_%j.txt
-#SBATCH --error=outputs/final_results/error_random_walk_training_lorentz_soft_prompt_%j.txt
+#SBATCH --job-name=random_walk_training_hyperbolicity
+#SBATCH --output=outputs/final_results/output_random_walk_training_hyperbolicity_%j.txt
+#SBATCH --error=outputs/final_results/error_random_walk_training_hyperbolicity_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
@@ -54,4 +54,4 @@ echo $PATH
 
 echo "Libraries Installed"
 echo "Starting Training Script...."
-python -u train_random_walk.py
+python -u compute_delta_hyperbolicity.py --tuned --knowledge_integration

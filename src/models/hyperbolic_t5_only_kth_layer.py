@@ -324,8 +324,8 @@ class HyperbolicKthLayerT5Model(T5ForConditionalGeneration):
         encoder_config.is_encoder_decoder = False
 
         in_features = encoder_config.d_model
-        self.hyperbolic_layer = nn.Linear(in_features, in_features)
-        #self.hyperbolic_layer = HyperbolicLayer(curvature=self.curvature, type='poincare', scaled=False, learnable=True, in_features=in_features, out_features=in_features, hidden_dim=in_features)
+        #self.hyperbolic_layer = nn.Linear(in_features, in_features)
+        self.hyperbolic_layer = HyperbolicLayer(curvature=self.curvature, type='poincare', scaled=False, learnable=True, in_features=in_features, out_features=in_features, hidden_dim=in_features)
         #print(f"Map after the Encoder, after final_layer_norm and dropout")
         self.encoder = T5Stack(config=encoder_config, embed_tokens=self.shared, map_layers=map_encoder_layers, hyperbolic_layer=None)
 
