@@ -85,7 +85,7 @@ class Config:
                 
     class T5_Model:
         def __init__(self):
-            self.batch_size = 64
+            self.batch_size = 4
             self.model_name = "google/t5-large-lm-adapt"            
             self.tokenizer_max_length = 120
             self.map_encoder_layers = []

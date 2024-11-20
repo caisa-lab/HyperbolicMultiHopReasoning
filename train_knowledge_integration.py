@@ -1,7 +1,8 @@
-from src.utils.util import load_dataset, load_c4_dataset
+from src.utils.util import load_dataset, load_c4_dataset, load_musique_dataset
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from src.datasets import KnowledgeIntegrationDataset, C4Dataset
+from src.datasets.musique import KnowledgeIntegrationMusiqueDataset
 import torch
 from src.config import Config
 from torch.utils.data import DataLoader
@@ -9,17 +10,28 @@ from src.train import *
 import argparse
 from src.models import HyperbolicKthLayerT5Model
 
-def _knowledge_integration_with_c4(hyperbolic):
-    train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=True)
+def _knowledge_integration_with_c4(hyperbolic, dataset):
+
+    if dataset in ['2wikimultihop', 'wikimultihop']: 
+        print("Training on 2WikiMultiHopQA")
+        train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=True)
 
 
-    print("Creating Single Hop Datasets...")
-    dataset_with_all_entries = pd.concat([train_dataset, dev_dataset, test_dataset])
+        print("Creating Single Hop Datasets...")
+        dataset_with_all_entries = pd.concat([train_dataset, dev_dataset, test_dataset])
 
-    ki_dataset = KnowledgeIntegrationDataset(dataset_with_all_entries)
+        ki_dataset = KnowledgeIntegrationDataset(dataset_with_all_entries)
+
+    elif dataset in ['musique']:
+        print("Training on Musique")
+        train_dataset, dev_dataset = load_musique_dataset('dataset/musique', replace_answer_with_gt=True)
+
+        dataset_with_all_entries = pd.concat([train_dataset, dev_dataset])
+
+        ki_dataset = KnowledgeIntegrationMusiqueDataset(dataset_with_all_entries)
+
 
     ki_train = ki_dataset
-
 
     #Specify Hyperparameters via config file
     config = Config()
@@ -144,9 +156,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Knowledge Integration Training')
     parser.add_argument('--c4', action='store_true', help='Include C4 dataset in training')
     parser.add_argument('--hyperbolic', action='store_true', help='Train with hyperbolic representation in single hop dataset')
+    parser.add_argument('remainder', type=str, nargs='?', default=None, help='Specify the remainder (e.g., musique, 2wikimultihop)')
     args = parser.parse_args()
-    
+
     if args.c4:
-        _knowledge_integration_with_c4(hyperbolic = args.hyperbolic)
+        _knowledge_integration_with_c4(hyperbolic = args.hyperbolic, dataset = args.remainder)
     else:
-        _knowledge_integration_without_c4(hyperbolic = args.hyperbolic)
+        _knowledge_integration_without_c4(hyperbolic = args.hyperbolic, dataset = args.remainder)
