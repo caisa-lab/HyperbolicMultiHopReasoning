@@ -6,9 +6,9 @@
 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --job-name=parse_training_hyperbolic_layer_c1
-#SBATCH --output=outputs/final_results/output_parse_training_hyperbolic_layer_c1_%j.txt
-#SBATCH --error=outputs/final_results/error_parse_training_hyperbolic_layer_c1_%j.txt
+#SBATCH --job-name=parse_training_musique_lr_0.3_bsize16
+#SBATCH --output=outputs/musique/parse_training/output_parse_training_musique_gt_not_replaced_lr_0.3bsize16_%j.txt
+#SBATCH --error=outputs/musique/parse_training/output_parse_training_musique_gt_not_replaced_lr_0.3bsize16_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
@@ -54,4 +54,4 @@ echo $PATH
 
 echo "Libraries Installed"
 echo "Starting Training Script...."
-python -u train_parse_then_hop.py --hyperbolic
+python -u train_parse_then_hop.py --lr 0.3 musique

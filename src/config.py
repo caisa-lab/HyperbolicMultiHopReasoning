@@ -32,13 +32,13 @@ class BaseTrainingConfig:
 class Config:  
     class SingleHopTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(log_dir='tboard_logs/final_results/knowledge_integration',
-                             model_save_path='checkpoints/final_results/knowledge_integration',
+            super().__init__(log_dir='tboard_logs/musique_dataset/knowledge_integration',
+                             model_save_path='checkpoints/musique_dataset/knowledge_integration',
                              model_checkpoint_path= None,
                              tboard_checkpoint_path=None,
                              num_workers=16,
                              curvature=1.0)
-            self.additional_log_info=f'poincare_hyperbolic_linear_layer_c1'
+            self.additional_log_info=f'euclidean_t5_bsize64_without_gt_inserted'
 
                 
     class OneHopWikiTraining(BaseTrainingConfig):
@@ -70,24 +70,24 @@ class Config:
         def __init__(self):
             super().__init__(learning_rate=0.3,
                              epochs=250,
-                             log_dir='tboard_logs/parse_then_hop_training/euclidean',
-                             model_save_path='checkpoints/parse_then_hop_training/euclidean',
-                             model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth',
+                             log_dir='tboard_logs/musique_dataset/parse_training/',
+                             model_save_path='checkpoints/musique_dataset/parse_training/',
+                             model_checkpoint_path= 'checkpoints/musique_dataset/knowledge_integration/euclidean_gt_not_replaced/knit5_epoch_28_val_loss_0.0045.pth',
                              tboard_checkpoint_path=None,
                              num_workers=16,
                              curvature=log(exp(1.0) - 1)
                              )
             self.prompt_length = 100
-            self.additional_log_info=f'hyperbolic_linear_layer_after_encoder_c1'
+            self.additional_log_info=f'parse_training_gt_not_replaced_euclidean_linear_layer_lr{self.learning_rate}_bsize16'
             self.hopping_prompt_checkpoint_path = None
             self.parsing_prompt_checkpoint_path = None
             
                 
     class T5_Model:
         def __init__(self):
-            self.batch_size = 4
+            self.batch_size = 16
             self.model_name = "google/t5-large-lm-adapt"            
-            self.tokenizer_max_length = 120
+            self.tokenizer_max_length = 128
             self.map_encoder_layers = []
             self.map_decoder_layers = []
 

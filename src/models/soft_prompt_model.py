@@ -7,12 +7,12 @@ from config import Config
 from geoopt.manifolds import Lorentz, PoincareBall
 from src.utils.util import expmap0, logmap0
 from .hyperbolic_model_utils import HyperbolicLayer
-from .hyperbolic_t5_only_kth_layer import HyperbolicKthLayerT5Model
+from .hyperbolic_t5_additional_layer import T5ModelWithAdditionalLayer
 from typing import Union
 
 class SoftPromptModel(nn.Module):
     def __init__(self,
-                 knit5 : Union[T5Model, HyperbolicKthLayerT5Model],
+                 knit5 : Union[T5Model, T5ModelWithAdditionalLayer],
                  knit5_checkpoint_path : str,
                  model_name : str = '',
                  curvature = 1.0, 

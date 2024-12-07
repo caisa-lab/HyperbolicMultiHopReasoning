@@ -8,13 +8,13 @@ from src.config import Config
 from torch.utils.data import DataLoader
 from src.train import *
 import argparse
-from src.models import HyperbolicKthLayerT5Model
+from src.models import T5ModelWithAdditionalLayer
 
 def _knowledge_integration_with_c4(hyperbolic, dataset):
 
     if dataset in ['2wikimultihop', 'wikimultihop']: 
         print("Training on 2WikiMultiHopQA")
-        train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=True)
+        train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=False)
 
 
         print("Creating Single Hop Datasets...")
@@ -45,11 +45,11 @@ def _knowledge_integration_with_c4(hyperbolic, dataset):
     print(f"Loading Model {config.t5_model.model_name}...")
     #Adjust Dropout
     if hyperbolic:
-        model = HyperbolicKthLayerT5Model(curvature=config.single_hop_training.curvature, map_encoder_layers=config.t5_model.map_encoder_layers, map_decoder_layers=config.t5_model.map_decoder_layers, checkpoint_hyperbolic_knit5=config.single_hop_training.model_checkpoint_path)
-        print(f"Train with hyperbolic Soft Prompt Model with curvature {config.single_hop_training.curvature} and Hyperbolic Linear Layer")
-
+        model = T5ModelWithAdditionalLayer(curvature=config.single_hop_training.curvature, checkpoint_hyperbolic_knit5=config.single_hop_training.model_checkpoint_path)
+        print(f"Train with hyperbolic T5 with curvature {config.single_hop_training.curvature} and Hyperbolic Linear Layer")
     else:
         model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
+        print(f"Train Euclidean T5 Model")
         
     model.config.dropout_rate = 0.1
     model.config.hidden_dropout_prob = 0.1
@@ -117,7 +117,7 @@ def _knowledge_integration_without_c4(hyperbolic):
     
     if hyperbolic:
         print("Train with Hyperbolic Model.")
-        model = HyperbolicKthLayerT5Model(curvature=config.single_hop_training.curvature, map_encoder_layers=config.t5_model.map_encoder_layers, map_decoder_layers=config.t5_model.map_decoder_layers)
+        model = T5ModelWithAdditionalLayer(curvature=config.single_hop_training.curvature, map_encoder_layers=config.t5_model.map_encoder_layers, map_decoder_layers=config.t5_model.map_decoder_layers)
     else:
         model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
         

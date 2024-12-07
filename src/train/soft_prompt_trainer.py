@@ -42,7 +42,7 @@ class SoftPromptTrainer:
         
         
         self.start_epoch = 0
-        self.patience = 40
+        self.patience = 15
         self.best_loss = float('inf')
         self.best_em = 0
         self.early_stop_counter=0
@@ -63,7 +63,7 @@ class SoftPromptTrainer:
             self.training_config = config.parse_then_hop_training
         
         print(f"Hyperbolic Layer learnable: {all(param.requires_grad for param in model.knit5.hyperbolic_layer.parameters())}")
-        self.optimizer = get_optimizer([{'params': model.soft_prompt, 'lr': 0.3},
+        self.optimizer = get_optimizer([{'params': model.soft_prompt, 'lr': self.training_config.learning_rate},
                                         {'params': model.knit5.hyperbolic_layer.parameters(), 'lr': 0.001},
                                          ], self.training_config)
             

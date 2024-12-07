@@ -7,7 +7,7 @@ import torch
 from src.config import Config
 from torch.utils.data import DataLoader
 from src.knowledge_graph import create_knowledge_graph
-from src.models import SoftPromptModel, HyperbolicKthLayerT5Model
+from src.models import SoftPromptModel, T5ModelWithAdditionalLayer
 from src.eval import evaluate_parse_then_hop_training
 import argparse
 import optuna
@@ -15,8 +15,8 @@ import os
 
 BATCH_SIZE = 6
 NUM_WORKERS = 4
-HOPPING_PROMPT_CHECKPOINT_PATH = "checkpoints/random_walk_training/euclidean/random_walk_euclidean/soft_prompt_epoch_28_val_loss_0.1201_em_0.405318.pth"
-PARSING_PROMPT_CHECKPOINT_PATH = "checkpoints/parse_then_hop_training/euclidean/parse_euclidean/soft_prompt_epoch_23_val_loss_0.0686_em_0.883859.pth"
+HOPPING_PROMPT_CHECKPOINT_PATH = "checkpoints/random_walk_training/hyperbolic/curvature_ablation/Nov03_15-46-13_encoder[]_decoder[]_AdaFactor_0.3_-0.9751712515040364_poincare_hyperbolic_linear_after_encoder_only_soft_prompt_c032/soft_prompt_epoch_26_val_loss_0.1095.pth"
+PARSING_PROMPT_CHECKPOINT_PATH = "checkpoints/parse_then_hop_training/euclidean/euclidean_additional_layer/soft_prompt_epoch_23_val_loss_0.0686_em_0.883859.pth"
 KNIT_MODEL_CHECKPOINT_PATH = "checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth"
 def test_path():
     train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
@@ -47,8 +47,8 @@ def test_path():
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")
-    knit5_parsing_model = HyperbolicKthLayerT5Model(curvature=config.random_walk_training.curvature, map_encoder_layers=config.t5_model.map_encoder_layers, map_decoder_layers=config.t5_model.map_decoder_layers, checkpoint_hyperbolic_knit5=KNIT_MODEL_CHECKPOINT_PATH)
-    knit5_hopping_model = HyperbolicKthLayerT5Model(curvature=config.random_walk_training.curvature, map_encoder_layers=config.t5_model.map_encoder_layers, map_decoder_layers=config.t5_model.map_decoder_layers, checkpoint_hyperbolic_knit5=KNIT_MODEL_CHECKPOINT_PATH)
+    knit5_parsing_model = T5ModelWithAdditionalLayer(layer_type='euclidean', curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=KNIT_MODEL_CHECKPOINT_PATH)
+    knit5_hopping_model = T5ModelWithAdditionalLayer(layer_type='euclidean', curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=KNIT_MODEL_CHECKPOINT_PATH)
     import torch.nn as nn
 
     checkpoint = torch.load(PARSING_PROMPT_CHECKPOINT_PATH, map_location=device)
@@ -58,7 +58,9 @@ def test_path():
     hopping_prompt = nn.Parameter(checkpoint['soft_prompt_state_dict'], requires_grad=False)
     additional_hopping_linear_layer = checkpoint['additional_linear_layer']
 
+
     knit5_hopping_model.hyperbolic_layer.load_state_dict(additional_hopping_linear_layer)
+    knit5_parsing_model.hyperbolic_layer = torch.nn.Linear(1024, 1024)
     knit5_parsing_model.hyperbolic_layer.load_state_dict(additional_parsing_linear_layer)
     print("Loaded Soft Prompts and Additional Linear Layer")
 

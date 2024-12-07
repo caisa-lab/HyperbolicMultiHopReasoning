@@ -55,6 +55,7 @@ class ModelTrainer:
         self.start_epoch = 0
         self.patience = 5
         self.best_loss = float('inf')
+        self.best_em = 0
         self.early_stop_counter=0
         self.best_model_path = None
         
@@ -252,27 +253,27 @@ class ModelTrainer:
         
         
 
-        if avg_em_perc >= 0.85 or epoch >= 15:
-            torch.save({
-                'model_state_dict': self.model.state_dict(),
-                'optimizer_state_dict': self.optimizer.state_dict(),
-                'epoch': epoch}, soft_prompt_path)
-        # if avg_loss < self.best_loss:
-        #     if self.best_model_path:
-        #         os.remove(self.best_model_path)
-        #     self.best_loss = avg_loss
-        #     self.early_stop_counter = 0
-        #     self.best_model_path = soft_prompt_path
+        # if avg_em_perc >= 0.85 or epoch >= 15:
         #     torch.save({
         #         'model_state_dict': self.model.state_dict(),
         #         'optimizer_state_dict': self.optimizer.state_dict(),
         #         'epoch': epoch}, soft_prompt_path)
-        # else:
-        #     self.early_stop_counter += 1
-        #     print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
-        #     if self.early_stop_counter >= self.patience:
-        #         print("Early stopping trigered. Stopping training")
-        #         return True
+        if avg_em_perc > self.best_em:
+            if self.best_model_path:
+                os.remove(self.best_model_path)
+            self.best_em = avg_em_perc
+            self.early_stop_counter = 0
+            self.best_model_path = soft_prompt_path
+            torch.save({
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'epoch': epoch}, soft_prompt_path)
+        else:
+            self.early_stop_counter += 1
+            print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
+            if self.early_stop_counter >= self.patience:
+                print("Early stopping trigered. Stopping training")
+                return True
         return False
 
    
