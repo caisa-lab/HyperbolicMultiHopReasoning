@@ -11,7 +11,7 @@ from src.eval import evaluate_random_walk_training
 
 BATCH_SIZE = 8
 NUM_WORKERS = 4
-HOPPING_PROMPT_CHECKPOINT_PATH = "checkpoints/parse_then_hop_training/euclidean/parse_euclidean/soft_prompt_epoch_23_val_loss_0.0686_em_0.883859.pth"
+HOPPING_PROMPT_CHECKPOINT_PATH = "checkpoints/parse_then_hop_training/euclidean/euclidean_additional_layer/soft_prompt_epoch_23_val_loss_0.0686_em_0.883859.pth"
 KNIT_MODEL_CHECKPOINT_PATH = "checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth"
 def test_parse():
     train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)

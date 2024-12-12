@@ -7,7 +7,7 @@ import torch
 from src.config import Config
 from torch.utils.data import DataLoader
 from src.knowledge_graph import create_knowledge_graph_wikimultihop
-from src.models import SoftPromptModel, HyperbolicKthLayerT5Model
+from src.models import SoftPromptModel, T5ModelWithAdditionalLayer
 from src.eval import evaluate_parse_then_hop_training, evaluate_random_walk_training
 import argparse
 import optuna
@@ -46,7 +46,7 @@ def test_path():
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")
-    hyperbolic_knit5_model = HyperbolicKthLayerT5Model(curvature=config.random_walk_training.curvature, map_encoder_layers=config.t5_model.map_encoder_layers, map_decoder_layers=config.t5_model.map_decoder_layers, checkpoint_hyperbolic_knit5=KNIT_MODEL_CHECKPOINT_PATH)
+    hyperbolic_knit5_model = T5ModelWithAdditionalLayer(layer_type='euclidean', curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=KNIT_MODEL_CHECKPOINT_PATH)
     import torch.nn as nn
 
     checkpoint = torch.load(HOPPING_PROMPT_CHECKPOINT_PATH, map_location=device)
