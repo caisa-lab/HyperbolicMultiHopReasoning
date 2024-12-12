@@ -6,7 +6,7 @@ from src.datasets import RandomWalkDataset, ParseDataset
 import torch
 from src.config import Config
 from torch.utils.data import DataLoader
-from src.knowledge_graph import create_knowledge_graph
+from src.knowledge_graph import create_knowledge_graph_wikimultihop
 import matplotlib.pyplot as plt
 import sys
 import argparse
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     train_dataset, dev_dataset, test_dataset, _, _, _ = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
 
     all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
-    all_kg = create_knowledge_graph(all_data)
+    all_kg = create_knowledge_graph_wikimultihop(all_data)
 
     print(f"Nodes in Data: {len(list(all_kg.nodes()))}")
 
