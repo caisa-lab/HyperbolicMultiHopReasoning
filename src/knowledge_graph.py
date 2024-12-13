@@ -16,11 +16,12 @@ def create_knowledge_graph_metaqa(data : pd.DataFrame, iterations = 0):
     for idx, row in tqdm(data.iterrows(), desc="Creating Knowledge Graph...", total=len(data) if iterations == 0 else iterations):
         if index > iterations:
             return G
-        head = row['entity1'].strip()
-        relation = row['relation'].strip()
-        tail = row['entitiy2'].strip()
+        head = row['entity1'].strip().lower()
+        relation = row['relation'].strip().lower()
+        tail = row['entitiy2'].strip().lower()
         G.add_edge(head, tail, key=relation, relation=relation)
-        G.add_edge(tail, head, key=f"{relation}_reversed", relation=f"{relation}_reversed")
+        if head != tail:
+            G.add_edge(tail, head, key=f"{relation}_reversed", relation=f"{relation}_reversed")
 
         if iterations > 0:
             index += 1
