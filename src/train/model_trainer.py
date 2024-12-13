@@ -14,6 +14,8 @@ from config import Config
 from eval import exact_match_score, f1_score
 from utils.trainer_utils import *
 from typing import Union
+from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.distributed as dist
 
 """Triggering Multi-Hop Reasoning for Question Answering
 in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/2306.04009
@@ -30,8 +32,13 @@ class ModelTrainer:
                  tboard_checkpoint_path : str = None,
                  validation_step : int = 1,
                  method : str = 'single_hop_training',
-                 load_optimizer = True):
+                 load_optimizer = True,
+                 gpu_parallelization = False):
+        self.device = device
         self.model = model.to(device)
+        self.gpu_parallelization = gpu_parallelization
+        if gpu_parallelization:
+            self.model = DDP(self.model, device_ids=[self.device])
         self.tokenizer = tokenizer
         self.tokenizer.model_max_length = config.t5_model.tokenizer_max_length
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -44,12 +51,12 @@ class ModelTrainer:
         else:
             raise ValueError('Length of List for Train Dataloaders must be >= 1')
         self.val_dataloader = val_dataloader
-        self.device = device
         self.config = config
         self.checkpoint_path = checkpoint_path
         self.tboard_checkpoint_path = tboard_checkpoint_path
         self.validation_step = validation_step
         self.load_optimizer = load_optimizer
+        
         
         
         self.start_epoch = 0
@@ -104,6 +111,12 @@ class ModelTrainer:
     def _train_with_c4(self, epochs : int):
         self.model.train()
         for epoch in range(epochs):
+            if self.gpu_parallelization:
+                self.single_hop_train_dataloader.sampler.set_epoch(epoch)
+                self.c4_train_dataloader.sampler.set_epoch(epoch)
+
+
+
             total_c4_loss = 0
             total_single_hop_loss = 0
             single_hop_iter = iter(self.single_hop_train_dataloader)
@@ -144,14 +157,31 @@ class ModelTrainer:
                 loss.backward()
                 self.optimizer.step()
                 
+                if batch_idx <= 10 and batch_idx % 2 == 0:
+                    print(f"{input_str = }")
+                    print(f"{label = }")
                 len_trainloader = len(self.single_hop_train_dataloader)
-                
-                if batch_idx % 2 == 0:
-                    total_single_hop_loss += loss.item()
-                    log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx//2, 'Training/SingleHop', eval_metric='loss')
+                if self.gpu_parallelization:
+                    # After loss.backward() and self.optimizer.step()
+                    loss_tensor = torch.tensor([loss.item()], device=self.device)
+                    dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
+                    global_loss = loss_tensor.item() / dist.get_world_size()
+
+                    
+                    # Log only from rank 0
+                    if batch_idx % 2 == 0:
+                        total_single_hop_loss += global_loss
+                        log_tensorboard(self.writer, global_loss, epoch*len_trainloader + batch_idx//2, 'Training/SingleHop', eval_metric='loss')
+                    else:
+                        total_c4_loss += global_loss
+                        log_tensorboard(self.writer, global_loss, epoch*len_trainloader + batch_idx//2, 'Training/C4', eval_metric='loss')
                 else:
-                    total_c4_loss += loss.item() 
-                    log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx//2, 'Training/C4', eval_metric='loss')
+                    if batch_idx % 2 == 0:
+                        total_single_hop_loss += loss.item()
+                        log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx//2, 'Training/SingleHop', eval_metric='loss')
+                    else:
+                        total_c4_loss += loss.item()
+                        log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx//2, 'Training/C4', eval_metric='loss')
                 
                 progress_bar.set_description(f"Epoch {epoch} - Training - {self.method} - Loss: {loss.item():.4f}")
                 
@@ -242,13 +272,34 @@ class ModelTrainer:
                                      f'Prediction: {decoded_predictions[0]}\nLabel: {label[0]}', epoch)
                 
                 #progress_bar.set_description(f"Epoch {epoch} - Validation - Random Walk Training - Loss: {loss.item():.4f}")
-            avg_loss = total_loss / len(self.val_dataloader)
-            avg_em_perc = total_em / len(self.val_dataloader.dataset)
-            avg_f1_perc = total_f1 / len(self.val_dataloader.dataset)
-            log_tensorboard(self.writer, avg_loss, epoch, 'Validation', eval_metric='loss')
-            log_tensorboard(self.writer, avg_em_perc, epoch, 'Validation', eval_metric='em')
-            log_tensorboard(self.writer, avg_f1_perc, epoch, 'Validation', eval_metric='f1')
-            print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
+            if self.gpu_parallelization:
+                # Convert totals to tensors and reduce
+                total_loss_tensor = torch.tensor([total_loss], device=self.device)
+                dist.all_reduce(total_loss_tensor, op=dist.ReduceOp.SUM)
+                avg_loss = (total_loss_tensor.item() / dist.get_world_size()) / len(self.val_dataloader)
+
+                total_em_tensor = torch.tensor([total_em], device=self.device)
+                dist.all_reduce(total_em_tensor, op=dist.ReduceOp.SUM)
+                avg_em = total_em_tensor.item() / len(self.val_dataloader.dataset)
+
+                total_f1_tensor = torch.tensor([total_f1], device=self.device)
+                dist.all_reduce(total_f1_tensor, op=dist.ReduceOp.SUM)
+                avg_f1 = total_f1_tensor.item() / len(self.val_dataloader.dataset)
+
+                
+                # Log only aggregated metrics from the main process
+                log_tensorboard(self.writer, avg_loss, epoch, 'Validation', eval_metric='loss')
+                log_tensorboard(self.writer, avg_em, epoch, 'Validation', eval_metric='em')
+                log_tensorboard(self.writer, avg_f1, epoch, 'Validation', eval_metric='f1')
+                print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em:.4f} | AvgF1: {avg_f1:.4f}")
+            else:
+                avg_loss = total_loss / len(self.val_dataloader)
+                avg_em_perc = total_em / len(self.val_dataloader.dataset)
+                avg_f1_perc = total_f1 / len(self.val_dataloader.dataset)
+                log_tensorboard(self.writer, avg_loss, epoch, 'Validation', eval_metric='loss')
+                log_tensorboard(self.writer, avg_em_perc, epoch, 'Validation', eval_metric='em')
+                log_tensorboard(self.writer, avg_f1_perc, epoch, 'Validation', eval_metric='f1')
+                print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
         soft_prompt_path = f"{self.model_dir}/knit5_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         
         
