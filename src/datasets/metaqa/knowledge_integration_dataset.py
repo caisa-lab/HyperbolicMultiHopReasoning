@@ -3,9 +3,9 @@ import networkx as nx
 
 class KnowledgeIntegrationMetaQADataset(Dataset):
     """
-    Needs a dataset that has all entries so train + dev + test. 
+    Takes in a Graph with all entities and relations
     """
-    def __init__(self, kg : nx.MultiGraph, undirected = True):
+    def __init__(self, kg : nx.MultiGraph, undirected = False):
         self.data = []
 
         for u, v, data in kg.edges(data = True):

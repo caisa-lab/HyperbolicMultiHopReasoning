@@ -12,7 +12,7 @@ from tqdm import tqdm
 # Film --> written_by --> Sergei Kozlov
 def create_knowledge_graph_metaqa(data : pd.DataFrame, iterations = 0):
     index = 0
-    G = nx.MultiGraph()
+    G = nx.MultiDiGraph()
     for idx, row in tqdm(data.iterrows(), desc="Creating Knowledge Graph...", total=len(data) if iterations == 0 else iterations):
         if index > iterations:
             return G
@@ -20,6 +20,8 @@ def create_knowledge_graph_metaqa(data : pd.DataFrame, iterations = 0):
         relation = row['relation'].strip()
         tail = row['entitiy2'].strip()
         G.add_edge(head, tail, key=relation, relation=relation)
+        G.add_edge(tail, head, key=f"{relation}_reversed", relation=f"{relation}_reversed")
+
         if iterations > 0:
             index += 1
             

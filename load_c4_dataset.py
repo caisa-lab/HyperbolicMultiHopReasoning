@@ -47,8 +47,6 @@ def load_c4_subset(files: int = 5):
  
  
 if __name__ == '__main__':
-    #Each File is 309 MB
-    #Imagine we have 100 GB of Storage so we can do 100 * 1000 / 309 = 323 Files 
     storage = 100_000 #MB
     number_of_files = int(storage / 309)
     

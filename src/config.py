@@ -13,7 +13,8 @@ class BaseTrainingConfig:
                      model_checkpoint_path = None,
                      load_optimizer = False,
                      additional_log_info = '',
-                     num_workers = 4):
+                     num_workers = 4,
+                     gpu_parallelization = False):
             self.optimizer = optimizer #[Adam, AdamW, AdaFactor, Hyperbolic]
             self.learning_rate = learning_rate #Same as in the paper
             self.optimizer_param = optimizer_param #weight_decay for AdamW Check which Optimizer
@@ -28,23 +29,25 @@ class BaseTrainingConfig:
             self.num_workers = num_workers
             self.curvature = curvature
             self.additional_log_info = additional_log_info
+            self.gpu_parallelization = gpu_parallelization
             
 class Config:  
     class SingleHopTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(log_dir='tboard_logs/musique_dataset/knowledge_integration',
-                             model_save_path='checkpoints/musique_dataset/knowledge_integration',
+            super().__init__(log_dir='tboard_logs/metaqa/knowledge_integration',
+                             model_save_path='checkpoints/metaqa/knowledge_integration',
                              model_checkpoint_path= None,
                              tboard_checkpoint_path=None,
                              num_workers=16,
-                             curvature=1.0)
-            self.additional_log_info=f'euclidean_t5_bsize64_without_gt_inserted'
+                             curvature=1.0,
+                             gpu_parallelization=True)
+            self.additional_log_info=f'euclidean_t5_large_batch_size64_with_c4_prefix_language_modeling'
 
                 
     class OneHopWikiTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(log_dir='tboard_logs/final_results/one_hop_wiki_finetuning',
-                             model_save_path='checkpoints/final_results/one_hop_wiki_finetuning',
+            super().__init__(log_dir='tboard_logs/metaqa/one_hop_wiki_finetuning',
+                             model_save_path='checkpoints/metaqa/one_hop_wiki_finetuning',
                              epochs=160,
                              model_checkpoint_path= None,
                              tboard_checkpoint_path=None,
@@ -54,8 +57,8 @@ class Config:
         def __init__(self):
             super().__init__(learning_rate=0.3,
                              epochs=35,
-                             log_dir='tboard_logs/random_walk_training/euclidean',
-                             model_save_path='checkpoints/random_walk_training/euclidean',
+                             log_dir='tboard_logs/metaqa/random_walk_training/euclidean',
+                             model_save_path='checkpoints/metaqa/random_walk_training/euclidean',
                              model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth', #'checkpoints/knowledge_integration/large_adapt_bsize64_c4_hyperbolic_after_decoder/knit5_epoch_10_val_loss_0.0217.pth'
                              tboard_checkpoint_path=None,
                              num_workers=16,
@@ -70,8 +73,8 @@ class Config:
         def __init__(self):
             super().__init__(learning_rate=0.3,
                              epochs=250,
-                             log_dir='tboard_logs/musique_dataset/parse_training/',
-                             model_save_path='checkpoints/musique_dataset/parse_training/',
+                             log_dir='tboard_logs/metaqa/parse_training/',
+                             model_save_path='checkpoints/metaqa/parse_training/',
                              model_checkpoint_path= 'checkpoints/musique_dataset/knowledge_integration/euclidean_gt_not_replaced/knit5_epoch_28_val_loss_0.0045.pth',
                              tboard_checkpoint_path=None,
                              num_workers=16,
@@ -85,9 +88,9 @@ class Config:
                 
     class T5_Model:
         def __init__(self):
-            self.batch_size = 16
+            self.batch_size = 64
             self.model_name = "google/t5-large-lm-adapt"            
-            self.tokenizer_max_length = 128
+            self.tokenizer_max_length = 115
             self.map_encoder_layers = []
             self.map_decoder_layers = []
 

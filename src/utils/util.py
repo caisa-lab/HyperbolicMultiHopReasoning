@@ -13,7 +13,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
 
-from src.knowledge_graph import create_knowledge_graph
+from src.knowledge_graph import create_knowledge_graph_wikimultihop
 import numpy as np
 from sklearn.model_selection import train_test_split
 
@@ -121,9 +121,9 @@ def load_dataset(path: str,
         correct_wrong_evidences(test_dataset)
 
     print("Creating Knowledge Graphs...")
-    kg_train = create_knowledge_graph(train_dataset)
-    kg_dev = create_knowledge_graph(dev_dataset)
-    kg_test = create_knowledge_graph(test_dataset)
+    kg_train = create_knowledge_graph_wikimultihop(train_dataset)
+    kg_dev = create_knowledge_graph_wikimultihop(dev_dataset)
+    kg_test = create_knowledge_graph_wikimultihop(test_dataset)
     
     return train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test
 
