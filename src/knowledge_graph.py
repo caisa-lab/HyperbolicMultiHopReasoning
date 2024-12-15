@@ -86,18 +86,35 @@ def print_graph(kg):
     print(f"#Nodes: {len(kg.nodes())}")
     print(f"#Edges: {len(kg.edges(data=True))}")
 
-#TODO CHECK IF THIS MAKES SENSE
-#TODO CHECK FOR MORE relations that can be found in the questions and adjust the mapping accordingly
-
 #################################################
-#This is for MetaQA to create files with the evidences we only have start entity and answer in the files
-#We need to create the evidence series entity --> relation --> entity --> relation --> entity ourself
+#METAQA HOW TO GET THE EVIDENCES
+#We use the qtype txt files which kind of gives us the path to the answer
 import networkx as nx
 import re
 import pandas as pd
 from collections import Counter
 import itertools
 from tqdm import tqdm
+import ast
+import os
+
+# Mapping from (source_type, target_type) to knowledge graph relations
+# '_reversed' indicates traversal in the reverse direction (from target to source)
+TRANSITION_TO_RELATION = {
+    ('movie', 'language'): 'in_language',
+    ('movie', 'year'): 'release_year',
+    ('movie', 'writer'): 'written_by',
+    ('movie', 'director'): 'directed_by',
+    ('movie', 'genre'): 'has_genre',
+    ('movie', 'actor'): 'starred_actors',
+
+    ('language', 'movie'): 'in_language_reversed',
+    ('year', 'movie'): 'release_year_reversed',
+    ('writer', 'movie'): 'written_by_reversed',
+    ('director', 'movie'): 'directed_by_reversed',
+    ('genre', 'movie'): 'has_genre_reversed',
+    ('actor', 'movie'): 'starred_actors_reversed',
+}
 
 def extract_starting_entity(question):
     """
@@ -116,238 +133,222 @@ def split_answers(answer_str):
     """
     return [ans.strip().lower() for ans in answer_str.split('|')]
 
-def find_paths_with_relations(G, start, end, n=None):
+def validate_triplet(G, entity1, relation, entity2, debug=False):
     """
-    Finds all paths from 'start' to 'end', optionally with exactly 'n' relations.
-    Allows self-visits (revisiting nodes) in paths.
-    For each path, records the sequence of relations.
+    Validates whether a triplet (entity1, relation, entity2) exists in the knowledge graph.
+
+    Args:
+        G (networkx.Graph): The knowledge graph.
+        entity1 (str): Source entity.
+        relation (str): Relation name.
+        entity2 (str): Target entity.
+        debug (bool): If True, print debug statements.
+
+    Returns:
+        bool: True if the triplet exists, False otherwise.
+    """
+    if debug:
+        print(f"Validating triplet: ({entity1}, {relation}, {entity2})")
+    if G.has_edge(entity1, entity2):
+        edge_attrs = G.get_edge_data(entity1, entity2)
+        if G.is_multigraph():
+            # For MultiGraphs, check if any edge has the specified relation
+            for key, attrs in edge_attrs.items():
+                if attrs.get('relation', '').strip().lower() == relation.lower():
+                    if debug:
+                        print(f"  Triplet exists via edge {key}: ({entity1}, {relation}, {entity2})")
+                    return True
+        else:
+            # For simple graphs, check the relation attribute
+            rel_attr = edge_attrs.get('relation', '').strip().lower()
+            if rel_attr == relation.lower():
+                if debug:
+                    print(f"  Triplet exists: ({entity1}, {relation}, {entity2})")
+                return True
+    if debug:
+        print(f"  Triplet does NOT exist: ({entity1}, {relation}, {entity2})")
+    return False
+
+def find_paths_with_relations(G, start, end, relation_path, debug=False):
+    """
+    Given a relation path (e.g., 'writer_to_movie_to_genre'), maps it to knowledge graph relations,
+    traverses the KG starting from 'start', follows the relations in sequence, and finds paths to 'end'.
 
     Args:
         G (networkx.Graph): The knowledge graph.
         start (str): The starting entity.
-        end (str): The target entity (answer).
-        n (int, optional): The exact number of relations (hops) in the path.
-            If None, retrieves all paths up to a reasonable maximum number of relations.
+        end (str): The target entity.
+        relation_path (str): The relation path from the txt file (e.g., 'writer_to_movie_to_genre').
+        debug (bool): If True, print debug statements.
 
     Returns:
         List of tuples: Each tuple contains (path, relation_sequence)
     """
+    # Split the relation path into transitions
+    parts = relation_path.split('_to_')  # ['writer', 'movie', 'genre']
+    transitions = list(zip(parts[:-1], parts[1:]))  # [('writer', 'movie'), ('movie', 'genre')]
+
+    # Map transitions to relations using the provided mapping
+    relations = []
+    for src, tgt in transitions:
+        relation = TRANSITION_TO_RELATION.get((src.lower(), tgt.lower()))
+        if not relation:
+            if debug:
+                print(f"  Warning: No relation mapping found for transition ({src}, {tgt}). Skipping path.")
+            return []  # Invalid path due to missing mapping
+        relations.append(relation)
+
+    # Define the relation sequence
+    relation_sequence = relations  # e.g., ['written_by_reversed', 'has_genre']
+
+    # Initialize list to collect paths
     paths_rel = []
 
-    def all_paths_allowing_cycles(G, source, target, max_depth):
-        """
-        Generator that yields all paths from source to target allowing cycles,
-        up to a maximum path length.
+    # Initialize stack for DFS: (current_node, current_path, relations_left)
+    stack = [(start, [start], relation_sequence.copy())]
 
-        Args:
-            G (networkx.Graph): The graph.
-            source (str): Starting node.
-            target (str): Target node.
-            max_depth (int): Maximum number of nodes in the path.
+    while stack:
+        current_node, current_path, relations_left = stack.pop()
+        if debug:
+            print(f"Traversing from '{current_node}' with relations left: {relations_left}")
 
-        Yields:
-            List of nodes representing a path from source to target.
-        """
-        stack = [(source, [source])]
-        while stack:
-            (vertex, path) = stack.pop()
-            if len(path) > max_depth:
-                continue
-            for neighbor in G.neighbors(vertex):
-                new_path = path + [neighbor]
-                if neighbor == target:
-                    yield new_path
-                if len(new_path) < max_depth:
-                    stack.append((neighbor, new_path))
+        if not relations_left:
+            if current_node == end:
+                # Collect the relation sequence
+                relation_seq = tuple(current_path[i] for i in range(1, len(current_path), 2))
+                paths_rel.append((current_path.copy(), relation_seq))
+                if debug:
+                    print(f"  Found valid path: {current_path}")
+            continue
 
-    try:
-        if n is not None:
-            # Exact number of relations: n hops => n+1 nodes
-            max_depth = n + 1
-            all_paths = list(all_paths_allowing_cycles(G, source=start, target=end, max_depth=max_depth))
-            # Filter paths that have exactly n relations (i.e., n+1 nodes)
-            exact_paths = [path for path in all_paths if len(path) == n + 1]
-            # Iterate through exact paths
-            for path in exact_paths:
-                relations_per_pair = []
-                for i in range(len(path) - 1):
-                    node1 = path[i]
-                    node2 = path[i + 1]
-                    rel = []
-                    if G.has_edge(node1, node2):
-                        edge_attrs = G.get_edge_data(node1, node2)
-                        if G.is_multigraph():
-                            # Collect all unique relations, normalize them
-                            rel = list(set(
-                                attrs.get('relation').strip().lower() for key, attrs in edge_attrs.items() if 'relation' in attrs
-                            ))
-                        else:
-                            rel_attr = edge_attrs.get('relation')
-                            if rel_attr:
-                                rel = [rel_attr.strip().lower()]
-                    if not rel:
-                        rel = ['unknown_relation']
-                    relations_per_pair.append(rel)
+        next_relation = relations_left[0]
+        if debug:
+            print(f"  Next relation to traverse: '{next_relation}'")
 
-                # Generate all combinations of relations
-                for relation_combo in itertools.product(*relations_per_pair):
-                    #print(f"  Generated path: {path} with relations {relation_combo}")
-                    paths_rel.append((path, relation_combo))
+        # Determine if the relation needs to be traversed in reverse
+        if next_relation.endswith('_reversed'):
+            actual_relation = next_relation.replace('_reversed', '')
+            traverse_direction = 'incoming'
         else:
-            # Retrieve all paths allowing self-visits up to a reasonable max_depth
-            # Define max_depth based on graph size to prevent excessive computation
-            # For example, twice the number of nodes
-            num_nodes = G.number_of_nodes()
-            max_depth = num_nodes * 2  # Adjust as needed
-            all_paths = list(all_paths_allowing_cycles(G, source=start, target=end, max_depth=max_depth))
-            print(f"  Found {len(all_paths)} paths from '{start}' to '{end}':")
-            for path in all_paths:
-                relations_per_pair = []
-                for i in range(len(path) - 1):
-                    node1 = path[i]
-                    node2 = path[i + 1]
-                    rel = []
-                    if G.has_edge(node1, node2):
-                        edge_attrs = G.get_edge_data(node1, node2)
-                        if G.is_multigraph():
-                            # Collect all unique relations, normalize them
-                            rel = list(set(
-                                attrs.get('relation').strip().lower() for key, attrs in edge_attrs.items() if 'relation' in attrs
-                            ))
-                        else:
-                            rel_attr = edge_attrs.get('relation')
-                            if rel_attr:
-                                rel = [rel_attr.strip().lower()]
-                    if not rel:
-                        rel = ['unknown_relation']
-                    relations_per_pair.append(rel)
+            actual_relation = next_relation
+            traverse_direction = 'outgoing'
 
-                # Generate all combinations of relations
-                for relation_combo in itertools.product(*relations_per_pair):
-                    paths_rel.append((path, relation_combo))
-    except Exception as e:
-        # Handle exceptions such as no path exists
-        if isinstance(e, nx.NetworkXNoPath):
-            if n is not None:
-                print(f"  No path found from '{start}' to '{end}' with exactly {n} relations.")
+        # Traverse based on direction
+        if traverse_direction == 'incoming':
+            neighbors = G.predecessors(current_node)
+        else:
+            neighbors = G.successors(current_node)
+
+        for neighbor in neighbors:
+            # Depending on direction, get the edge data
+            if traverse_direction == 'incoming':
+                if G.has_edge(neighbor, current_node):
+                    edge_attrs = G.get_edge_data(neighbor, current_node)
             else:
-                print(f"  No path found from '{start}' to '{end}'.")
-        else:
-            # For other exceptions, re-raise
-            raise e
+                if G.has_edge(current_node, neighbor):
+                    edge_attrs = G.get_edge_data(current_node, neighbor)
+                else:
+                    continue  # No such edge
+
+            if G.is_multigraph():
+                # Check if any edge has the required relation
+                if any(attrs.get('relation', '').strip().lower() == actual_relation.lower() for attrs in edge_attrs.values()):
+                    # Find the specific edge
+                    for key, attrs in edge_attrs.items():
+                        if attrs.get('relation', '').strip().lower() == actual_relation.lower():
+                            if debug:
+                                print(f"  Current Node: '{current_node}', Neighbor: '{neighbor}', Relation: '{next_relation}'")
+                                
+                            # Handle self-loop: if current_node == neighbor and relation is reversed, use forward relation
+                            if current_node == neighbor and next_relation.endswith('_reversed'):
+                                adjusted_relation = actual_relation
+                                #print(f"  Adjusting relation for self-loop from '{next_relation}' to '{adjusted_relation}'")
+                            else:
+                                adjusted_relation = actual_relation
+                                
+                            # Append relation and neighbor
+                            current_path_extended = current_path.copy()
+                            current_path_extended.append(adjusted_relation)
+                            current_path_extended.append(neighbor)
+                            if debug:
+                                print(f"  Extending path: {current_path_extended}")
+                                
+                            # Validate the triplet with the adjusted relation
+                            if traverse_direction == 'incoming':
+                                # For incoming, triplet is (neighbor, relation, current_node)
+                                if validate_triplet(G, neighbor, adjusted_relation, current_node, debug=debug):
+                                    stack.append((neighbor, current_path_extended, relations_left[1:].copy()))
+                            else:
+                                # For outgoing, triplet is (current_node, relation, neighbor)
+                                if validate_triplet(G, current_node, adjusted_relation, neighbor, debug=debug):
+                                    stack.append((neighbor, current_path_extended, relations_left[1:].copy()))
+                            break  # Only need to find one matching edge
+            else:
+                # For single graphs
+                rel_attr = edge_attrs.get('relation', '').strip().lower()
+                if rel_attr == actual_relation.lower():
+                    if debug:
+                        print(f"  Current Node: '{current_node}', Neighbor: '{neighbor}', Relation: '{next_relation}'")
+                        
+                    # Handle self-loop: if current_node == neighbor and relation is reversed, use forward relation
+                    if current_node == neighbor and next_relation.endswith('_reversed'):
+                        adjusted_relation = actual_relation
+                        #print(f"  Adjusting relation for self-loop from '{next_relation}' to '{adjusted_relation}'")
+                    else:
+                        adjusted_relation = rel_attr
+
+                    # Append relation and neighbor
+                    current_path_extended = current_path.copy()
+                    current_path_extended.append(adjusted_relation)
+                    current_path_extended.append(neighbor)
+                    if debug:
+                        print(f"  Extending path: {current_path_extended}")
+
+                    # Validate the triplet
+                    if traverse_direction == 'incoming':
+                        if validate_triplet(G, neighbor, adjusted_relation, current_node, debug=debug):
+                            stack.append((neighbor, current_path_extended, relations_left[1:].copy()))
+                    else:
+                        if validate_triplet(G, current_node, adjusted_relation, neighbor, debug=debug):
+                            stack.append((neighbor, current_path_extended, relations_left[1:].copy()))
+
     return paths_rel
 
-def find_common_relation_sequences(all_answers_paths, n):
+def process_questions(question_answer_file, relation_path_file, G, n):
     """
-    Identifies relation sequences that are present in all answers' relation sequences.
+    Processes each question-answer pair, reads the corresponding relation path from the txt file,
+    maps the relations, validates triplets in the knowledge graph, and constructs evidences.
 
     Args:
-        all_answers_paths (List[List[Tuple[List[str], Tuple[str, ...]]]]): 
-            A list where each element corresponds to an answer and contains a list of (path, relation_sequence) tuples.
-        n (int): The exact number of relations (hops) to consider.
-
-    Returns:
-        Set of relation sequences (tuples) that are common to all answers.
-    """
-    # For each answer, collect all relation sequences
-    relation_sequences_per_answer = []
-    for answer_idx, answer_paths in enumerate(all_answers_paths):
-        rel_seqs = set(
-            tuple(rel.lower().strip() for rel in rel_seq)
-            for path, rel_seq in answer_paths
-            if len(rel_seq) == n
-        )
-        #print(f"  Answer {answer_idx + 1} relation sequences: {rel_seqs}")
-        relation_sequences_per_answer.append(rel_seqs)
-
-    if not relation_sequences_per_answer:
-        return set()
-
-    # Find intersection of all relation sets
-    common_rel_seqs = set.intersection(*relation_sequences_per_answer)
-    #print(f"  Common relation sequences across all answers: {common_rel_seqs}")
-
-    return common_rel_seqs
-
-def select_paths_with_specific_relation_sequence(all_answers_paths, selected_rel_seq):
-    """
-    Selects one path per answer that matches the specified relation sequence.
-
-    Args:
-        all_answers_paths (List[List[Tuple[List[str], Tuple[str, ...]]]]): 
-            A list where each element corresponds to an answer and contains a list of (path, relation_sequence) tuples.
-        selected_rel_seq (Tuple[str, ...]): 
-            The specific relation sequence to match.
-
-    Returns:
-        List of selected (path, relation_sequence), one for each answer.
-    """
-    selected_paths = []
-    for answer_idx, answer_paths in enumerate(all_answers_paths):
-        selected_path = None
-        selected_rel_seq_found = None
-        for path, rel_seq in answer_paths:
-            # Uncomment the following lines for detailed debugging
-            # print(f"    Checking path for Answer {answer_idx + 1}: {path} with relations {rel_seq}")
-            # print(f"      Path relation sequence type: {type(rel_seq)}")
-            # print(f"      Selected relation sequence type: {type(selected_rel_seq)}")
-            # print(f"      Selected relation sequence: {selected_rel_seq}")
-            # print(f"      Current path's relation sequence: {rel_seq}")
-            if rel_seq == selected_rel_seq:
-                selected_path = path
-                selected_rel_seq_found = rel_seq
-                # Uncomment the following line for detailed debugging
-                # print(f"        --> Match found for Answer {answer_idx + 1}")
-                break  # Select the first matching path
-        if selected_path and selected_rel_seq_found:
-            selected_paths.append((selected_path, selected_rel_seq_found))
-        else:
-            # If no path contains the specific relation sequence, append None
-            print(f"    No path with the specific relation sequence found for Answer {answer_idx + 1}.")
-            selected_paths.append((None, None))
-    return selected_paths
-
-def process_questions(file_path, G, n):
-    """
-    Processes each question-answer pair, finds the corresponding paths in the KG,
-    ensures relations are consistent across multiple answers with exactly 'n' hops,
-    and returns a DataFrame with the results.
-
-    Args:
-        file_path (str): Path to the TXT file containing questions and answers.
+        question_answer_file (str): Path to the TSV file containing questions and answers.
+        relation_path_file (str): Path to the TXT file containing relation paths per question.
         G (networkx.Graph): The knowledge graph.
         n (int): The exact number of relations (hops) to consider.
 
     Returns:
         pandas.DataFrame: DataFrame containing the question, answers, and evidences.
     """
-    # Define the phrase-to-relation mapping
-    PHRASE_TO_RELATION = {
-        "written by": "written_by_reversed",
-        "directed by": "directed_by_reversed",
-        "acted by": "acted_by_reversed",
-        "starred by": "starred_actors_reversed",
-    }
+    # Read the relation path file
+    with open(relation_path_file, 'r') as f:
+        relation_paths = f.read().splitlines()
 
-    # Compile regex patterns for phrases
-    phrase_patterns = {phrase: re.compile(r'\b' + re.escape(phrase) + r'\b', re.IGNORECASE) 
-                       for phrase in PHRASE_TO_RELATION.keys()}
+    # Read the question-answer file
+    df = pd.read_csv(question_answer_file, sep='\t', header=None, names=['question', 'answer'])
 
-    # Define priority order for phrases (optional)
-    PHRASE_PRIORITY = ["written by", "directed by", "acted by", "starred by"]
-
-    # Read the file into a pandas DataFrame
-    df = pd.read_csv(file_path, sep='\t', header=None, names=['question', 'answer'])
+    # Check if the number of questions matches the number of relation paths
+    if len(df) != len(relation_paths):
+        raise ValueError("The number of questions and relation paths do not match.")
 
     # Lists to store DataFrame columns
     questions = []
     answers_list = []
     evidences_list = []
 
-    # Iterate over each row in the DataFrame
+    # Iterate over each row in the DataFrame along with the corresponding relation path
     for index, row in tqdm(df.iterrows(), total=len(df), desc="Processing Questions"):
         question = row['question']
         answer_str = row['answer'].lower()
+        relation_path = relation_paths[index].strip()  # e.g., 'writer_to_movie_to_genre'
 
         # Extract the starting entity from the question
         start_entity = extract_starting_entity(question)
@@ -357,92 +358,37 @@ def process_questions(file_path, G, n):
 
         # Split the answers by '|'
         answers = split_answers(answer_str)
+        if not answers:
+            print(f"  No answers found for question: '{question}'. Skipping.\n")
+            continue  # Skip if no answers
 
-        # Collect all paths for each answer
-        all_answers_paths = []
-        missing_paths = False  # Flag to check if any answer has no path
+        # Determine if debugging should be enabled
+        debug = False#(start_entity == 'malcolm x')
+
+        # For each answer, find the path based on the relation path
+        evidences = []
+        all_valid = True  # Flag to ensure all answers have valid paths
+
         for answer in answers:
-            paths_rel = find_paths_with_relations(G, start_entity, answer, n)
+            # Find the path using the relation path
+            paths_rel = find_paths_with_relations(G, start_entity, answer, relation_path, debug=debug)
             if not paths_rel:
-                print(f"    No path found from '{start_entity}' to '{answer}'.")
-                missing_paths = True
-            all_answers_paths.append(paths_rel)
-
-        if missing_paths:
-            print(f"  Some answers have no paths. Skipping this question.\n")
-            continue  # Skip processing if any answer lacks a path
-
-        # If there are multiple answers, ensure relation sequences are common across all
-        if len(answers) > 1:
-            common_rel_seqs = find_common_relation_sequences(all_answers_paths, n)
-            if not common_rel_seqs:
-                # No common relation sequences found across all answers
-                print(f"  No common relation sequences found across all answers for question: '{question}'. Skipping.\n")
-                continue  # Skip if no common relation sequences
-
-            # Initialize selected_rel_seq to None
-            selected_rel_seq = None
-
-            # Check for specific phrases in the question to prioritize relation selection
-            for phrase in PHRASE_PRIORITY:
-                relation = PHRASE_TO_RELATION[phrase]
-                if phrase_patterns[phrase].search(question):
-                    # Find a relation sequence that includes the corresponding relation
-                    matching_seqs = [seq for seq in common_rel_seqs if relation in seq]
-                    if matching_seqs:
-                        selected_rel_seq = matching_seqs[0]  # Select the first matching sequence
-                        #print(f"  Phrase '{phrase}' found in question. Selected relation sequence: {selected_rel_seq}")
-                        break  # Stop after finding the first matching phrase
-
-            # If no specific phrase is found, select the first common relation sequence
-            if not selected_rel_seq:
-                selected_rel_seq = next(iter(common_rel_seqs))
-                #print(f"  No specific phrase found in question. Selected first common relation sequence: {selected_rel_seq}")
-
-            # Select paths that match this specific relation sequence
-            selected_paths = select_paths_with_specific_relation_sequence(all_answers_paths, selected_rel_seq)
-
-            # Check if all selected paths are valid (not None)
-            if any(path is None for path, rel_seq in selected_paths):
-                print(f"  Not all answers have paths with the selected common relation sequence for question: '{question}'. Skipping.\n")
-                continue  # Skip if any answer does not have a path with the common relation sequence
-
-            # Prepare evidences for the current question
-            evidences = []
-            for path, rel_seq in selected_paths:
-                # Construct the path string with relations
-                path_with_relations = []
-                for j in range(len(path)):
-                    path_with_relations.append(str(path[j]))
-                    if j < len(rel_seq):
-                        path_with_relations.append(str(rel_seq[j]))
-                # Store as tuple
-                evidences.append(tuple(path_with_relations))
-
-            # Append data to lists
-            questions.append(question)
-            answers_list.append(answers)
-            evidences_list.append(evidences)
-        else:
-            # For single answers, select the first available path
-            if all_answers_paths[0]:
-                selected_path, selected_rel_seq = all_answers_paths[0][0]  # First path tuple
-                # Construct the path string with relations
-                path_with_relations = []
-                for j in range(len(selected_path)):
-                    path_with_relations.append(str(selected_path[j]))
-                    if j < len(selected_rel_seq):
-                        path_with_relations.append(str(selected_rel_seq[j]))
-                # Store as tuple
-                evidences = [tuple(path_with_relations)]
-
-                # Append data to lists
-                questions.append(question)
-                answers_list.append(answers)
-                evidences_list.append(evidences)
+                print(f"    No valid path found for answer '{answer}' with relation path '{relation_path}'.")
+                all_valid = False
+                break  # Skip this question if any answer lacks a valid path
             else:
-                print(f"    No path selected for answer: '{answers[0]}'.\n")
-                evidences_list.append([None])
+                # Since the relation path is predefined, we expect only one path
+                path, relation_seq = paths_rel[0]
+                evidences.append(path)  # Append the full path including entities and relations
+
+        if not all_valid:
+            print(f"  Skipping question due to missing paths for some answers: '{question}'.\n")
+            continue  # Skip adding this question
+
+        # Append data to lists
+        questions.append(question)
+        answers_list.append(answers)
+        evidences_list.append(evidences)
 
     # Create the DataFrame
     results_df = pd.DataFrame({
@@ -453,3 +399,22 @@ def process_questions(file_path, G, n):
 
     return results_df
 
+def display_outgoing_relations(G, entity):
+    """
+    Displays all outgoing relations from a specified entity.
+
+    Args:
+        G (networkx.Graph): The knowledge graph.
+        entity (str): The entity to inspect.
+    """
+    if G.has_node(entity):
+        print(f"Outgoing relations from '{entity}':")
+        for neighbor in G.neighbors(entity):
+            edge_attrs = G.get_edge_data(entity, neighbor)
+            if G.is_multigraph():
+                for key, attrs in edge_attrs.items():
+                    print(f"  --[{attrs.get('relation', 'no_relation')}]--> {neighbor}")
+            else:
+                print(f"  --[{edge_attrs.get('relation', 'no_relation')}]--> {neighbor}")
+    else:
+        print(f"Entity '{entity}' does not exist in the knowledge graph.")
