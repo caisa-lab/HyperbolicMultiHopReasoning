@@ -37,7 +37,7 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
         self.curvature = curvature
 
         in_features = config.d_model
-        if layer_type not in ['euclidean', 'hyperbolic']:
+        if layer_type not in ['euclidean', 'hyperbolic', 'identity']:
             raise ValueError(f"{layer_type} not supported. Only 'hyperbolic' or 'euclidean'")
         if layer_type == 'euclidean':
             self.hyperbolic_layer = nn.Linear(in_features, in_features)
@@ -45,6 +45,9 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
         elif layer_type == 'hyperbolic':
             self.hyperbolic_layer = HyperbolicLayer(curvature=self.curvature, type='poincare', scaled=False, learnable=True, in_features=in_features, out_features=in_features, hidden_dim=in_features)
             print("Using Hyperbolic Additional Layer")
+        elif layer_type == 'identity':
+            self.hyperbolic_layer = nn.Identity()
+            print("Using Identity (No Extra Layer)")
         #print(f"Map after the Encoder, after final_layer_norm and dropout")
 
         
