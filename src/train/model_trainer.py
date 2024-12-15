@@ -280,18 +280,18 @@ class ModelTrainer:
 
                 total_em_tensor = torch.tensor([total_em], device=self.device)
                 dist.all_reduce(total_em_tensor, op=dist.ReduceOp.SUM)
-                avg_em = total_em_tensor.item() / len(self.val_dataloader.dataset)
+                avg_em_perc = total_em_tensor.item() / len(self.val_dataloader.dataset)
 
                 total_f1_tensor = torch.tensor([total_f1], device=self.device)
                 dist.all_reduce(total_f1_tensor, op=dist.ReduceOp.SUM)
-                avg_f1 = total_f1_tensor.item() / len(self.val_dataloader.dataset)
+                avg_f1_perc = total_f1_tensor.item() / len(self.val_dataloader.dataset)
 
                 
                 # Log only aggregated metrics from the main process
                 log_tensorboard(self.writer, avg_loss, epoch, 'Validation', eval_metric='loss')
-                log_tensorboard(self.writer, avg_em, epoch, 'Validation', eval_metric='em')
-                log_tensorboard(self.writer, avg_f1, epoch, 'Validation', eval_metric='f1')
-                print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em:.4f} | AvgF1: {avg_f1:.4f}")
+                log_tensorboard(self.writer, avg_em_perc, epoch, 'Validation', eval_metric='em')
+                log_tensorboard(self.writer, avg_f1_perc, epoch, 'Validation', eval_metric='f1')
+                print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
             else:
                 avg_loss = total_loss / len(self.val_dataloader)
                 avg_em_perc = total_em / len(self.val_dataloader.dataset)
