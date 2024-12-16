@@ -91,7 +91,8 @@ def _knowledge_integration_with_c4(dataset, rank, world_size):
                         checkpoint_path=config.single_hop_training.model_checkpoint_path,
                         tboard_checkpoint_path=config.single_hop_training.tboard_checkpoint_path,
                         method = 'single_hop_training',
-                        gpu_parallelization=config.single_hop_training.gpu_parallelization)
+                        gpu_parallelization=config.single_hop_training.gpu_parallelization,
+                        rank = rank)
 
     print(f'Knowledge Integration training..')
     print(f'with model: {config.t5_model.model_name}')
