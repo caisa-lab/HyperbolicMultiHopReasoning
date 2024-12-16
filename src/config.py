@@ -40,7 +40,7 @@ class Config:
                              tboard_checkpoint_path=None,
                              num_workers=16,
                              curvature=1.0,
-                             gpu_parallelization=True)
+                             gpu_parallelization=False)
             self.additional_log_info=f'euclidean_t5_large_batch_size64_with_c4_prefix_language_modeling'
 
                 

@@ -298,8 +298,34 @@ class ModelTrainer:
                 avg_f1_perc = total_f1 / len(self.val_dataloader.dataset)
         
         
-
-        if self.rank == 0:  # Only main process logs and handles model saving
+        if self.gpu_parallelization:
+            if self.rank == 0:  # Only main process logs and handles model saving
+                log_tensorboard(self.writer, avg_loss, epoch, 'Validation', eval_metric='loss')
+                log_tensorboard(self.writer, avg_em_perc, epoch, 'Validation', eval_metric='em')
+                log_tensorboard(self.writer, avg_f1_perc, epoch, 'Validation', eval_metric='f1')
+                print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
+            
+                soft_prompt_path = f"{self.model_dir}/knit5_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
+            
+                if avg_em_perc > self.best_em:
+                    if self.best_model_path and os.path.exists(self.best_model_path):
+                        os.remove(self.best_model_path)
+                        print(f"Removed previous best model at {self.best_model_path}")
+                    self.best_em = avg_em_perc
+                    self.early_stop_counter = 0
+                    self.best_model_path = soft_prompt_path
+                    torch.save({
+                        'model_state_dict': self.model.state_dict(),
+                        'optimizer_state_dict': self.optimizer.state_dict(),
+                        'epoch': epoch
+                    }, self.best_model_path)
+                else:
+                    self.early_stop_counter += 1
+                    print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
+                    if self.early_stop_counter >= self.patience:
+                        print("Early stopping triggered. Stopping training")
+                        return True
+        else:
             log_tensorboard(self.writer, avg_loss, epoch, 'Validation', eval_metric='loss')
             log_tensorboard(self.writer, avg_em_perc, epoch, 'Validation', eval_metric='em')
             log_tensorboard(self.writer, avg_f1_perc, epoch, 'Validation', eval_metric='f1')

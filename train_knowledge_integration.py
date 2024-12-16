@@ -13,6 +13,7 @@ import argparse
 from src.models import T5ModelWithAdditionalLayer
 import torch.distributed as dist
 
+config = Config()
 def _knowledge_integration_with_c4(dataset, rank, world_size):
 
     if dataset in ['2wikimultihop', 'wikimultihop']: 
@@ -36,7 +37,6 @@ def _knowledge_integration_with_c4(dataset, rank, world_size):
     ki_train = ki_dataset
 
     #Specify Hyperparameters via config file
-    config = Config()
     device = f'cuda:{rank}' if torch.cuda.is_available() else 'cpu'
     print(f"Process rank: {rank} using device: {device}")
     if dist.is_initialized():
@@ -129,8 +129,10 @@ if __name__ == '__main__':
     parser.add_argument('--c4', action='store_true', help='Include C4 dataset in training')
     parser.add_argument('remainder', type=str, nargs='?', default=None, help='Specify the remainder (e.g., metaqa, 2wikimultihop)')
     args = parser.parse_args()
-
-    if args.c4:
-        world_size = torch.cuda.device_count()
-        dataset = args.remainder  # Pass the dataset name
-        mp.spawn(train_ddp, args=(world_size, dataset), nprocs=world_size, join=True)
+    dataset = args.remainder  # Pass the dataset name
+    if config.single_hop_training.gpu_parallelization:
+        if args.c4:
+            world_size = torch.cuda.device_count()
+            mp.spawn(train_ddp, args=(world_size, dataset), nprocs=world_size, join=True)
+    else:
+        _knowledge_integration_with_c4(dataset=dataset, rank = None, world_size=None)
