@@ -33,10 +33,12 @@ class ModelTrainer:
                  validation_step : int = 1,
                  method : str = 'single_hop_training',
                  load_optimizer = True,
-                 gpu_parallelization = False):
+                 gpu_parallelization = False,
+                 rank = 1):
         self.device = device
         self.model = model.to(device)
         self.gpu_parallelization = gpu_parallelization
+        self.rank = rank
         if gpu_parallelization:
             self.model = DDP(self.model, device_ids=[self.device])
         self.tokenizer = tokenizer
@@ -167,14 +169,14 @@ class ModelTrainer:
                     dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
                     global_loss = loss_tensor.item() / dist.get_world_size()
 
-                    
-                    # Log only from rank 0
-                    if batch_idx % 2 == 0:
-                        total_single_hop_loss += global_loss
-                        log_tensorboard(self.writer, global_loss, epoch*len_trainloader + batch_idx//2, 'Training/SingleHop', eval_metric='loss')
-                    else:
-                        total_c4_loss += global_loss
-                        log_tensorboard(self.writer, global_loss, epoch*len_trainloader + batch_idx//2, 'Training/C4', eval_metric='loss')
+                    if self.rank == 0:
+                        # Log only from rank 0
+                        if batch_idx % 2 == 0:
+                            total_single_hop_loss += global_loss
+                            log_tensorboard(self.writer, global_loss, epoch*len_trainloader + batch_idx//2, 'Training/SingleHop', eval_metric='loss')
+                        else:
+                            total_c4_loss += global_loss
+                            log_tensorboard(self.writer, global_loss, epoch*len_trainloader + batch_idx//2, 'Training/C4', eval_metric='loss')
                 else:
                     if batch_idx % 2 == 0:
                         total_single_hop_loss += loss.item()
@@ -186,10 +188,12 @@ class ModelTrainer:
                 progress_bar.set_description(f"Epoch {epoch} - Training - {self.method} - Loss: {loss.item():.4f}")
                 
                 
-                vram_allocated = torch.cuda.memory_allocated(self.device) / (1024 ** 2)  # Convert to MB
-                vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
-                self.writer.add_scalar('VRAM/Training/Allocated', vram_allocated, epoch*len_trainloader + batch_idx)
-                self.writer.add_scalar('VRAM/Training/Reserved', vram_reserved, epoch*len_trainloader + batch_idx)
+                if self.rank == 0:
+                    vram_allocated = torch.cuda.memory_allocated(self.device) / (1024 ** 2)
+                    vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)
+                    self.writer.add_scalar('VRAM/Training/Allocated', vram_allocated, epoch * len_trainloader + batch_idx)
+                    self.writer.add_scalar('VRAM/Training/Reserved', vram_reserved, epoch * len_trainloader + batch_idx)
+
 
             avg_single_hop_loss = total_single_hop_loss / len_trainloader
             avg_c4_loss = total_c4_loss / len_trainloader
@@ -288,43 +292,56 @@ class ModelTrainer:
 
                 
                 # Log only aggregated metrics from the main process
-                log_tensorboard(self.writer, avg_loss, epoch, 'Validation', eval_metric='loss')
-                log_tensorboard(self.writer, avg_em_perc, epoch, 'Validation', eval_metric='em')
-                log_tensorboard(self.writer, avg_f1_perc, epoch, 'Validation', eval_metric='f1')
-                print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
             else:
                 avg_loss = total_loss / len(self.val_dataloader)
                 avg_em_perc = total_em / len(self.val_dataloader.dataset)
                 avg_f1_perc = total_f1 / len(self.val_dataloader.dataset)
-                log_tensorboard(self.writer, avg_loss, epoch, 'Validation', eval_metric='loss')
-                log_tensorboard(self.writer, avg_em_perc, epoch, 'Validation', eval_metric='em')
-                log_tensorboard(self.writer, avg_f1_perc, epoch, 'Validation', eval_metric='f1')
-                print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
-        soft_prompt_path = f"{self.model_dir}/knit5_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
         
         
 
-        # if avg_em_perc >= 0.85 or epoch >= 15:
-        #     torch.save({
-        #         'model_state_dict': self.model.state_dict(),
-        #         'optimizer_state_dict': self.optimizer.state_dict(),
-        #         'epoch': epoch}, soft_prompt_path)
-        if avg_em_perc > self.best_em:
-            if self.best_model_path:
-                os.remove(self.best_model_path)
-            self.best_em = avg_em_perc
-            self.early_stop_counter = 0
-            self.best_model_path = soft_prompt_path
-            torch.save({
-                'model_state_dict': self.model.state_dict(),
-                'optimizer_state_dict': self.optimizer.state_dict(),
-                'epoch': epoch}, soft_prompt_path)
-        else:
-            self.early_stop_counter += 1
-            print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
-            if self.early_stop_counter >= self.patience:
-                print("Early stopping trigered. Stopping training")
-                return True
+        if self.rank == 0:  # Only main process logs and handles model saving
+            log_tensorboard(self.writer, avg_loss, epoch, 'Validation', eval_metric='loss')
+            log_tensorboard(self.writer, avg_em_perc, epoch, 'Validation', eval_metric='em')
+            log_tensorboard(self.writer, avg_f1_perc, epoch, 'Validation', eval_metric='f1')
+            print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
+        
+            soft_prompt_path = f"{self.model_dir}/knit5_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
+        
+            if avg_em_perc > self.best_em:
+                if self.best_model_path and os.path.exists(self.best_model_path):
+                    os.remove(self.best_model_path)
+                    print(f"Removed previous best model at {self.best_model_path}")
+                self.best_em = avg_em_perc
+                self.early_stop_counter = 0
+                self.best_model_path = soft_prompt_path
+                torch.save({
+                    'model_state_dict': self.model.state_dict(),
+                    'optimizer_state_dict': self.optimizer.state_dict(),
+                    'epoch': epoch
+                }, self.best_model_path)
+            else:
+                self.early_stop_counter += 1
+                print(f"Early stopping counter: {self.early_stop_counter} / {self.patience}")
+                if self.early_stop_counter >= self.patience:
+                    print("Early stopping triggered. Stopping training")
+                    return True
+                
+        # Optionally, synchronize the early_stop_counter and best_em across all processes
+        if self.gpu_parallelization:
+            # Broadcast best_em and early_stop_counter from rank 0 to all processes
+            if self.rank == 0:
+                best_em_tensor = torch.tensor([self.best_em], device=self.device)
+                early_stop_tensor = torch.tensor([self.early_stop_counter], device=self.device)
+            else:
+                best_em_tensor = torch.tensor([0.0], device=self.device)
+                early_stop_tensor = torch.tensor([0], device=self.device)
+            
+            dist.broadcast(best_em_tensor, src=0)
+            dist.broadcast(early_stop_tensor, src=0)
+            
+            if self.rank != 0:
+                self.best_em = best_em_tensor.item()
+                self.early_stop_counter = early_stop_tensor.item()
         return False
 
    
