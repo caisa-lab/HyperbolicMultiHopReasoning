@@ -100,6 +100,17 @@ import os
 
 # Mapping from (source_type, target_type) to knowledge graph relations
 # '_reversed' indicates traversal in the reverse direction (from target to source)
+import networkx as nx
+import re
+import pandas as pd
+from collections import Counter
+import itertools
+from tqdm import tqdm
+import ast
+import os
+
+# Mapping from (source_type, target_type) to knowledge graph relations
+# '_reversed' indicates traversal in the reverse direction (from target to source)
 TRANSITION_TO_RELATION = {
     ('movie', 'language'): 'in_language',
     ('movie', 'year'): 'release_year',
@@ -225,30 +236,43 @@ def find_paths_with_relations(G, start, end, relation_path, debug=False):
         if debug:
             print(f"  Next relation to traverse: '{next_relation}'")
 
-        # Determine if the relation needs to be traversed in reverse
-        if next_relation.endswith('_reversed'):
-            actual_relation = next_relation.replace('_reversed', '')
-            traverse_direction = 'incoming'
-        else:
-            actual_relation = next_relation
-            traverse_direction = 'outgoing'
+
+        actual_relation = next_relation
 
         # Traverse based on direction
-        if traverse_direction == 'incoming':
-            neighbors = G.predecessors(current_node)
-        else:
-            neighbors = G.successors(current_node)
+        neighbors = G.successors(current_node)
 
         for neighbor in neighbors:
-            # Depending on direction, get the edge data
-            if traverse_direction == 'incoming':
-                if G.has_edge(neighbor, current_node):
-                    edge_attrs = G.get_edge_data(neighbor, current_node)
+            if G.has_edge(current_node, neighbor):
+                edge_attrs = G.get_edge_data(current_node, neighbor)
+                
+                # If current_node is the same as neighbor, add reversed edge attributes
+                if current_node == neighbor:
+                    reversed_edge_attrs = {}
+                    for key, attrs in edge_attrs.items():
+                        # Create a new key with '_reversed' appended
+                        new_key = f"{key}_reversed"
+                        
+                        # Create a new attributes dictionary with 'relation' modified
+                        new_attrs = {}
+                        for attr_key, attr_value in attrs.items():
+                            if attr_key == 'relation' and isinstance(attr_value, str):
+                                new_attrs[attr_key] = f"{attr_value}_reversed"
+                            else:
+                                new_attrs[attr_key] = attr_value  # Keep other attributes unchanged
+                        
+                        # Add the modified key and attributes to the reversed_edge_attrs dictionary
+                        reversed_edge_attrs[new_key] = new_attrs
+                    
+                    # Merge the reversed_edge_attrs into the original edge_attrs
+                    edge_attrs.update(reversed_edge_attrs)
+                
+                # Debugging output
+                if debug:
+                    print(f"edge_attrs = {edge_attrs}")
+                    print(f"actual_relation = {actual_relation}")
             else:
-                if G.has_edge(current_node, neighbor):
-                    edge_attrs = G.get_edge_data(current_node, neighbor)
-                else:
-                    continue  # No such edge
+                continue  # No such edge
 
             if G.is_multigraph():
                 # Check if any edge has the required relation
@@ -273,44 +297,11 @@ def find_paths_with_relations(G, start, end, relation_path, debug=False):
                             if debug:
                                 print(f"  Extending path: {current_path_extended}")
                                 
-                            # Validate the triplet with the adjusted relation
-                            if traverse_direction == 'incoming':
-                                # For incoming, triplet is (neighbor, relation, current_node)
-                                if validate_triplet(G, neighbor, adjusted_relation, current_node, debug=debug):
-                                    stack.append((neighbor, current_path_extended, relations_left[1:].copy()))
-                            else:
-                                # For outgoing, triplet is (current_node, relation, neighbor)
-                                if validate_triplet(G, current_node, adjusted_relation, neighbor, debug=debug):
-                                    stack.append((neighbor, current_path_extended, relations_left[1:].copy()))
+                            # For incoming, triplet is (neighbor, relation, current_node)
+                            if validate_triplet(G, current_node, adjusted_relation, neighbor, debug=debug):
+                                stack.append((neighbor, current_path_extended, relations_left[1:].copy()))
+
                             break  # Only need to find one matching edge
-            else:
-                # For single graphs
-                rel_attr = edge_attrs.get('relation', '').strip().lower()
-                if rel_attr == actual_relation.lower():
-                    if debug:
-                        print(f"  Current Node: '{current_node}', Neighbor: '{neighbor}', Relation: '{next_relation}'")
-                        
-                    # Handle self-loop: if current_node == neighbor and relation is reversed, use forward relation
-                    if current_node == neighbor and next_relation.endswith('_reversed'):
-                        adjusted_relation = actual_relation
-                        #print(f"  Adjusting relation for self-loop from '{next_relation}' to '{adjusted_relation}'")
-                    else:
-                        adjusted_relation = rel_attr
-
-                    # Append relation and neighbor
-                    current_path_extended = current_path.copy()
-                    current_path_extended.append(adjusted_relation)
-                    current_path_extended.append(neighbor)
-                    if debug:
-                        print(f"  Extending path: {current_path_extended}")
-
-                    # Validate the triplet
-                    if traverse_direction == 'incoming':
-                        if validate_triplet(G, neighbor, adjusted_relation, current_node, debug=debug):
-                            stack.append((neighbor, current_path_extended, relations_left[1:].copy()))
-                    else:
-                        if validate_triplet(G, current_node, adjusted_relation, neighbor, debug=debug):
-                            stack.append((neighbor, current_path_extended, relations_left[1:].copy()))
 
     return paths_rel
 
