@@ -56,9 +56,18 @@ def setup_directories(trainer_config : BaseTrainingConfig, t5_config):
 def load_model_checkpoint(model : nn.Module,
                           checkpoint_path,
                           device = 'cuda' if torch.cuda.is_available() else 'cpu',
-                          with_model_state_dict = True
+                          with_model_state_dict = True,
+                          gpu_parallelization = False
                           ):
     checkpoint = torch.load(checkpoint_path, map_location=device)
+    if gpu_parallelization:
+        new_checkpoint = {k.replace('module.', ''): v for k, v in checkpoint['model_state_dict'].items()}
+        missing, unexpected = model.load_state_dict(new_checkpoint, strict=False)
+        
+        print(f"{missing = }")
+        print(f"{unexpected = }")
+        print(f"Loaded checkpoint from {checkpoint_path}")
+        return model
     if with_model_state_dict:
         missing, unexpected = model.load_state_dict(checkpoint['model_state_dict'], strict=False)
     else:

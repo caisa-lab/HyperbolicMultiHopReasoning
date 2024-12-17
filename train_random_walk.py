@@ -48,19 +48,10 @@ def _train_random_walk(hyperbolic : bool, dataset : str, rank, world_size):
 
 
     #Specify Hyperparameters via config file
-    device = f'cuda:{rank}' if torch.cuda.is_available() else 'cpu'
-    print(f"Process rank: {rank} using device: {device}")
-    if dist.is_initialized():
-        print(f"Rank: {dist.get_rank()} / World size: {dist.get_world_size()}")
-
-    if config.random_walk_training.gpu_parallelization:
-        from torch.utils.data import DistributedSampler
-
-        random_walk_sampler_train = DistributedSampler(random_walk_train, num_replicas=world_size, rank=rank)
-        random_walk_sampler_dev = DistributedSampler(random_walk_dev, num_replicas=world_size, rank=rank)
-
-        random_walk_dataloader_train = DataLoader(random_walk_train, sampler=random_walk_sampler_train, batch_size=config.t5_model.batch_size, shuffle=True, num_workers=config.random_walk_training.num_workers)
-        random_walk_dataloader_dev = DataLoader(random_walk_dev,  sampler=random_walk_sampler_dev, batch_size=config.t5_model.batch_size, shuffle=False, num_workers=config.random_walk_training.num_workers)
+    config = Config()
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    random_walk_dataloader_train = DataLoader(random_walk_train, batch_size=config.t5_model.batch_size, shuffle=True, num_workers=config.random_walk_training.num_workers)
+    random_walk_dataloader_dev = DataLoader(random_walk_dev,  batch_size=config.t5_model.batch_size, shuffle=False, num_workers=config.random_walk_training.num_workers)
     print(f'Training on device: {device}')
     #google/t5-large-lm-adapt
     model_name = config.t5_model.model_name
@@ -79,11 +70,11 @@ def _train_random_walk(hyperbolic : bool, dataset : str, rank, world_size):
         soft_prompt = None
     
     if hyperbolic:
-        hyperbolic_knit5_model = T5ModelWithAdditionalLayer(layer_type='identity', curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=config.random_walk_training.model_checkpoint_path, with_model_state_dict=True)
-        model = SoftPromptModel(curvature=config.random_walk_training.curvature, knit5=hyperbolic_knit5_model, knit5_checkpoint_path=config.random_walk_training.model_checkpoint_path, model_name='hyperbolic_hopping_prompt', soft_prompt=soft_prompt, with_model_state_dict=False)
+        hyperbolic_knit5_model = T5ModelWithAdditionalLayer(layer_type='identity', curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=config.random_walk_training.model_checkpoint_path, with_model_state_dict=True, gpu_parallelization=True)
+        model = SoftPromptModel(curvature=config.random_walk_training.curvature, knit5=hyperbolic_knit5_model, knit5_checkpoint_path=config.random_walk_training.model_checkpoint_path, model_name='hyperbolic_hopping_prompt', soft_prompt=soft_prompt, with_model_state_dict=True, gpu_parallelization=True)
         print(f"Train with hyperbolic Soft Prompt Model with curvature {config.random_walk_training.curvature}")
     else:
-        model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt', with_model_state_dict=False, soft_prompt=soft_prompt, curvature = config.random_walk_training.curvature)
+        model = SoftPromptModel(knit5_model, config.random_walk_training.model_checkpoint_path, 'hopping_prompt', with_model_state_dict=True, soft_prompt=soft_prompt, curvature = config.random_walk_training.curvature)
 
     print("Model type before passing to SoftPromptTrainer:", type(model))
 
@@ -96,6 +87,7 @@ def _train_random_walk(hyperbolic : bool, dataset : str, rank, world_size):
                       method='random_walk_training',
                       checkpoint_path=config.random_walk_training.hopping_prompt_checkpoint_path,
                       tboard_checkpoint_path=config.random_walk_training.tboard_checkpoint_path,
+                      retrain = False
                       retrain = True,
                       gpu_parallelization=config.single_hop_training.gpu_parallelization,
                       rank = rank
@@ -113,30 +105,14 @@ def _train_random_walk(hyperbolic : bool, dataset : str, rank, world_size):
 
     trainer.train(epochs=config.random_walk_training.epochs)  
     
-import torch.distributed as dist
-import torch.multiprocessing as mp
-import os
-def setup_ddp(rank, world_size):
-    dist.init_process_group(
-        backend="nccl",
-        init_method='env://',
-        world_size=world_size,
-        rank=rank
-    )
-    torch.cuda.set_device(rank)
 
-def train_ddp(rank, world_size, dataset, hyperbolic):
-    setup_ddp(rank, world_size)
-    _train_random_walk(hyperbolic=hyperbolic, dataset=dataset, rank=rank, world_size=world_size)  # Call your training method
-    dist.destroy_process_group()
 
 if __name__ == '__main__':    
     
     parser = argparse.ArgumentParser(description='Random Walk Training Training')
     parser.add_argument('--hyperbolic', action='store_true', help='Train with hyperbolic representation')
+    parser.add_argument('remainder', type=str, nargs='?', default=None, help='Specify the remainder (e.g., metaqa, 2wikimultihop)')
     args = parser.parse_args()
-
-    world_size = torch.cuda.device_count()
     dataset = args.remainder  # Pass the dataset name
-    hyperbolic = args.hyperbolic
-    mp.spawn(train_ddp, args=(world_size, dataset, hyperbolic), nprocs=world_size, join=True)
+
+    _train_random_walk(hyperbolic = args.hyperbolic, dataset=dataset)
