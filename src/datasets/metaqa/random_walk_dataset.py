@@ -12,25 +12,13 @@ class RandomWalkMetaQADataset(Dataset):
 
     Each sample consists of:
     - Incomplete Path: "entity1 ; relation1 ; relation2"
-    - Complete Paths: 
-        - If `all_paths=True`: "entity1 ; relation1 ; entity2 ; relation2 ; entity3_1 | entity1 ; relation1 ; entity2 ; relation2 ; entity3_2 | ..."
-        - If `all_paths=False`: "entity1 ; relation1 ; entity2 ; relation2 ; entity3"
-
+    - Complete Paths: "entity1 ; relation1 ; entity2 ; relation2 ; entity3_1 | entity1 ; relation1 ; entity2 ; relation2 ; entity3_2 | ..."
+    
     Ensures that for all complete paths, entity1 != entity3.
-
-    Parameters:
-    - all_kg (networkx.MultiDiGraph): The knowledge graph.
-    - validation_dataframe (DataFrame): DataFrame containing validation walks.
-    - test_dataframe (DataFrame): DataFrame containing test walks.
-    - steps (int): Number of steps (not directly used).
-    - type (str): One of 'train', 'dev', 'test' to specify the dataset split.
-    - all_paths (bool): If True, include all possible completions for each incomplete path.
-                        If False, include only one completion per incomplete path.
     """
-    def __init__(self, all_kg, validation_dataframe, test_dataframe, steps, type='train', all_paths=False):
+    def __init__(self, all_kg, validation_dataframe, test_dataframe, steps, type='train', all_paths = False):
         self.kg: networkx.MultiDiGraph = all_kg
         self.steps = steps  # Not directly used, but retained for compatibility
-        self.all_paths = all_paths  # Store the all_paths flag
 
         if type not in ['train', 'dev', 'test']:
             raise ValueError(f"Unknown type: {type}. Supported Types are ['train', 'dev', 'test']") 
@@ -56,6 +44,18 @@ class RandomWalkMetaQADataset(Dataset):
 
         # Organize walks into incomplete and complete paths
         self.data = self._organize_walks(walks)
+
+        cleaned_data = []
+        if not all_paths:
+            for incomplete, complete in self.data:
+                splitted_complete = complete.split('|')
+                if len(splitted_complete) > 1:
+                    continue
+                cleaned_data.append((incomplete, complete))
+        print(f"Left with {len(cleaned_data)} / {len(self.data)} Single Answer Walks")
+
+        self.data = cleaned_data
+
         
     def _get_walks(self, dataset):
         """
@@ -105,7 +105,7 @@ class RandomWalkMetaQADataset(Dataset):
             current_node = next_node
         return path
     
-    def _generate_random_walks(self, num_walks_per_node=50, walk_length=3, num_iterations=5):
+    def _generate_random_walks(self, num_walks_per_node=20, walk_length=3, num_iterations=5):
         """
         Generate a set of unique random walks.
 
@@ -133,12 +133,10 @@ class RandomWalkMetaQADataset(Dataset):
         Organize walks into a dictionary where each key is an incomplete path
         and the value is a list of possible complete paths.
 
-        Incomplete Path: "e1 ; r1 ; r2"
-        Complete Paths: 
-            - If `all_paths=True`: "e1 ; r1 ; e2 ; r2 ; e3_1 | e1 ; r1 ; e2 ; r2 ; e3_2 | ..."
-            - If `all_paths=False`: "e1 ; r1 ; e2 ; r2 ; e3"
+        Incomplete Path: "entity1 ; relation1 ; relation2"
+        Complete Paths: "entity1 ; relation1 ; entity2 ; relation2 ; entity3"
 
-        Ensures that e1 != e3.
+        Ensures that entity1 != entity3.
 
         Parameters:
         - walks (List[Tuple]): List of walks as tuples.
@@ -163,16 +161,10 @@ class RandomWalkMetaQADataset(Dataset):
         # Convert to list of tuples (incomplete, completions)
         data = []
         for incomplete, completions in incomplete_to_completions.items():
-            if self.all_paths:
-                # Sort completions for consistency
-                sorted_completions = sorted(completions)
-                # Join completions with '|'
-                completions_joined = " | ".join(sorted_completions)
-            else:
-                # Randomly select one completion
-                completions_list = list(completions)
-                selected_completion = random.choice(completions_list)
-                completions_joined = selected_completion
+            # Sort completions for consistency
+            sorted_completions = sorted(completions)
+            # Join completions with '|'
+            completions_joined = " | ".join(sorted_completions)
             data.append((incomplete, completions_joined))
         
         return data
