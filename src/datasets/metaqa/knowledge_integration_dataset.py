@@ -5,14 +5,12 @@ class KnowledgeIntegrationMetaQADataset(Dataset):
     """
     Takes in a Graph with all entities and relations
     """
-    def __init__(self, kg : nx.MultiGraph, undirected = False):
+    def __init__(self, kg : nx.MultiGraph):
         self.data = []
 
         for u, v, data in kg.edges(data = True):
             rel = data.get('relation', 'unknown_relation')
             self.data.append((f"{u} ; {rel}", f"{v}"))
-            if undirected:
-                self.data.append((f"{v} ; {rel}", f"{u}"))
         
     def __len__(self):
         return len(self.data)

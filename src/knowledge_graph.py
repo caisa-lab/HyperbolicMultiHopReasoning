@@ -10,23 +10,30 @@ from tqdm import tqdm
 #But in the Graph it is:
 # Film --> directed by --> Yuriy Norshteyn
 # Film --> written_by --> Sergei Kozlov
-def create_knowledge_graph_metaqa(data : pd.DataFrame, iterations = 0):
+def create_knowledge_graph_metaqa(data : pd.DataFrame, iterations = 0, from_kb = True, max_answers = None):
     index = 0
     G = nx.MultiDiGraph()
-    for idx, row in tqdm(data.iterrows(), desc="Creating Knowledge Graph...", total=len(data) if iterations == 0 else iterations):
-        if index > iterations:
-            return G
-        head = row['entity1'].strip().lower()
-        relation = row['relation'].strip().lower()
-        tail = row['entitiy2'].strip().lower()
-        if relation == "has_tags":
-            continue
-        G.add_edge(head, tail, key=relation, relation=relation)
-        if head != tail:
-            G.add_edge(tail, head, key=f"{relation}_reversed", relation=f"{relation}_reversed")
-
-        if iterations > 0:
-            index += 1
+    if from_kb:
+        for idx, row in tqdm(data.iterrows(), desc="Creating Knowledge Graph...", total=len(data) if iterations == 0 else iterations):
+            if index > iterations:
+                return G
+            head = row['entity1'].strip().lower()
+            relation = row['relation'].strip().lower()
+            tail = row['entity2'].strip().lower()
+            if relation == "has_tags":
+                continue
+            G.add_edge(head, tail, key=relation, relation=relation)
+            if head != tail:
+                G.add_edge(tail, head, key=f"{relation}_reversed", relation=f"{relation}_reversed")
+            if iterations > 0:
+                index += 1
+    else:
+        for evidences_list in tqdm(data['evidences']):
+            if max_answers is None or len(evidences_list) <= max_answers:
+                for evidence in evidences_list:
+                    entity1, relation1, entity2, relation2, entity3 = evidence
+                    G.add_edge(entity1, entity2, key=relation1, relation=relation1)
+                    G.add_edge(entity2, entity3, key=relation2, relation=relation2)
             
     return G
 def create_knowledge_graph_wikimultihop(data, iterations = 0):

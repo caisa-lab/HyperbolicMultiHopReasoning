@@ -16,7 +16,7 @@ class RandomWalkMetaQADataset(Dataset):
     
     Ensures that for all complete paths, entity1 != entity3.
     """
-    def __init__(self, all_kg, validation_dataframe, test_dataframe, steps, type='train', all_paths = False):
+    def __init__(self, all_kg, validation_dataframe, test_dataframe, steps, type='train', max_answers = False):
         self.kg: networkx.MultiDiGraph = all_kg
         self.steps = steps  # Not directly used, but retained for compatibility
 
@@ -44,17 +44,16 @@ class RandomWalkMetaQADataset(Dataset):
 
         # Organize walks into incomplete and complete paths
         self.data = self._organize_walks(walks)
-
         cleaned_data = []
-        if not all_paths:
-            for incomplete, complete in self.data:
-                splitted_complete = complete.split('|')
-                if len(splitted_complete) > 1:
-                    continue
-                cleaned_data.append((incomplete, complete))
-        print(f"Left with {len(cleaned_data)} / {len(self.data)} Single Answer Walks")
+        for incomplete, complete in self.data:
+            splitted_complete = complete.split('|')
+            if len(splitted_complete) > max_answers:
+                continue
+            cleaned_data.append((incomplete, complete))
+        print(f"Left with {len(cleaned_data)} / {len(self.data)} Walks of lengths {max_answers}")
 
         self.data = cleaned_data
+
 
         
     def _get_walks(self, dataset):
