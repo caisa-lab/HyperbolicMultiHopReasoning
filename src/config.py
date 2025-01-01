@@ -38,10 +38,13 @@ class Config:
                              model_save_path='checkpoints/metaqa/knowledge_integration',
                              model_checkpoint_path= None,
                              tboard_checkpoint_path=None,
+                             scheduler=None,
                              num_workers=16,
-                             curvature=1.0,
-                             gpu_parallelization=False)
-            self.additional_log_info=f'euclidean_t5_large_batch_size64_with_c4_prefix_language_modeling'
+                             curvature=log(exp(0.36) - 1),
+                             gpu_parallelization=True,
+                             learning_rate=0.001,
+                             epochs=40)
+            self.additional_log_info=f'knowledge_integration_bsize64_lr0.001_max_answers_5'
 
                 
     class OneHopWikiTraining(BaseTrainingConfig):
@@ -56,29 +59,31 @@ class Config:
     class RandomWalkTraining(BaseTrainingConfig):
         def __init__(self):
             super().__init__(learning_rate=0.3,
-                             epochs=35,
+                             epochs=75,
                              log_dir='tboard_logs/metaqa/random_walk_training/euclidean',
-                             model_save_path='checkpoints/metaqa/random_walk_training/euclidean',
-                             model_checkpoint_path= 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth', #'checkpoints/knowledge_integration/large_adapt_bsize64_c4_hyperbolic_after_decoder/knit5_epoch_10_val_loss_0.0217.pth'
+                             model_save_path='checkpoints/metaqa/random_walk_training/euclidean', #Dec27_09-23-05_AdaFactor_0.001_-0.8362570675638017_knowledge_integration_bsize64_lr0.001_scheduler_only_single_answer_kb_hyperbolic/knit5.pth #Dec26_14-35-36_AdaFactor_0.001_-0.8362570675638017_knowledge_integration_bsize64_lr0.001_scheduler_only_single_answer_kb/knit5.pth
+                             model_checkpoint_path= 'checkpoints/metaqa/knowledge_integration/Dec30_18-41-01_AdaFactor_0.001_-0.8362570675638017_knowledge_integration_bsize64_lr0.001_max_answers_3/knit5.pth', 
                              tboard_checkpoint_path=None,
                              num_workers=16,
                              optimizer='AdaFactor',
-                             curvature=log(exp(0.5) - 1)
+                             curvature=log(exp(0.36) - 1),
+                             gpu_parallelization=True
                              )
             self.prompt_length = 100
-            self.additional_log_info=f'euclidean_linear_layer_after_encoder'
+            self.additional_log_info=f'linear_after_encoder_bsize32_prompt_lenght100_lr{self.learning_rate}_additional_layer_lr0.001_max_answer_3'
             self.hopping_prompt_checkpoint_path = None
 
     class ParseThenHopTraining(BaseTrainingConfig):
         def __init__(self):
-            super().__init__(learning_rate=0.3,
+            super().__init__(learning_rate=0.8,
                              epochs=250,
                              log_dir='tboard_logs/metaqa/parse_training/',
                              model_save_path='checkpoints/metaqa/parse_training/',
                              model_checkpoint_path= 'checkpoints/musique_dataset/knowledge_integration/euclidean_gt_not_replaced/knit5_epoch_28_val_loss_0.0045.pth',
                              tboard_checkpoint_path=None,
                              num_workers=16,
-                             curvature=log(exp(1.0) - 1)
+                             curvature=log(exp(1.0) - 1),
+                             gpu_parallelization=True
                              )
             self.prompt_length = 100
             self.additional_log_info=f'parse_training_gt_not_replaced_euclidean_linear_layer_lr{self.learning_rate}_bsize16'
@@ -88,9 +93,9 @@ class Config:
                 
     class T5_Model:
         def __init__(self):
-            self.batch_size = 64
+            self.batch_size = 32
             self.model_name = "google/t5-large-lm-adapt"            
-            self.tokenizer_max_length = 115
+            self.tokenizer_max_length = 512
             self.map_encoder_layers = []
             self.map_decoder_layers = []
 

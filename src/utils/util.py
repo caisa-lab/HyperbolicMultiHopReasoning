@@ -196,7 +196,16 @@ def count_learnable_parameters(model: nn.Module):
     """
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     return total_params
-
+import numpy as np
+import random
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    # Ensures deterministic behavior (may impact performance)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 ##---------------------hyperbolic operations ----------------------- CODE TAKEN FROM https://github.com/HazyResearch/KGEmb/blob/master/utils/hyperbolic.py
 import torch
 import torch.nn.functional as F

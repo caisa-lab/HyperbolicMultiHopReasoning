@@ -14,7 +14,7 @@ from src.models import T5ModelWithAdditionalLayer
 import torch.distributed as dist
 
 config = Config()
-def _knowledge_integration_with_c4(dataset, rank, world_size):
+def _knowledge_integration_with_c4(dataset, rank = 0, world_size = 0):
 
     if dataset in ['2wikimultihop', 'wikimultihop']: 
         print("Training on 2WikiMultiHopQA")
@@ -28,8 +28,15 @@ def _knowledge_integration_with_c4(dataset, rank, world_size):
 
     elif dataset in ['metaqa']:
         print("Training on MetaQA")
-        metaqa_kg_data = pd.read_csv('dataset/metaqa/kb.txt', sep="|")
-        kg = create_knowledge_graph_metaqa(metaqa_kg_data)
+        #metaqa_kg_data = pd.read_csv('dataset/metaqa/kb.txt', sep="|")
+
+        #Comment Out if we want to use the whole kb. This used only the kb for questions with a single answer
+        df_dev = pd.read_json("dataset/metaqa/2hops/qa_dev_evidences.json")
+        df_train = pd.read_json("dataset/metaqa/2hops/qa_train_evidences.json")
+        df_test = pd.read_json("dataset/metaqa/2hops/qa_test_evidences.json")
+
+        df_kg = pd.concat([df_dev, df_train, df_test])
+        kg = create_knowledge_graph_metaqa(df_kg, from_kb=False, max_answers=5)
 
         ki_dataset = KnowledgeIntegrationMetaQADataset(kg)
 
@@ -46,13 +53,14 @@ def _knowledge_integration_with_c4(dataset, rank, world_size):
     #google/t5-large-lm-adapt
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(config.t5_model.model_name)
+    tokenizer.model_max_length = config.t5_model.tokenizer_max_length
     print(f"Loading Model {config.t5_model.model_name}...")
     #Adjust Dropout
    
    
-    model = AutoModelForSeq2SeqLM.from_pretrained(config.t5_model.model_name)
     print(f"Train Euclidean T5 Model")
-        
+    additional_layer = "identity"
+    model = T5ModelWithAdditionalLayer(layer_type=additional_layer, curvature=config.single_hop_training.curvature, checkpoint_hyperbolic_knit5=config.single_hop_training.model_checkpoint_path, with_model_state_dict=True, gpu_parallelization=True)
     model.config.dropout_rate = 0.1
     model.config.hidden_dropout_prob = 0.1
     model.config.attention_probs_dropout_prob = 0.1
@@ -68,9 +76,9 @@ def _knowledge_integration_with_c4(dataset, rank, world_size):
         from torch.utils.data import DistributedSampler
 
         # Create DistributedSampler for each dataset
-        ki_train_sampler = DistributedSampler(ki_train, num_replicas=world_size, rank=rank)
-        c4_sampler = DistributedSampler(c4_train, num_replicas=world_size, rank=rank)
-        ki_dev_sampler = DistributedSampler(ki_train, num_replicas=world_size, rank=rank)
+        ki_train_sampler = DistributedSampler(ki_train, shuffle=True, num_replicas=world_size, rank=rank)
+        c4_sampler = DistributedSampler(c4_train,  shuffle=True, num_replicas=world_size, rank=rank)
+        ki_dev_sampler = DistributedSampler(ki_train, shuffle=False, num_replicas=world_size, rank=rank)
 
         # Create DataLoaders using these samplers
         single_hop_dataloader_train = DataLoader(ki_train, sampler=ki_train_sampler, batch_size=config.t5_model.batch_size)
@@ -109,7 +117,7 @@ def _knowledge_integration_with_c4(dataset, rank, world_size):
 
 import torch.distributed as dist
 import torch.multiprocessing as mp
-import os
+from src.utils.util import set_seed
 def setup_ddp(rank, world_size):
     dist.init_process_group(
         backend="nccl",
@@ -118,6 +126,8 @@ def setup_ddp(rank, world_size):
         rank=rank
     )
     torch.cuda.set_device(rank)
+    set_seed(42)
+    
 
 def train_ddp(rank, world_size, dataset):
     setup_ddp(rank, world_size)
@@ -135,4 +145,4 @@ if __name__ == '__main__':
             world_size = torch.cuda.device_count()
             mp.spawn(train_ddp, args=(world_size, dataset), nprocs=world_size, join=True)
     else:
-        _knowledge_integration_with_c4(dataset=dataset, rank = None, world_size=None)
+        _knowledge_integration_with_c4(dataset=dataset)
