@@ -20,7 +20,7 @@ class C4Dataset(Dataset):
         self.corruption_rate = corruption_rate
         self.average_length_of_spans = average_length_of_spans
         self.objective = objective
-        self.dataset = self._cleanup_dataset(list_of_texts)
+        self.dataset = list_of_texts#self._cleanup_dataset(list_of_texts)
 
         
         
@@ -125,7 +125,8 @@ class C4Dataset(Dataset):
         target_sequence = self.tokenizer.convert_tokens_to_string(target_tokens)
         
         return input_sequence, target_sequence, input_tokens, target_tokens
-    def _prefix_language_modeling(self, text):
+    def _prefix_language_modeling(self, text, seed=42):
+        random.seed(seed)
         tokens = self.tokenizer.tokenize(text)
         split_point = random.randint(1, len(tokens)-1)
         input_tokens = tokens[:split_point]
