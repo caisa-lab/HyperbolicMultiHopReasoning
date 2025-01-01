@@ -7,7 +7,7 @@ import pandas as pd
 from torch.utils.data import Dataset
 
 class ParseMetaQADataset(Dataset):
-    def __init__(self, dataframe: pd.DataFrame):
+    def __init__(self, dataframe: pd.DataFrame, max_answers : int = 3):
         """
         Initializes the dataset with the provided DataFrame.
 
@@ -22,6 +22,12 @@ class ParseMetaQADataset(Dataset):
         
         # Select only the required columns and reset index
         self.dataset = dataframe[['question', 'evidences']].reset_index(drop=True)
+        self.dataset = self.dataset[self.dataset['evidences'].apply(lambda x : len(x) <= max_answers)]
+
+        for evidence_list in self.dataset['evidences']:
+            if len(evidence_list) > max_answers:
+                print(f"Found List with more than {max_answers} evidences: {evidence_list}")
+        print(f"No Evidence List found with more than {max_answers}")
 
     def __len__(self):
         """
@@ -66,10 +72,13 @@ class ParseMetaQADataset(Dataset):
         return incomplete_path
 
 
+
+
     
 class ParseThenHopMusiqueDataset(Dataset):
-    def __init__(self, dataframe : pd.DataFrame):
+    def __init__(self, dataframe : pd.DataFrame, max_answers : int = 3):
         self.dataset = dataframe[['question', 'evidences']]
+        self.dataset = self.dataset[self.dataset['evidences'].apply(lambda x : len(x) <= max_answers)]
         
     def __len__(self):
         return len(self.dataset)
