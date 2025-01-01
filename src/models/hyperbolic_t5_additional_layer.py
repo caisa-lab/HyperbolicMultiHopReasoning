@@ -23,7 +23,9 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
                  model_name : str = 'google/t5-large-lm-adapt',
                  checkpoint_hyperbolic_knit5 : str = None,
                  with_model_state_dict = True,
-                 curvature : Optional[float] = 1.0):
+                 curvature : Optional[float] = 1.0,
+                 gpu_parallelization = False, 
+                 soft_prompt_length = 100):
         r"""
         params:
         model_name: Pretrained Model name.
@@ -35,11 +37,12 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
                 
         super(T5ModelWithAdditionalLayer, self).__init__(config=config)
         self.curvature = curvature
-
+        self.soft_prompt_length = soft_prompt_length
         in_features = config.d_model
-        if layer_type not in ['euclidean', 'hyperbolic', 'identity']:
+        self.additional_layer_type = layer_type
+        if layer_type not in ['linear', 'hyperbolic', 'identity']:
             raise ValueError(f"{layer_type} not supported. Only 'hyperbolic' or 'euclidean'")
-        if layer_type == 'euclidean':
+        if layer_type == 'linear':
             self.hyperbolic_layer = nn.Linear(in_features, in_features)
             print("Using Euclidean Additional Layer")
         elif layer_type == 'hyperbolic':
@@ -62,6 +65,8 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
         else:
             print(f"Loading Checkpoint from {checkpoint_hyperbolic_knit5}")
             checkpoint = torch.load(checkpoint_hyperbolic_knit5)
+            if gpu_parallelization:
+                checkpoint['model_state_dict'] = {k.replace('module.', ''): v for k, v in checkpoint['model_state_dict'].items()}
             
 
             missing, unexpected = self.load_state_dict(checkpoint['model_state_dict'] if with_model_state_dict else checkpoint, strict=False)
@@ -130,18 +135,12 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
             )
 
         hidden_states = encoder_outputs[0]
+        hidden_states = self.hyperbolic_layer(hidden_states)
 
-        #hidden_states = torch.cat([soft_prompt, hidden_states], dim = 1)
-        #hidden_states = self.hyperbolic_layer(hidden_states)
+        # soft_prompt_hidden_state = hidden_states[:, :self.soft_prompt_length, :]
+        # soft_prompt_hidden_state = self.hyperbolic_layer(soft_prompt_hidden_state)
 
-
-        #soft_prompt_attention_mask = torch.ones((attention_mask.size(0), soft_prompt.size(1)), device=self.device)
-        #attention_mask = torch.cat([soft_prompt_attention_mask, attention_mask], dim=1)
-
-        soft_prompt_hidden_state = hidden_states[:, :100, :]
-        soft_prompt_hidden_state = self.hyperbolic_layer(soft_prompt_hidden_state)
-
-        hidden_states = torch.cat([soft_prompt_hidden_state, hidden_states[:, 100:, :]], dim = 1)
+        # hidden_states = torch.cat([soft_prompt_hidden_state, hidden_states[:, self.soft_prompt_length:, :]], dim = 1)
 
         
 
