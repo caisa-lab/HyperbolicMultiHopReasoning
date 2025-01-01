@@ -40,7 +40,7 @@ def _comput_delta_hyperbolicity(dataloader, model, tuned, parse):
     model.to(device)
     layer_embedding_list = []
     with torch.no_grad():
-        for question, answer in tqdm(dataloader, file=sys.stdout):
+        for idx, (question, answer) in enumerate(tqdm(dataloader, file=sys.stdout)):
             inputs = tokenizer(question, padding=True, truncation=True, return_tensors='pt')
             labels = tokenizer(answer, padding=True, truncation=True, return_tensors='pt').input_ids.to(device)
             input_ids = inputs.input_ids.to(device)
@@ -49,11 +49,29 @@ def _comput_delta_hyperbolicity(dataloader, model, tuned, parse):
             outputs = model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True, labels = labels)
 
             # Extract the encoder's output at the desired layer
-            encoder_output = outputs.encoder_hidden_states[24].cpu()
+            encoder_output = outputs.encoder_hidden_states[24]
 
-            # Compute the sentence embedding by averaging over the token embeddings
-            sentence_embedding = torch.mean(encoder_output, dim=1)
-            layer_embedding_list.append(sentence_embedding)
+            mask = attention_mask.bool()
+
+            token_embeddings = encoder_output[mask]
+            layer_embedding_list.append(token_embeddings.detach().cpu())
+            if idx <= 2:
+                print(f"{token_embeddings.shape = }")
+            
+
+            # mask = attention_mask.unsqueeze(-1)
+            # # Convert mask to float for multiplication
+            # mask = mask.float() 
+            # masked_encoder_output = encoder_output * mask
+            # sum_embeddings = masked_encoder_output.sum(dim=1)
+            # non_padded_tokens = mask.sum(dim=1)
+            # non_padded_tokens = torch.clamp(non_padded_tokens, min=1e-9)#
+            # # Compute the mean by dividing the sum by the number of non-padded tokens
+            # sentence_embedding = sum_embeddings / non_padded_tokens  # Shape: (batch_size, hidden_size)
+
+            # #Append to the list
+            # layer_embedding_list.append(sentence_embedding.detach().cpu())
+
     output_embeddings = torch.cat(layer_embedding_list, dim=0)
     mean, std, c = batched_delta_hyp(output_embeddings)
     dataloader_string = "Parse" if parse else "Random_Walk"
@@ -79,13 +97,12 @@ if __name__ == '__main__':
     parse = args.parse
     dataset_string = "Parse" if parse else "Random Walk"
     tuned_string = "Tuned" if tuned else "Not Tuned"
-    
-    print(f"Start {tuned_string} {dataset_string}")
-    model_checkpoint_path = 'checkpoints/knowledge_integration/large_adapt_bsize64_c4/model_epoch_16_val_loss_0.0336.pth'
-
-    
-
     config = Config()
+    print(f"Start {tuned_string} {dataset_string}")
+    model_checkpoint_path = config.random_walk_training.model_checkpoint_path#'checkpoints/metaqa/knowledge_integration/Dec15_18-47-46_AdaFactor_0.001_1.0_euclidean_t5_large_batch_size64_with_c4_prefix_language_modeling/knit5_epoch_24_val_loss_0.1764.pth'
+
+    
+
     model_name = config.t5_model.model_name
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -96,31 +113,53 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     knit5_model.to(device)
     if tuned:
-        load_model_checkpoint(knit5_model, model_checkpoint_path, with_model_state_dict=False)
+        load_model_checkpoint(knit5_model, model_checkpoint_path, with_model_state_dict=True, gpu_parallelization=True)
 
-    train_dataset, dev_dataset, test_dataset, _, _, _ = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
+    from src.knowledge_graph import create_knowledge_graph_metaqa
 
-    all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
-    all_kg = create_knowledge_graph_wikimultihop(all_data)
-
-    print(f"Nodes in Data: {len(list(all_kg.nodes()))}")
-
-    print(f"Lenght Train Data: {len(train_dataset)}")
-    print(f"Lenght Dev Data: {len(dev_dataset)}")
-    print(f"Lenght Test Data: {len(test_dataset)}")
+    dataframe_kg = pd.read_csv("dataset/metaqa/kb.txt", sep="|")
+    all_kg = create_knowledge_graph_metaqa(dataframe_kg)
+    dev_dataset = pd.read_json('dataset/metaqa/2hops/qa_dev_evidences.json')
+    test_dataset = pd.read_json('dataset/metaqa/2hops/qa_test_evidences.json')
+    train_dataset = pd.read_json('dataset/metaqa/2hops/qa_train_evidences.json')
+    from src.datasets import RandomWalkMetaQADataset, ParseMetaQADataset
     from torch.utils.data import ConcatDataset
     if random_walk:
-        random_walk_train = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='train')
-        random_walk_dev = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='dev')
-        random_walk_test = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='test')
+        random_walk_train = RandomWalkMetaQADataset(all_kg, dev_dataset, test_dataset, steps=3, type='train', all_paths=False)
+        random_walk_dev = RandomWalkMetaQADataset(all_kg, dev_dataset, test_dataset, steps=3, type='dev', all_paths=False)
+        random_walk_test = RandomWalkMetaQADataset(all_kg, dev_dataset, test_dataset, steps=3, type='test', all_paths=False)
         combined_dataset = ConcatDataset([random_walk_train, random_walk_test, random_walk_dev])
-        dataloader = DataLoader(combined_dataset, shuffle=False, batch_size=64, num_workers=16)
     if parse:
-        parse_train = ParseDataset(train_dataset)
-        parse_dev = ParseDataset(dev_dataset)
-        parse_test = ParseDataset(test_dataset)
+        parse_train = ParseMetaQADataset(train_dataset)
+        parse_dev = ParseMetaQADataset(dev_dataset)
+        parse_test = ParseMetaQADataset(test_dataset)
         combined_dataset = ConcatDataset([parse_train, parse_dev, parse_test])
-        dataloader = DataLoader(combined_dataset, shuffle=False, batch_size=64, num_workers=16)
+    if not random_walk and not parse:
+        from src.datasets import KnowledgeIntegrationMetaQADataset
+        print("Training on MetaQA")
+        metaqa_kg_data = pd.read_csv('dataset/metaqa/kb.txt', sep="|")
+
+        #Comment Out if we want to use the whole kb. This used only the kb for questions with a single answer
+        df_dev = pd.read_json("dataset/metaqa/2hops/qa_dev_evidences.json")
+        df_train = pd.read_json("dataset/metaqa/2hops/qa_train_evidences.json")
+        df_test = pd.read_json("dataset/metaqa/2hops/qa_test_evidences.json")
+        evidences = df_test['evidences'].to_list() + df_train['evidences'].to_list() + df_dev['evidences'].to_list()
+        list_of_all_entities = set()
+        for evidence_list in evidences:
+            if len(evidence_list) > 1:
+                continue
+            for evidence in evidence_list:
+                entity_1 = evidence[0]
+                entity_2 = evidence[2]
+                entity_3 = evidence[4]
+                list_of_all_entities.add(entity_1)
+                list_of_all_entities.add(entity_2)
+                list_of_all_entities.add(entity_3)
+        list_of_all_entities = list(list_of_all_entities)
+        kg = create_knowledge_graph_metaqa(metaqa_kg_data, list_of_all_entities=list_of_all_entities)
+
+        combined_dataset = KnowledgeIntegrationMetaQADataset(kg)
+    dataloader = DataLoader(combined_dataset, shuffle=False, batch_size=64, num_workers=16)
 
     
 
