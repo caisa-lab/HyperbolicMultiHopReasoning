@@ -9,3 +9,6 @@ to_try.txt
 *.db
 *.ipynb
 notebooks/
+tboard_logs/
+*.txt
+job_script*.sh
