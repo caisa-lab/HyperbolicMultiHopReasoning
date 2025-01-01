@@ -5,6 +5,7 @@ from tqdm import tqdm
 import sys
 import networkx
 from collections import defaultdict
+import numpy as np
 
 class RandomWalkMetaQADataset(Dataset):
     """
@@ -16,7 +17,7 @@ class RandomWalkMetaQADataset(Dataset):
     
     Ensures that for all complete paths, entity1 != entity3.
     """
-    def __init__(self, all_kg, validation_dataframe, test_dataframe, steps, type='train', max_answers = False):
+    def __init__(self, all_kg, validation_dataframe, test_dataframe, steps, type='train', max_answers : int = 100):
         self.kg: networkx.MultiDiGraph = all_kg
         self.steps = steps  # Not directly used, but retained for compatibility
 
@@ -104,7 +105,7 @@ class RandomWalkMetaQADataset(Dataset):
             current_node = next_node
         return path
     
-    def _generate_random_walks(self, num_walks_per_node=20, walk_length=3, num_iterations=5):
+    def _generate_random_walks(self, num_walks_per_node=100, walk_length=3, num_iterations=5, base_seed = 42):
         """
         Generate a set of unique random walks.
 
@@ -118,8 +119,11 @@ class RandomWalkMetaQADataset(Dataset):
         """
         all_paths = set()
         nodes = list(self.kg.nodes())
-        for iter_num in tqdm(range(num_iterations), desc="Generating walks", file=sys.stdout):
-            random.seed()  # Change seed for each iteration
+        for iter_num in tqdm(range(num_iterations), desc=f"Generating walks", file=sys.stdout):
+            iteration_seed = base_seed+iter_num
+            print(f"Seed: {iteration_seed}")
+            random.seed(iteration_seed)  # Change seed for each iteration
+            np.random.seed(iteration_seed)
             for node in nodes:
                 for _ in range(num_walks_per_node):
                     path = self._random_walk(node, hops=walk_length - 1)
