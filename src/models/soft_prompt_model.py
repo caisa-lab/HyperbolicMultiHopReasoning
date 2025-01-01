@@ -17,13 +17,14 @@ class SoftPromptModel(nn.Module):
                  model_name : str = '',
                  curvature = 1.0, 
                  soft_prompt = None,
-                 with_model_state_dict = True):
+                 with_model_state_dict = True,
+                 gpu_parallelization = False):
         super(SoftPromptModel, self).__init__()
         self.knit5 = knit5
         self.model_name = model_name
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if knit5_checkpoint_path is not None:
-           load_model_checkpoint(knit5, knit5_checkpoint_path, with_model_state_dict=with_model_state_dict)
+           load_model_checkpoint(knit5, knit5_checkpoint_path, with_model_state_dict=with_model_state_dict, gpu_parallelization=gpu_parallelization)
         
         self.config = Config()
         
@@ -36,11 +37,15 @@ class SoftPromptModel(nn.Module):
         for param in self.knit5.parameters():
             param.requires_grad = False
 
-        #Remove if no learnable curvature
+        # Remove if no learnable curvature
         if hasattr(self.knit5, 'hyperbolic_layer'):
-            for param in self.knit5.hyperbolic_layer.parameters():
-                param.requires_grad = True
-            print(f"Hyperbolic Layer learnable in soft prompt model class: {all(param.requires_grad for param in self.knit5.hyperbolic_layer.parameters())}")
+            print(f"{self.knit5.additional_layer_type = }")
+            if self.knit5.additional_layer_type != 'identity':
+                print(f"Setting All parameters of hyperbolic layer to True")
+                for param in self.knit5.hyperbolic_layer.parameters():
+                    param.requires_grad = True
+
+        print(f"Hyperbolic Layer learnable in soft prompt model class: {all(param.requires_grad for param in self.knit5.hyperbolic_layer.parameters()) if self.knit5.additional_layer_type != 'identity' else False}")
         
         self.soft_prompt.requires_grad = True
         
@@ -58,7 +63,7 @@ class SoftPromptModel(nn.Module):
 
         #pp_embeddings = torch.cat([torch.randn(pp_length,1), pp_embeddings], dim = -1)
         print(f"Initialized Embeddings with Shape: {pp_embeddings.shape}")
-        print(f"Initializing Soft Prompt with top 100 tokens from pretraining corpus")
+        print(f"Initializing Soft Prompt with top {pp_length} tokens from pretraining corpus")
         return nn.Parameter(pp_embeddings)
     
     def _forward_soft_prompt_only_enc(self, input_ids, attention_mask, labels, **forward_kwargs):
