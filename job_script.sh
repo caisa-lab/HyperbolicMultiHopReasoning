@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#SBATCH --partition=A100medium
-#SBATCH --time=1-00:00:00
-#SBATCH --gpus=1
+#SBATCH --partition=A40short
+#SBATCH --time=1:00:00
+#SBATCH --gpus=4
 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --job-name=parse_training_musique_lr_0.3_bsize16
-#SBATCH --output=outputs/musique/parse_training/output_parse_training_musique_gt_not_replaced_lr_0.3bsize16_%j.txt
-#SBATCH --error=outputs/musique/parse_training/output_parse_training_musique_gt_not_replaced_lr_0.3bsize16_%j.txt
+#SBATCH --job-name=random_walk_training_metaqa
+#SBATCH --output=outputs/metaqa/random_walk_training/output_random_walk_identity_bsize64_promptlength_100%j.txt
+#SBATCH --error=outputs/metaqa/random_walk_training/error_random_walk_identity_bsize64_promptlength_100_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
@@ -44,7 +44,7 @@ echo "PATH after activation:"
 echo $PATH
 
 #pip install transformers --quiet
-#pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu118 --quiet
+#pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu118
 #pip install sentencepiece --quiet
 #pip install optuna --quiet
 #pip install geoopt --quiet
@@ -54,4 +54,4 @@ echo $PATH
 
 echo "Libraries Installed"
 echo "Starting Training Script...."
-python -u train_parse_then_hop.py --lr 0.3 musique
+torchrun --nproc_per_node=1 train_random_walk.py --additional_layer identity --learning_rate 0.3 metaqa
