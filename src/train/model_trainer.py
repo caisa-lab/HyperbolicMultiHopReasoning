@@ -16,13 +16,14 @@ from utils.trainer_utils import *
 from typing import Union
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
+from src.models import T5ModelWithAdditionalLayer
 
 """Triggering Multi-Hop Reasoning for Question Answering
 in Language Models using Soft Prompts and Random Walks: https://arxiv.org/pdf/2306.04009
 """
 class ModelTrainer:
     def __init__(self,
-                 model : Union[nn.Module],
+                 model : Union[nn.Module, T5ModelWithAdditionalLayer, DDP],
                  tokenizer : AutoTokenizer,
                  list_train_dataloader: list,
                  val_dataloader : DataLoader,
@@ -34,7 +35,7 @@ class ModelTrainer:
                  method : str = 'single_hop_training',
                  load_optimizer = True,
                  gpu_parallelization = False,
-                 rank = 1):
+                 rank = 0):
         self.device = device
         self.model = model.to(device)
         self.gpu_parallelization = gpu_parallelization
@@ -61,12 +62,6 @@ class ModelTrainer:
         
         
         
-        self.start_epoch = 0
-        self.patience = 5
-        self.best_loss = float('inf')
-        self.best_em = 0
-        self.early_stop_counter=0
-        self.best_model_path = None
         
         self.supported_methods = ['single_hop_training', 'one_hop_wiki_training']
         
@@ -81,7 +76,22 @@ class ModelTrainer:
         elif self.method == 'one_hop_wiki_training':
             self.training_config = config.one_hop_wiki_training
         self.optimizer = get_optimizer(self.model.parameters(), self.training_config)
+        
 
+        self.start_epoch = 0
+        self.patience = self.training_config.epochs
+        self.best_loss = float('inf')
+        self.best_em = 0
+        self.early_stop_counter=0
+        self.best_model_path = None
+
+        from transformers import get_linear_schedule_with_warmup
+        num_steps = len(self.single_hop_train_dataloader) * self.training_config.epochs * 2
+        if self.training_config.scheduler is not None:
+            self.scheduler = get_linear_schedule_with_warmup(self.optimizer, num_training_steps=num_steps, num_warmup_steps=int(0.1 * num_steps))
+        else:
+            self.scheduler = None
+        print(f"Using Scheduler: {self.scheduler}")
         
         self.log_dir, self.model_dir = setup_directories(self.training_config, self.config.t5_model)
         if self.tboard_checkpoint_path is not None:
@@ -94,7 +104,8 @@ class ModelTrainer:
         
     def train(self,
             epochs : int):
-        
+        self.model.module.config.use_cache = False
+        self.model.module.gradient_checkpointing_enable()
         """Trains Knowledge Integration part. Given 'e1 ; r1' predict 'e2'
         """
         
@@ -158,10 +169,11 @@ class ModelTrainer:
                 
                 loss.backward()
                 self.optimizer.step()
-                
-                if batch_idx <= 10 and batch_idx % 2 == 0:
-                    print(f"{input_str = }")
-                    print(f"{label = }")
+                if self.scheduler is not None:
+                    self.scheduler.step()
+                # if batch_idx <= 10 and batch_idx % 2 == 0:
+                #     print(f"{input_str = }")
+                #     print(f"{label = }")
                 len_trainloader = len(self.single_hop_train_dataloader)
                 if self.gpu_parallelization:
                     # After loss.backward() and self.optimizer.step()
@@ -193,7 +205,11 @@ class ModelTrainer:
                     vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)
                     self.writer.add_scalar('VRAM/Training/Allocated', vram_allocated, epoch * len_trainloader + batch_idx)
                     self.writer.add_scalar('VRAM/Training/Reserved', vram_reserved, epoch * len_trainloader + batch_idx)
-
+                    if self.model.module.additional_layer_type == 'hyperbolic':
+                        c = self.model.module.hyperbolic_layer.manifold.c.item()
+                    else:
+                        c = 0.0
+                    self.writer.add_scalar('Training/Curvature', c, epoch*len_trainloader + batch_idx)
 
             avg_single_hop_loss = total_single_hop_loss / len_trainloader
             avg_c4_loss = total_c4_loss / len_trainloader
@@ -305,12 +321,13 @@ class ModelTrainer:
                 log_tensorboard(self.writer, avg_f1_perc, epoch, 'Validation', eval_metric='f1')
                 print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
             
-                soft_prompt_path = f"{self.model_dir}/knit5_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
+                soft_prompt_path = f"{self.model_dir}/knit5.pth"
             
                 if avg_em_perc > self.best_em:
-                    if self.best_model_path and os.path.exists(self.best_model_path):
-                        os.remove(self.best_model_path)
-                        print(f"Removed previous best model at {self.best_model_path}")
+                    if self.best_model_path:
+                        if os.path.exists(self.best_model_path):
+                            os.remove(self.best_model_path)
+                            print(f"Removed previous best model at {self.best_model_path}")
                     self.best_em = avg_em_perc
                     self.early_stop_counter = 0
                     self.best_model_path = soft_prompt_path
@@ -331,7 +348,7 @@ class ModelTrainer:
             log_tensorboard(self.writer, avg_f1_perc, epoch, 'Validation', eval_metric='f1')
             print(f"Epoch {epoch} - Validation - AvgLoss: {avg_loss:.4f} | AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
         
-            soft_prompt_path = f"{self.model_dir}/knit5_epoch_{epoch}_val_loss_{avg_loss:.4f}.pth"
+            soft_prompt_path = f"{self.model_dir}/knit5.pth"
         
             if avg_em_perc > self.best_em:
                 if self.best_model_path and os.path.exists(self.best_model_path):
