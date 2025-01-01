@@ -37,8 +37,8 @@ def _train_parse_then_hop(additional_layer : str, dataset : str, rank, world_siz
         validation_dataframe = pd.read_json('dataset/metaqa/2hops/qa_dev_evidences.json')
         train_dataframe = pd.read_json('dataset/metaqa/2hops/qa_train_evidences.json')
 
-        parse_train = ParseMetaQADataset(train_dataframe)
-        parse_dev = ParseMetaQADataset(validation_dataframe)
+        parse_train = ParseMetaQADataset(train_dataframe, max_answers=3)
+        parse_dev = ParseMetaQADataset(validation_dataframe, max_answers=3)
     else:
         print(f"Unknown Dataset")
     print(f"Number of Parse Questions Train: {len(parse_train)}")

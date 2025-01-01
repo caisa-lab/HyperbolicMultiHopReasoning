@@ -44,7 +44,7 @@ def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, 
         random_walk_dev = RandomWalkMetaQADataset(kg, df_dev, df_test, steps=3, type='dev', max_answers=3)
 
     else:
-        print(f"Unknown Dataset")
+        raise ValueError(f"Unknown Dataset")
     print(f"Number of Random Walks Train: {len(random_walk_train)}")
     print(f"Number of Random Walk Dev: {len(random_walk_dev)}")
     #Specify Hyperparameters via config file

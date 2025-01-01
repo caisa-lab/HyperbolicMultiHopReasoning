@@ -39,7 +39,8 @@ def _knowledge_integration_with_c4(dataset, rank = 0, world_size = 0):
         kg = create_knowledge_graph_metaqa(df_kg, from_kb=False, max_answers=5)
 
         ki_dataset = KnowledgeIntegrationMetaQADataset(kg)
-
+    else:
+        raise ValueError(f"Unknown Dataset")
 
     ki_train = ki_dataset
 
