@@ -6,9 +6,9 @@ from src.datasets import RandomWalkDataset
 import torch
 from src.config import Config
 from torch.utils.data import DataLoader
-from src.knowledge_graph import create_knowledge_graph_wikimultihop, create_knowledge_graph_metaqa
+from src.knowledge_graph import create_knowledge_graph_wikimultihop, create_knowledge_graph_metaqa, create_knowledge_graph_mlpq
 from src.models import SoftPromptModel, T5ModelWithAdditionalLayer
-from src.datasets import RandomWalkMetaQADataset
+from src.datasets import RandomWalkMetaQADataset, RandomWalkMLPQDataset
 import argparse
 import optuna
 import os
@@ -37,12 +37,18 @@ def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, 
         df_train = pd.read_json("dataset/metaqa/2hops/qa_train_evidences.json")
         df_test = pd.read_json("dataset/metaqa/2hops/qa_test_evidences.json")
 
-        df_kg = pd.concat([df_dev, df_train, df_test])
-        kg = create_knowledge_graph_metaqa(df_kg, from_kb=False, max_answers=3)
+        random_walk_train = RandomWalkMetaQADataset(kg, validation_dataframe, test_dataframe, steps=3, type='train')
+        random_walk_dev = RandomWalkMetaQADataset(kg, validation_dataframe, test_dataframe, steps=3, type='dev')
+    elif dataset in ['mlpq']:
+        #txt_file_paths = ['dataset/mlpq/Triples_in_questions/EN_KG', 'dataset/mlpq/Triples_in_questions/FR_KG']
+        txt_file_paths = ['dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', 'dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', 'dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json']
+        kg = create_knowledge_graph_mlpq(txt_file_paths, from_kb = False)
 
-        random_walk_train = RandomWalkMetaQADataset(kg, df_dev, df_test, steps=3, type='train', max_answers=3)
-        random_walk_dev = RandomWalkMetaQADataset(kg, df_dev, df_test, steps=3, type='dev', max_answers=3)
+        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', lines=True)
+        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json', lines=True)
 
+        random_walk_train = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=3, type='train')
+        random_walk_dev = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=3, type='dev')
     else:
         raise ValueError(f"Unknown Dataset")
     print(f"Number of Random Walks Train: {len(random_walk_train)}")

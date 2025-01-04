@@ -3,6 +3,45 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from tqdm import tqdm
 
+def create_knowledge_graph_mlpq(txt_file_paths : list, from_kb = True):
+    G = nx.MultiDiGraph()
+    if from_kb:
+        for txt_file_path in txt_file_paths:
+            with open(txt_file_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    # Remove whitespace at the start and end
+                    line = line.strip()
+                    
+                    # Split the line by tabs
+                    parts = line.split('@@@')
+                    
+                    # Check we have at least three parts
+                    if len(parts) == 3:
+                        head = parts[0].lower()
+                        relation = parts[1].lower()
+                        tail = parts[2].lower()
+                        if head == 'triumvirate' or head == 'triumvirat':
+                            continue
+                        G.add_edge(head, tail, key=relation, relation=relation)
+                    else:
+                        print(f"Length of line != 3: {line}")
+    else:
+        for txt_file_path in txt_file_paths:
+            print(txt_file_path)
+            df = pd.read_json(txt_file_path, lines=True)
+            print(len(df))
+            for evidence in df['evidences']:
+                first_head = evidence[0]
+                first_relation = evidence[1]
+                first_tail = evidence[2]
+                second_head = evidence[2]
+                second_relation = evidence[3]
+                second_tail = evidence[4]
+
+                G.add_edge(first_head, first_tail, key=first_relation, relation=first_relation) 
+                G.add_edge(second_head, second_tail, key=second_relation, relation=second_relation) 
+
+    return G
 
 #Need to use a undirected Graph here otherwise we will not learn the paths neccessarry for the questions
 # Example we have a question: which person wrote the films directed by [Yuriy Norshteyn]	Sergei Kozlov

@@ -1,10 +1,11 @@
 from src.utils.util import load_dataset, load_c4_dataset
-from src.knowledge_graph import create_knowledge_graph_metaqa
+from src.knowledge_graph import create_knowledge_graph_metaqa, create_knowledge_graph_mlpq
 
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from src.datasets import KnowledgeIntegrationDataset, C4Dataset
 from src.datasets.metaqa import KnowledgeIntegrationMetaQADataset
+from src.datasets import KnowledgeIntegrationMLPQDataset
 import torch
 from src.config import Config
 from torch.utils.data import DataLoader
@@ -18,7 +19,7 @@ def _knowledge_integration_with_c4(dataset, rank = 0, world_size = 0):
 
     if dataset in ['2wikimultihop', 'wikimultihop']: 
         print("Training on 2WikiMultiHopQA")
-        train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=False)
+        train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=True)
 
 
         print("Creating Single Hop Datasets...")
@@ -39,8 +40,14 @@ def _knowledge_integration_with_c4(dataset, rank = 0, world_size = 0):
         kg = create_knowledge_graph_metaqa(df_kg, from_kb=False, max_answers=5)
 
         ki_dataset = KnowledgeIntegrationMetaQADataset(kg)
+    elif dataset in ['mlpq']:
+        #txt_file_paths = ['dataset/mlpq/Triples_in_questions/EN_KG', 'dataset/mlpq/Triples_in_questions/FR_KG']
+        txt_file_paths = ['dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', 'dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', 'dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json']
+        kg = create_knowledge_graph_mlpq(txt_file_paths, from_kb = False) 
+        ki_dataset = KnowledgeIntegrationMLPQDataset(kg)
     else:
-        raise ValueError(f"Unknown Dataset")
+        raise ValueError("Unknown Dataset")  
+
 
     ki_train = ki_dataset
 
