@@ -68,7 +68,7 @@ def evaluate_one_hop_wiki(model : Union[nn.Module],
     total_em = 0
     total_f1 = 0
     prediction_vs_label = {}
-    progress_bar = tqdm(test_dataloader, leave=True, desc=f"Test - Knowledge Integration", file = sys.stdout)
+    progress_bar = tqdm(test_dataloader, leave=True, desc=f"Test - Knowledge Integration", file = sys.stdout, dynamic_ncols=True)
     with torch.no_grad():
         for batch_idx, (input_str, label) in enumerate(progress_bar):
             input_ids = tokenizer(input_str, padding=True, truncation=True, return_tensors='pt')['input_ids'].to(device)
@@ -111,7 +111,7 @@ def evaluate_random_walk_training(finetuned_model : SoftPromptModel,
     total_em = 0
     total_f1 = 0
     prediction_vs_label = {}
-    progress_bar = tqdm(test_dataloader, leave=True, desc=f"Test - Random Walk Training", file=sys.stdout)
+    progress_bar = tqdm(test_dataloader, leave=True, desc=f"Test - Random Walk Training", file=sys.stdout, dynamic_ncols=True)
     with torch.no_grad():
         for batch_idx, batch in enumerate(progress_bar):
             incomplete_sequence, complete_sequence = batch
@@ -176,7 +176,7 @@ def evaluate_parse_then_hop_training(parsing_model: SoftPromptModel,
     hopping_model.eval()
     total_em = 0
     total_f1 = 0
-    progress_bar = tqdm(test_dataloader, leave=True, desc=f"Test - Parse Then Hop", file=sys.stdout)
+    progress_bar = tqdm(test_dataloader, leave=True, desc=f"Test - Parse Then Hop", file=sys.stdout, dynamic_ncols=True)
     prediction_vs_label = {}
     with torch.no_grad():
         for batch_idx, batch in enumerate(progress_bar):

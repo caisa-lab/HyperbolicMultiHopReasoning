@@ -29,7 +29,7 @@ class C4Dataset(Dataset):
         cleaned_dataset = []     
         if self.objective == 'span_corruption':
             cleaned_dataset = [
-                text for text in tqdm(dataset, desc=f'Cleanup Dataset: Remove texts with < {self.average_length_of_spans} corrupted tokens', file=sys.stdout)
+                text for text in tqdm(dataset, desc=f'Cleanup Dataset: Remove texts with < {self.average_length_of_spans} corrupted tokens', file=sys.stdout, dynamic_ncols=True)
                 if len(self.tokenizer.encode(text, add_special_tokens=False)) * self.corruption_rate >= self.average_length_of_spans
             ]
                 

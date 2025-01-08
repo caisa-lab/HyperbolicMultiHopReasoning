@@ -165,7 +165,7 @@ def load_c4_dataset(base_path: str,
                     number_of_files : int,
                     chunk_size : int = 100_000):
     list_of_texts = []
-    for i in tqdm(range(number_of_files), desc='Loading Dataframe with c4 Data...', file = sys.stdout):
+    for i in tqdm(range(number_of_files), desc='Loading Dataframe with c4 Data...', file = sys.stdout, dynamic_ncols=True):
         for chunk in pd.read_json(base_path.format(i), lines=True, chunksize=chunk_size):
             list_of_texts.extend(chunk['text'])
     return list_of_texts

@@ -134,7 +134,7 @@ class ModelTrainer:
             total_single_hop_loss = 0
             single_hop_iter = iter(self.single_hop_train_dataloader)
             c4_iter = iter(self.c4_train_dataloader)
-            progress_bar = tqdm(range(2*min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - {self.method}", file=sys.stdout)
+            progress_bar = tqdm(range(2*min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - {self.method}", file=sys.stdout, dynamic_ncols=True)
             for batch_idx in progress_bar:
                 #Train in 50:50 Mixture
                 if batch_idx % 2 == 0:
@@ -223,7 +223,7 @@ class ModelTrainer:
         
     def _train_without_c4(self, epochs : int):
         for epoch in range(self.start_epoch, epochs):
-            progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - {self.method}", file=sys.stdout)
+            progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - {self.method}", file=sys.stdout, dynamic_ncols=True)
             total_loss = 0
             for batch_idx, batch in enumerate(progress_bar):
                 self.optimizer.zero_grad()
@@ -266,7 +266,7 @@ class ModelTrainer:
         total_loss = 0
         total_em = 0
         total_f1 = 0
-        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - {self.method}", file=sys.stdout)
+        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - {self.method}", file=sys.stdout, dynamic_ncols=True)
         with torch.no_grad():
             for batch_idx, batch in enumerate(progress_bar):
                 input_str, label = batch

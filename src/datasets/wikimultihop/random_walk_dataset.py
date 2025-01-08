@@ -60,7 +60,7 @@ class RandomWalkDataset(Dataset):
     def _generate_random_walks(self, num_walks_per_node=20, walk_length=3, num_iterations=5):
         all_paths = set()
         nodes = list(self.kg.nodes())
-        for _ in tqdm(range(num_iterations), file=sys.stdout):
+        for _ in tqdm(range(num_iterations), file=sys.stdout, dynamic_ncols=True):
             random.seed()  # Change seed for each iteration
             for idx, node in enumerate(nodes):
                 walks = set()

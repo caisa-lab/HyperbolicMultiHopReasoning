@@ -48,6 +48,8 @@ class SoftPromptModel(nn.Module):
         print(f"Hyperbolic Layer learnable in soft prompt model class: {all(param.requires_grad for param in self.knit5.hyperbolic_layer.parameters()) if self.knit5.additional_layer_type != 'identity' else False}")
         
         self.soft_prompt.requires_grad = True
+
+        # self.knit5.gradient_checkpointing_enable()
         
     def init_soft_prompt(self):
         tokenizer = AutoTokenizer.from_pretrained(self.config.t5_model.model_name)

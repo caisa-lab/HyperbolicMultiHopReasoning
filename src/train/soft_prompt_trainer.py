@@ -82,6 +82,8 @@ class SoftPromptTrainer:
         if self.checkpoint_path is not None and retrain:
             self.model.soft_prompt = load_soft_prompt(self.model.soft_prompt, checkpoint_path)
             self.optimizer, self.start_epoch = load_optimizer_and_start_epoch(self.optimizer, checkpoint_path)
+
+
         
             
         
@@ -95,8 +97,6 @@ class SoftPromptTrainer:
     
     def train(self,
             epochs : int):
-        # self.model.module.knit5.config.use_cache = False
-        # self.model.module.knit5.gradient_checkpointing_enable()
         """
         Trains soft prompts. Does either the random walk or the parsing step. Concatenating the input with the soft prompt and giving it to the knit5 model.
         """
@@ -105,9 +105,10 @@ class SoftPromptTrainer:
             print(f'Starting training from epoch {self.start_epoch}')
         
         for epoch in range(self.start_epoch, epochs):
+            print(f"Gradient checkpointing enabled: {self.model.module.knit5.is_gradient_checkpointing}")
             if self.gpu_parallelization:
                 self.train_dataloader.sampler.set_epoch(epoch)
-            progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - {self.method}", file=sys.stdout)
+            progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - {self.method}", file=sys.stdout, dynamic_ncols=True)
             total_loss = 0
             for batch_idx, batch in enumerate(progress_bar):
                 self.optimizer.zero_grad()
@@ -121,7 +122,7 @@ class SoftPromptTrainer:
                 labels_input_ids = labels.input_ids.to(self.device)
                 labels_input_ids[labels_input_ids == self.tokenizer.pad_token_id] = -100
                 #labels_attention_mask = labels.attention_mask.to(self.device)
-                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels_input_ids, use_cache=False)
+                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels_input_ids)
                 loss = outputs.loss
                 
                 
@@ -129,9 +130,9 @@ class SoftPromptTrainer:
                 loss.backward()
 		        
                 self.optimizer.step()
-                # if batch_idx <= 5:
-                #     print(f"{input_batch[0] = }")
-                #     print(f"{label_batch[0] = }")
+                if batch_idx <= 5:
+                    print(f"{input_batch[0] = }")
+                    print(f"{label_batch[0] = }")
                 if self.gpu_parallelization:
                     loss_tensor = torch.tensor([loss.item()], device=self.device)
                     dist.all_reduce(loss_tensor, op=dist.ReduceOp.SUM)
@@ -149,7 +150,6 @@ class SoftPromptTrainer:
                     vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # Convert to MB
                     self.writer.add_scalar('VRAM/Training/Allocated', vram_allocated, epoch*len(self.train_dataloader) + batch_idx)
                     self.writer.add_scalar('VRAM/Training/Reserved', vram_reserved, epoch*len(self.train_dataloader) + batch_idx)
-                    #TODO What to do with curvature do global like loss or just rank == 0
                     if hasattr(self.model.module.knit5.hyperbolic_layer, 'manifold'):
                         c = self.model.module.knit5.hyperbolic_layer.manifold.c.item()
                     else:
@@ -167,7 +167,7 @@ class SoftPromptTrainer:
         total_loss = 0
         total_em = 0
         total_f1 = 0
-        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - {self.method}", file=sys.stdout)
+        progress_bar = tqdm(self.val_dataloader, leave=True, desc=f"Epoch {epoch} - Validation - {self.method}", file=sys.stdout, dynamic_ncols=True)
         with torch.no_grad():
             for batch_idx, batch in enumerate(progress_bar):
                 input_batch, label_batch = batch

@@ -26,20 +26,16 @@ def create_knowledge_graph_mlpq(txt_file_paths : list, from_kb = True):
                     else:
                         print(f"Length of line != 3: {line}")
     else:
-        for txt_file_path in txt_file_paths:
-            print(txt_file_path)
-            df = pd.read_json(txt_file_path, lines=True)
-            print(len(df))
-            for evidence in df['evidences']:
-                first_head = evidence[0]
-                first_relation = evidence[1]
-                first_tail = evidence[2]
-                second_head = evidence[2]
-                second_relation = evidence[3]
-                second_tail = evidence[4]
+        for evidence in txt_file_paths['evidences']:
+            first_head = evidence[0]
+            first_relation = evidence[1]
+            first_tail = evidence[2]
+            second_head = evidence[2]
+            second_relation = evidence[3]
+            second_tail = evidence[4]
 
-                G.add_edge(first_head, first_tail, key=first_relation, relation=first_relation) 
-                G.add_edge(second_head, second_tail, key=second_relation, relation=second_relation) 
+            G.add_edge(first_head, first_tail, key=first_relation, relation=first_relation) 
+            G.add_edge(second_head, second_tail, key=second_relation, relation=second_relation) 
 
     return G
 
@@ -53,7 +49,7 @@ def create_knowledge_graph_metaqa(data : pd.DataFrame, iterations = 0, from_kb =
     index = 0
     G = nx.MultiDiGraph()
     if from_kb:
-        for idx, row in tqdm(data.iterrows(), desc="Creating Knowledge Graph...", total=len(data) if iterations == 0 else iterations):
+        for idx, row in tqdm(data.iterrows(), desc="Creating Knowledge Graph...", total=len(data) if iterations == 0 else iterations, dynamic_ncols=True):
             if index > iterations:
                 return G
             head = row['entity1'].strip().lower()
