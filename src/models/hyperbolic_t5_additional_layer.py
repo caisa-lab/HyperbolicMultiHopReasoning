@@ -25,7 +25,8 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
                  with_model_state_dict = True,
                  curvature : Optional[float] = 1.0,
                  gpu_parallelization = False, 
-                 soft_prompt_length = 100):
+                 soft_prompt_length = 100,
+                 only_soft_prompt = False):
         r"""
         params:
         model_name: Pretrained Model name.
@@ -39,6 +40,11 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
         self.curvature = curvature
         self.soft_prompt_length = soft_prompt_length
         in_features = config.d_model
+        self.only_soft_prompt = only_soft_prompt
+        if self.only_soft_prompt:
+            print(f"Passing only soft prompts through hyperbolic")
+        else:
+            print(f"Passing everything through hyperbolic layer")
         self.additional_layer_type = layer_type
         if layer_type not in ['linear', 'hyperbolic', 'identity']:
             raise ValueError(f"{layer_type} not supported. Only 'hyperbolic' or 'euclidean'")
@@ -51,7 +57,6 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
         elif layer_type == 'identity':
             self.hyperbolic_layer = nn.Identity()
             print("Using Identity (No Extra Layer)")
-        #print(f"Map after the Encoder, after final_layer_norm and dropout")
 
         
         if checkpoint_hyperbolic_knit5 is None:
@@ -103,8 +108,6 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
                 return_dict: Optional[bool] = None):
         
         
-        # TODO instead of using knit5.encoder implement the encoder part again 
-        # but use soft prompt in the last layer and map the output of the last layr
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
@@ -135,12 +138,13 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
             )
 
         hidden_states = encoder_outputs[0]
-        hidden_states = self.hyperbolic_layer(hidden_states)
+        if self.only_soft_prompt:
+            soft_prompt_hidden_state = hidden_states[:, :self.soft_prompt_length, :]
+            soft_prompt_hidden_state = self.hyperbolic_layer(soft_prompt_hidden_state)
 
-        # soft_prompt_hidden_state = hidden_states[:, :self.soft_prompt_length, :]
-        # soft_prompt_hidden_state = self.hyperbolic_layer(soft_prompt_hidden_state)
-
-        # hidden_states = torch.cat([soft_prompt_hidden_state, hidden_states[:, self.soft_prompt_length:, :]], dim = 1)
+            hidden_states = torch.cat([soft_prompt_hidden_state, hidden_states[:, self.soft_prompt_length:, :]], dim = 1)
+        else:
+            hidden_states = self.hyperbolic_layer(hidden_states)
 
         
 
