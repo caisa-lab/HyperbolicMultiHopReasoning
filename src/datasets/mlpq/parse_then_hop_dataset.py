@@ -7,7 +7,7 @@ import pandas as pd
 from torch.utils.data import Dataset
 
 class ParseMLPQDataset(Dataset):
-    def __init__(self, dataframe: pd.DataFrame, max_answers : int = 3):
+    def __init__(self, dataframe: pd.DataFrame):
         """
         Initializes the dataset with the provided DataFrame.
 
