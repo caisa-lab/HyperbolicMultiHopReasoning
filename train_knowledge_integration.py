@@ -35,15 +35,19 @@ def _knowledge_integration_with_c4(dataset, rank = 0, world_size = 0):
         df_dev = pd.read_json("dataset/metaqa/2hops/qa_dev_evidences.json")
         df_train = pd.read_json("dataset/metaqa/2hops/qa_train_evidences.json")
         df_test = pd.read_json("dataset/metaqa/2hops/qa_test_evidences.json")
-
+        max_answers = 1
         df_kg = pd.concat([df_dev, df_train, df_test])
-        kg = create_knowledge_graph_metaqa(df_kg, from_kb=False, max_answers=5)
+        kg = create_knowledge_graph_metaqa(df_kg, from_kb=False, max_answers=max_answers)
 
         ki_dataset = KnowledgeIntegrationMetaQADataset(kg)
     elif dataset in ['mlpq']:
         #txt_file_paths = ['dataset/mlpq/Triples_in_questions/EN_KG', 'dataset/mlpq/Triples_in_questions/FR_KG']
-        txt_file_paths = ['dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', 'dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', 'dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json']
-        kg = create_knowledge_graph_mlpq(txt_file_paths, from_kb = False) 
+        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', lines=True)
+        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', lines=True)
+        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json', lines=True)
+
+        df_kg = pd.concat([train_dataframe, validation_dataframe, test_dataframe])
+        kg = create_knowledge_graph_mlpq(df_kg, from_kb = False)
         ki_dataset = KnowledgeIntegrationMLPQDataset(kg)
     else:
         raise ValueError("Unknown Dataset")  
@@ -61,10 +65,10 @@ def _knowledge_integration_with_c4(dataset, rank = 0, world_size = 0):
     #google/t5-large-lm-adapt
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(config.t5_model.model_name)
-    tokenizer.model_max_length = config.t5_model.tokenizer_max_length
+    config.t5_model.tokenizer_max_length = 115
+    tokenizer.model_max_length = 115#config.t5_model.tokenizer_max_length
     print(f"Loading Model {config.t5_model.model_name}...")
     #Adjust Dropout
-   
    
     print(f"Train Euclidean T5 Model")
     additional_layer = "identity"
