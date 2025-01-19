@@ -2,6 +2,7 @@ from torch.utils.data import Dataset
 import random
 from tqdm import tqdm
 import sys
+import numpy as np
 class RandomWalkMLPQDataset(Dataset):
     """Gets the Knowledge Graph as an input and should create Random Walks. For each node sample up to 20 random walks of length 3, do this 5 times with different seeds.
     #Hold out the random walks which are triples in the validation and test set.
@@ -56,11 +57,14 @@ class RandomWalkMLPQDataset(Dataset):
             current_node = next_node
         return path
     
-    def _generate_random_walks(self, num_walks_per_node=20, walk_length=3, num_iterations=5):
+    def _generate_random_walks(self, num_walks_per_node=20, walk_length=3, num_iterations=5, base_seed = 42):
         all_paths = set()
         nodes = list(self.kg.nodes())
-        for _ in tqdm(range(num_iterations), file=sys.stdout):
-            random.seed()  # Change seed for each iteration
+        for iter_num in tqdm(range(num_iterations), desc=f"Generating walks", file=sys.stdout, dynamic_ncols=True):
+            iteration_seed = base_seed+iter_num
+            print(f"Seed: {iteration_seed}")
+            random.seed(iteration_seed)  # Change seed for each iteration
+            np.random.seed(iteration_seed)
             for idx, node in enumerate(nodes):
                 walks = set()
                 for _ in range(num_walks_per_node):
