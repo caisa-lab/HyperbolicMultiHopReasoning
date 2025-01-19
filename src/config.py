@@ -43,8 +43,8 @@ class Config:
                              curvature=log(exp(0.36) - 1),
                              gpu_parallelization=True,
                              learning_rate=0.001,
-                             epochs=40)
-            self.additional_log_info=f'knowledge_integration_bsize64_lr0.001_max_answers_5'
+                             epochs=50)
+            self.additional_log_info=f'knowledge_integration_bsize64_lr0.001_max_answers_1'
 
                 
     class OneHopWikiTraining(BaseTrainingConfig):
@@ -59,18 +59,19 @@ class Config:
     class RandomWalkTraining(BaseTrainingConfig):
         def __init__(self):
             super().__init__(learning_rate=0.3,
-                             epochs=75,
+                             epochs=100,
                              log_dir='tboard_logs/metaqa/random_walk_training/euclidean',
                              model_save_path='checkpoints/metaqa/random_walk_training/euclidean', #Dec27_09-23-05_AdaFactor_0.001_-0.8362570675638017_knowledge_integration_bsize64_lr0.001_scheduler_only_single_answer_kb_hyperbolic/knit5.pth #Dec26_14-35-36_AdaFactor_0.001_-0.8362570675638017_knowledge_integration_bsize64_lr0.001_scheduler_only_single_answer_kb/knit5.pth
-                             model_checkpoint_path= 'checkpoints/metaqa/knowledge_integration/Dec30_18-41-01_AdaFactor_0.001_-0.8362570675638017_knowledge_integration_bsize64_lr0.001_max_answers_3/knit5.pth', 
+                             model_checkpoint_path= 'checkpoints/metaqa/knowledge_integration/Dec26_14-35-36_AdaFactor_0.001_-0.8362570675638017_knowledge_integration_bsize64_lr0.001_scheduler_only_single_answer_kb/knit5.pth', 
                              tboard_checkpoint_path=None,
-                             num_workers=16,
+                             num_workers=1,
                              optimizer='AdaFactor',
-                             curvature=log(exp(0.36) - 1),
+                             curvature=log(exp(0.32) - 1),
                              gpu_parallelization=True
                              )
+            self.use_soft_prompt = True
             self.prompt_length = 100
-            self.additional_log_info=f'linear_after_encoder_bsize32_prompt_lenght100_lr{self.learning_rate}_additional_layer_lr0.001_max_answer_3'
+            self.additional_log_info=f'identity_after_encoder_bsize64_prompt_lenght{self.prompt_length}_lr{self.learning_rate}_curvature{self.curvature}_additional_layer_lr0.001_max_answer_2'
             self.hopping_prompt_checkpoint_path = None
 
     class ParseThenHopTraining(BaseTrainingConfig):
@@ -81,10 +82,11 @@ class Config:
                              model_save_path='checkpoints/metaqa/parse_training/',
                              model_checkpoint_path= 'checkpoints/musique_dataset/knowledge_integration/euclidean_gt_not_replaced/knit5_epoch_28_val_loss_0.0045.pth',
                              tboard_checkpoint_path=None,
-                             num_workers=16,
+                             num_workers=1,
                              curvature=log(exp(1.0) - 1),
                              gpu_parallelization=True
                              )
+            self.use_soft_prompt = True
             self.prompt_length = 100
             self.additional_log_info=f'parse_training_gt_not_replaced_euclidean_linear_layer_lr{self.learning_rate}_bsize16'
             self.hopping_prompt_checkpoint_path = None
@@ -93,7 +95,7 @@ class Config:
                 
     class T5_Model:
         def __init__(self):
-            self.batch_size = 32
+            self.batch_size = 64
             self.model_name = "google/t5-large-lm-adapt"            
             self.tokenizer_max_length = 512
             self.map_encoder_layers = []
