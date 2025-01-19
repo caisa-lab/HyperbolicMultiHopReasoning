@@ -104,8 +104,6 @@ class ModelTrainer:
         
     def train(self,
             epochs : int):
-        self.model.module.config.use_cache = False
-        self.model.module.gradient_checkpointing_enable()
         """Trains Knowledge Integration part. Given 'e1 ; r1' predict 'e2'
         """
         
@@ -122,8 +120,8 @@ class ModelTrainer:
                 
                     
     def _train_with_c4(self, epochs : int):
-        self.model.train()
         for epoch in range(epochs):
+            self.model.train()
             if self.gpu_parallelization:
                 self.single_hop_train_dataloader.sampler.set_epoch(epoch)
                 self.c4_train_dataloader.sampler.set_epoch(epoch)
