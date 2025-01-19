@@ -127,39 +127,6 @@ def load_dataset(path: str,
     
     return train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test
 
-def load_musique_dataset(path : str, replace_answer_with_gt : bool):
-    print(f"Loading Musique Datasets")
-    train_dataset = pd.read_json(f"{path}/musique_ans_v1.0_train.jsonl", lines=True)
-    dev_dataset = pd.read_json(f"{path}/musique_ans_v1.0_dev.jsonl", lines=True)
-
-    #TODO We might replace the #1 in the second question decomp with the actual answer
-    def replace_placeholders(row):
-        import re
-        q_decomp = row['question_decomposition']
-        # Initialize a mapping from question numbers to their answers
-        answer_map = {}
-        # Iterate over each question-answer pair
-        for idx, qa in enumerate(q_decomp):
-            question_text = qa['question']
-            # For questions starting from the second one
-            if idx > 0:
-                # Function to replace placeholders with actual answers
-                def replacer(match):
-                    num = int(match.group(1))
-                    return answer_map.get(num, match.group(0))
-                # Replace placeholders in the question
-                qa['question'] = re.sub(r'#(\d+)', replacer, question_text)
-            # Update the answer map
-            answer_map[idx + 1] = qa['answer']
-        # Update the row with modified question_decomposition
-        row['question_decomposition'] = q_decomp
-        return row
-    
-    if replace_answer_with_gt:
-        train_dataset.apply(replace_placeholders, axis=1)
-        dev_dataset.apply(replace_placeholders, axis=1)
-    return train_dataset, dev_dataset
-
 
 def load_c4_dataset(base_path: str,
                     number_of_files : int,
