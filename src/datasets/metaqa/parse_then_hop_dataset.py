@@ -75,7 +75,7 @@ class ParseMetaQADataset(Dataset):
 
 
     
-class ParseThenHopMusiqueDataset(Dataset):
+class ParseThenHopMetaQADataset(Dataset):
     def __init__(self, dataframe : pd.DataFrame, max_answers : int = 3):
         self.dataset = dataframe[['question', 'evidences']]
         self.dataset = self.dataset[self.dataset['evidences'].apply(lambda x : len(x) <= max_answers)]

@@ -13,12 +13,13 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import os
 from src.utils.util import set_seed
-
+from math import exp, log
   
 config = Config()
-def _train_parse_then_hop(additional_layer : str, dataset : str, rank, world_size, lr = 0.3, curvature = 1.0, knit5_checkpoint_path=None, checkpoint_save_path = None, tboard_logs_save_path = None, epochs = None):
-
-
+def _train_parse_then_hop(additional_layer : str, dataset : str, rank, world_size, lr = 0.3, curvature = 1.0, knit5_checkpoint_path=None, checkpoint_save_path = None, tboard_logs_save_path = None, epochs = None, batch_size = None, additional_layer_lr = 0.001):
+    MAX_ANSWER = None
+    GPU_PARALLELIZATION = False if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop'] else True
+    WITH_MODEL_STATE_DICT = GPU_PARALLELIZATION
     if dataset in ['2wikimultihop', 'wikimultihop']:
         train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
 
@@ -56,6 +57,9 @@ def _train_parse_then_hop(additional_layer : str, dataset : str, rank, world_siz
     print(f"Process rank: {rank} using device: {device}")
     if dist.is_initialized():
         print(f"Rank: {dist.get_rank()} / World size: {dist.get_world_size()}")
+    if batch_size is not None:
+        config.t5_model.batch_size = batch_size
+        print(f"Setting batch size to: {batch_size}")
 
     #google/t5-large-lm-adapt
     if config.parse_then_hop_training.gpu_parallelization:
@@ -80,28 +84,33 @@ def _train_parse_then_hop(additional_layer : str, dataset : str, rank, world_siz
         soft_prompt = None
     config.parse_then_hop_training.learning_rate = lr
     print(f"Setting learning rate to {lr}")
-    config.parse_then_hop_training.curvature = curvature
+    config.parse_then_hop_training.curvature = log(exp(curvature) - 1)
     print(f"Setting Curvature to {curvature}")
+    if knit5_checkpoint_path is not None:
+        config.parse_then_hop_training.model_checkpoint_path = knit5_checkpoint_path
+        print(f"Setting KNIT5 Checkpoint Load Path to: {knit5_checkpoint_path}")
+    config.single_hop_training.learning_rate = additional_layer_lr
+    print(f"Setting additional layer learning rate to {additional_layer_lr}")
 
     print("Loading Model...")
-    hyperbolic_knit5_model = T5ModelWithAdditionalLayer(layer_type=additional_layer, curvature=config.parse_then_hop_training.curvature, checkpoint_hyperbolic_knit5=config.parse_then_hop_training.model_checkpoint_path, with_model_state_dict=True, gpu_parallelization=True, soft_prompt_length=config.parse_then_hop_training.prompt_length)
-    model = SoftPromptModel(curvature=config.parse_then_hop_training.curvature, knit5=hyperbolic_knit5_model, knit5_checkpoint_path=config.parse_then_hop_training.model_checkpoint_path, model_name='hyperbolic_hopping_prompt', soft_prompt=soft_prompt, with_model_state_dict=True, gpu_parallelization=True)
+    hyperbolic_knit5_model = T5ModelWithAdditionalLayer(layer_type=additional_layer, curvature=config.parse_then_hop_training.curvature, checkpoint_hyperbolic_knit5=config.parse_then_hop_training.model_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION, soft_prompt_length=config.parse_then_hop_training.prompt_length)
+    model = SoftPromptModel(curvature=config.parse_then_hop_training.curvature, knit5=hyperbolic_knit5_model, knit5_checkpoint_path=config.parse_then_hop_training.model_checkpoint_path, model_name='parsing_prompt', soft_prompt=soft_prompt, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION)
     print(f"Train with hyperbolic Soft Prompt Model with additional layer {additional_layer} and curvature {config.parse_then_hop_training.curvature if additional_layer == 'hyperbolic' else 0.0}")
 
     if epochs is not None:
         config.parse_then_hop_training.epochs = epochs
         print(f"Setting epochs to: {epochs}")
     print("Model type before passing to SoftPromptTrainer:", type(model))
-    if knit5_checkpoint_path is not None:
-        config.parse_then_hop_training.model_checkpoint_path = knit5_checkpoint_path
-        print(f"Setting KNIT5 Checkpoint Load Path to: {knit5_checkpoint_path}")
     if checkpoint_save_path is not None:
         config.parse_then_hop_training.model_save_path = checkpoint_save_path
         print(f"Setting Checkpoint Save path to: {checkpoint_save_path}")
     if tboard_logs_save_path is not None:
         config.parse_then_hop_training.log_dir = tboard_logs_save_path
         print(f"Setting Tensorboard Log save path to: {tboard_logs_save_path}")
-    config.parse_then_hop_training.additional_log_info=f'{additional_layer}_after_encoder_bsize{config.t5_model.batch_size}_prompt_lenght{config.parse_then_hop_training.prompt_length}_lr{config.parse_then_hop_training.learning_rate}_curvature{config.parse_then_hop_training.curvature}_additional_layer_lr0.001_max_answer_{MAX_ANSWER}'
+    if MAX_ANSWER is not None:
+        config.parse_then_hop_training.additional_log_info=f'{additional_layer}_after_encoder_bsize{config.t5_model.batch_size}_prompt_lenght{config.parse_then_hop_training.prompt_length}_lr{config.parse_then_hop_training.learning_rate}_curvature{config.parse_then_hop_training.curvature}_additional_layer_lr0.001_max_answer_{MAX_ANSWER}'
+    else:
+        config.parse_then_hop_training.additional_log_info=f'{additional_layer}_after_encoder_bsize{config.t5_model.batch_size}_prompt_lenght{config.parse_then_hop_training.prompt_length}_lr{config.parse_then_hop_training.learning_rate}_curvature{config.parse_then_hop_training.curvature}_additional_layer_lr0.001'
     trainer = SoftPromptTrainer(model,
                       tokenizer,
                       parse_dataloader_train,
@@ -138,9 +147,9 @@ def setup_ddp(rank, world_size):
     torch.cuda.set_device(rank)
     set_seed(42)
 
-def train_ddp(rank, world_size, dataset, additional_layer, lr, curvature, knit5_checkpoint_path, checkpoint_save_path, tboard_logs_save_path, epochs):
+def train_ddp(rank, world_size, dataset, additional_layer, lr, curvature, knit5_checkpoint_path, checkpoint_save_path, tboard_logs_save_path, epochs, batch_size, additional_layer_lr):
     setup_ddp(rank, world_size)
-    _train_parse_then_hop(additional_layer=additional_layer, dataset=dataset, rank=rank, world_size=world_size, lr=lr, curvature=curvature, knit5_checkpoint_path=knit5_checkpoint_path, checkpoint_save_path=checkpoint_save_path, tboard_logs_save_path=tboard_logs_save_path, epochs=epochs)  # Call your training method
+    _train_parse_then_hop(additional_layer=additional_layer, dataset=dataset, rank=rank, world_size=world_size, lr=lr, curvature=curvature, knit5_checkpoint_path=knit5_checkpoint_path, checkpoint_save_path=checkpoint_save_path, tboard_logs_save_path=tboard_logs_save_path, epochs=epochs, batch_size=batch_size, additional_layer_lr = additional_layer_lr)  # Call your training method
     dist.destroy_process_group()
     
 if __name__ == '__main__':    
@@ -190,6 +199,18 @@ if __name__ == '__main__':
         default=100,
         help='Specify number of epochs'
     )
+    parser.add_argument(
+        '--batch_size',
+        type=int,
+        default=128,
+        help='Specify path for tensorboard logs'
+    )
+    parser.add_argument(
+        '--additional_layer_lr',
+        type=float,
+        default=0.001,
+        help='Specify learning rate for additional layer'
+    )
     parser.add_argument('--dataset', type=str, nargs='?', default=None, help='Specify the dataset (e.g., metaqa, 2wikimultihop)')
     args = parser.parse_args()
 
@@ -202,4 +223,6 @@ if __name__ == '__main__':
     tboard_logs_save_path = args.tboard_logs_save_path
     epochs = args.epochs
     dataset = args.dataset
-    mp.spawn(train_ddp, args=(world_size, dataset, additional_layer, lr, curvature, knit5_checkpoint_path, checkpoint_save_path, tboard_logs_save_path, epochs), nprocs=world_size, join=True)
+    batch_size = args.batch_size
+    additional_layer_lr = args.additional_layer_lr
+    mp.spawn(train_ddp, args=(world_size, dataset, additional_layer, lr, curvature, knit5_checkpoint_path, checkpoint_save_path, tboard_logs_save_path, epochs, batch_size, additional_layer_lr), nprocs=world_size, join=True)
