@@ -15,6 +15,7 @@ from torch.nn import CrossEntropyLoss
 import copy
 from src.config import Config
 import geoopt
+from torch.utils.checkpoint import checkpoint
 
 from .hyperbolic_model_utils import *
 class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
@@ -26,7 +27,7 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
                  curvature : Optional[float] = 1.0,
                  gpu_parallelization = False, 
                  soft_prompt_length = 100,
-                 only_soft_prompt = False):
+                 only_map_soft_prompt = False):
         r"""
         params:
         model_name: Pretrained Model name.
@@ -40,8 +41,8 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
         self.curvature = curvature
         self.soft_prompt_length = soft_prompt_length
         in_features = config.d_model
-        self.only_soft_prompt = only_soft_prompt
-        if self.only_soft_prompt:
+        self.only_map_soft_prompt = only_map_soft_prompt
+        if self.only_map_soft_prompt:
             print(f"Passing only soft prompts through hyperbolic")
         else:
             print(f"Passing everything through hyperbolic layer")
@@ -138,7 +139,7 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
             )
 
         hidden_states = encoder_outputs[0]
-        if self.only_soft_prompt:
+        if self.only_map_soft_prompt:
             soft_prompt_hidden_state = hidden_states[:, :self.soft_prompt_length, :]
             soft_prompt_hidden_state = self.hyperbolic_layer(soft_prompt_hidden_state)
 
