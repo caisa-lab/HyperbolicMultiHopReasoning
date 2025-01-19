@@ -18,7 +18,9 @@ class SoftPromptModel(nn.Module):
                  curvature = 1.0, 
                  soft_prompt = None,
                  with_model_state_dict = True,
-                 gpu_parallelization = False):
+                 gpu_parallelization = False,
+                 soft_prompt_length = 100,
+                 use_soft_prompt = True):
         super(SoftPromptModel, self).__init__()
         self.knit5 = knit5
         self.model_name = model_name
@@ -27,6 +29,8 @@ class SoftPromptModel(nn.Module):
            load_model_checkpoint(knit5, knit5_checkpoint_path, with_model_state_dict=with_model_state_dict, gpu_parallelization=gpu_parallelization)
         
         self.config = Config()
+        self.soft_prompt_length = soft_prompt_length
+        self.use_soft_prompt = use_soft_prompt
         
         self.curvature = curvature
         if soft_prompt is None:
@@ -49,12 +53,11 @@ class SoftPromptModel(nn.Module):
         
         self.soft_prompt.requires_grad = True
 
-        # self.knit5.gradient_checkpointing_enable()
         
     def init_soft_prompt(self):
         tokenizer = AutoTokenizer.from_pretrained(self.config.t5_model.model_name)
         #HP Soft Prompt will be tuned
-        pp_length = self.config.random_walk_training.prompt_length
+        pp_length = self.soft_prompt_length
     
         pp_embedding_size = self.knit5.config.hidden_size
         pp_embeddings = torch.randn(pp_length, pp_embedding_size)
