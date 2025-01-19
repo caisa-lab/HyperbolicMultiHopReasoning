@@ -51,26 +51,26 @@ def _comput_delta_hyperbolicity(dataloader, model, tuned, parse):
             # Extract the encoder's output at the desired layer
             encoder_output = outputs.encoder_hidden_states[24]
 
-            mask = attention_mask.bool()
+            # mask = attention_mask.bool()
 
-            token_embeddings = encoder_output[mask]
-            layer_embedding_list.append(token_embeddings.detach().cpu())
-            if idx <= 2:
-                print(f"{token_embeddings.shape = }")
+            # token_embeddings = encoder_output[mask]
+            # layer_embedding_list.append(token_embeddings.detach().cpu())
+            # if idx <= 2:
+            #     print(f"{token_embeddings.shape = }")
             
 
-            # mask = attention_mask.unsqueeze(-1)
-            # # Convert mask to float for multiplication
-            # mask = mask.float() 
-            # masked_encoder_output = encoder_output * mask
-            # sum_embeddings = masked_encoder_output.sum(dim=1)
-            # non_padded_tokens = mask.sum(dim=1)
-            # non_padded_tokens = torch.clamp(non_padded_tokens, min=1e-9)#
-            # # Compute the mean by dividing the sum by the number of non-padded tokens
-            # sentence_embedding = sum_embeddings / non_padded_tokens  # Shape: (batch_size, hidden_size)
+            mask = attention_mask.unsqueeze(-1)
+            # Convert mask to float for multiplication
+            mask = mask.float() 
+            masked_encoder_output = encoder_output * mask
+            sum_embeddings = masked_encoder_output.sum(dim=1)
+            non_padded_tokens = mask.sum(dim=1)
+            non_padded_tokens = torch.clamp(non_padded_tokens, min=1e-9)#
+            # Compute the mean by dividing the sum by the number of non-padded tokens
+            sentence_embedding = sum_embeddings / non_padded_tokens  # Shape: (batch_size, hidden_size)
 
-            # #Append to the list
-            # layer_embedding_list.append(sentence_embedding.detach().cpu())
+            #Append to the list
+            layer_embedding_list.append(sentence_embedding.detach().cpu())
 
     output_embeddings = torch.cat(layer_embedding_list, dim=0)
     mean, std, c = batched_delta_hyp(output_embeddings)
@@ -91,75 +91,122 @@ if __name__ == '__main__':
     parser.add_argument('--tuned', action='store_true', help='Takes Knit5')
     parser.add_argument('--parse', action='store_true', help='Does Parse Dataset')
     parser.add_argument('--random_walk', action='store_true', help='Does Random Walk Dataset')
+    parser.add_argument('--dataset', type=str, help='choose dataset')
+    parser.add_argument('--model_checkpoint', type=str, help='model checkpoint path')
+
     args = parser.parse_args()
     tuned = args.tuned
     random_walk = args.random_walk
     parse = args.parse
+    dataset = args.dataset
+    model_checkpoint_path = args.model_checkpoint
     dataset_string = "Parse" if parse else "Random Walk"
     tuned_string = "Tuned" if tuned else "Not Tuned"
     config = Config()
-    print(f"Start {tuned_string} {dataset_string}")
-    model_checkpoint_path = config.random_walk_training.model_checkpoint_path#'checkpoints/metaqa/knowledge_integration/Dec15_18-47-46_AdaFactor_0.001_1.0_euclidean_t5_large_batch_size64_with_c4_prefix_language_modeling/knit5_epoch_24_val_loss_0.1764.pth'
+    print(f"Start {tuned_string} {dataset_string} on {dataset}")
 
-    
-
+    #model_checkpoint_path = 'checkpoints/metaqa/knowledge_integration/Jan04_23-55-58_AdaFactor_0.001_-0.8362570675638017_knowledge_integration_bsize64_lr0.001_max_answers_1/knit5.pth'    
+    #model_checkpoint_path = 'checkpoints/metaqa/knowledge_integration/Jan04_23-55-58_AdaFactor_0.001_-0.8362570675638017_knowledge_integration_bsize64_lr0.001_max_answers_1/knit5.pth'
+    #model_checkpoint_path = 'checkpoints/mlpq/knowledge_integration/Jan05_10-42-23_AdaFactor_0.001_knowledge_integration_bsize64_lr0.001/knit5.pth'
     model_name = config.t5_model.model_name
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")
-    knit5_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    from src.models import T5ModelWithAdditionalLayer
+    knit5_model = T5ModelWithAdditionalLayer(layer_type='identity')
     import torch.nn as nn
     from src.utils.trainer_utils import load_soft_prompt
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     knit5_model.to(device)
+    GPU_PARALLELIZATION = False if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop'] else True
+    WITH_MODEL_STATE_DICT = GPU_PARALLELIZATION
     if tuned:
-        load_model_checkpoint(knit5_model, model_checkpoint_path, with_model_state_dict=True, gpu_parallelization=True)
+        load_model_checkpoint(knit5_model, model_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION)
 
-    from src.knowledge_graph import create_knowledge_graph_metaqa
+    from src.knowledge_graph import create_knowledge_graph_metaqa, create_knowledge_graph_wikimultihop
 
-    dataframe_kg = pd.read_csv("dataset/metaqa/kb.txt", sep="|")
-    all_kg = create_knowledge_graph_metaqa(dataframe_kg)
-    dev_dataset = pd.read_json('dataset/metaqa/2hops/qa_dev_evidences.json')
-    test_dataset = pd.read_json('dataset/metaqa/2hops/qa_test_evidences.json')
-    train_dataset = pd.read_json('dataset/metaqa/2hops/qa_train_evidences.json')
+   
+    from src.datasets import ParseDataset
     from src.datasets import RandomWalkMetaQADataset, ParseMetaQADataset
+    from src.datasets import RandomWalkMLPQDataset, ParseMLPQDataset
+    from src.knowledge_graph import create_knowledge_graph_mlpq
     from torch.utils.data import ConcatDataset
     if random_walk:
-        random_walk_train = RandomWalkMetaQADataset(all_kg, dev_dataset, test_dataset, steps=3, type='train', all_paths=False)
-        random_walk_dev = RandomWalkMetaQADataset(all_kg, dev_dataset, test_dataset, steps=3, type='dev', all_paths=False)
-        random_walk_test = RandomWalkMetaQADataset(all_kg, dev_dataset, test_dataset, steps=3, type='test', all_paths=False)
-        combined_dataset = ConcatDataset([random_walk_train, random_walk_test, random_walk_dev])
+        if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop']:
+            train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
+
+            all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
+            all_kg = create_knowledge_graph_wikimultihop(all_data)
+
+            print(f"Nodes in Data: {len(list(all_kg.nodes()))}")
+
+            print(f"Lenght Train Data: {len(train_dataset)}")
+            print(f"Lenght Dev Data: {len(dev_dataset)}")
+            print(f"Lenght Test Data: {len(test_dataset)}")
+
+            random_walk_train = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='train')
+            random_walk_dev = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='dev')
+
+
+        elif dataset in ['metaqa']:
+            # df_kg = pd.read_csv("dataset/metaqa/kb.txt", sep="|")
+            # kg = create_knowledge_graph_metaqa(df_kg, from_kb=True)
+
+            df_dev = pd.read_json("dataset/metaqa/2hops/qa_dev_evidences.json")
+            df_train = pd.read_json("dataset/metaqa/2hops/qa_train_evidences.json")
+            df_test = pd.read_json("dataset/metaqa/2hops/qa_test_evidences.json")
+            MAX_ANSWER = 1
+            df_kg = pd.concat([df_dev, df_train, df_test])
+            kg = create_knowledge_graph_metaqa(df_kg, from_kb=False, max_answers=MAX_ANSWER)
+            random_walk_train = RandomWalkMetaQADataset(kg, df_dev, df_test, steps=3, type='train')
+            random_walk_dev = RandomWalkMetaQADataset(kg, df_dev, df_test, steps=3, type='dev')
+        elif dataset in ['mlpq']:
+            #txt_file_paths = ['dataset/mlpq/Triples_in_questions/EN_KG', 'dataset/mlpq/Triples_in_questions/FR_KG']
+            train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', lines=True)
+            validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', lines=True)
+            test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json', lines=True)
+
+            df_kg = pd.concat([train_dataframe, validation_dataframe, test_dataframe])
+            kg = create_knowledge_graph_mlpq(df_kg, from_kb = False)
+
+            random_walk_train = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=3, type='train')
+            random_walk_dev = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=3, type='dev')
+        else:
+            raise ValueError(f"Unknown Dataset")
+        
+        combined_dataset = ConcatDataset([random_walk_train])
     if parse:
-        parse_train = ParseMetaQADataset(train_dataset)
-        parse_dev = ParseMetaQADataset(dev_dataset)
-        parse_test = ParseMetaQADataset(test_dataset)
-        combined_dataset = ConcatDataset([parse_train, parse_dev, parse_test])
-    if not random_walk and not parse:
-        from src.datasets import KnowledgeIntegrationMetaQADataset
-        print("Training on MetaQA")
-        metaqa_kg_data = pd.read_csv('dataset/metaqa/kb.txt', sep="|")
+        if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop']:
+            train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
 
-        #Comment Out if we want to use the whole kb. This used only the kb for questions with a single answer
-        df_dev = pd.read_json("dataset/metaqa/2hops/qa_dev_evidences.json")
-        df_train = pd.read_json("dataset/metaqa/2hops/qa_train_evidences.json")
-        df_test = pd.read_json("dataset/metaqa/2hops/qa_test_evidences.json")
-        evidences = df_test['evidences'].to_list() + df_train['evidences'].to_list() + df_dev['evidences'].to_list()
-        list_of_all_entities = set()
-        for evidence_list in evidences:
-            if len(evidence_list) > 1:
-                continue
-            for evidence in evidence_list:
-                entity_1 = evidence[0]
-                entity_2 = evidence[2]
-                entity_3 = evidence[4]
-                list_of_all_entities.add(entity_1)
-                list_of_all_entities.add(entity_2)
-                list_of_all_entities.add(entity_3)
-        list_of_all_entities = list(list_of_all_entities)
-        kg = create_knowledge_graph_metaqa(metaqa_kg_data, list_of_all_entities=list_of_all_entities)
+            all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
+            all_kg = create_knowledge_graph_wikimultihop(all_data)
 
-        combined_dataset = KnowledgeIntegrationMetaQADataset(kg)
-    dataloader = DataLoader(combined_dataset, shuffle=False, batch_size=64, num_workers=16)
+            print(f"Nodes in Data: {len(list(all_kg.nodes()))}")
+
+            print(f"Lenght Train Data: {len(train_dataset)}")
+            print(f"Lenght Dev Data: {len(dev_dataset)}")
+            print(f"Lenght Test Data: {len(test_dataset)}")
+
+            parse_train = ParseDataset(train_dataset)
+            parse_dev = ParseDataset(dev_dataset)
+        elif dataset in ['metaqa']:
+            df_dev = pd.read_json("dataset/metaqa/2hops/qa_dev_evidences.json")
+            df_train = pd.read_json("dataset/metaqa/2hops/qa_train_evidences.json")
+            #df_test = pd.read_json("dataset/metaqa/2hops/qa_test_evidences.json")
+            MAX_ANSWER = 1
+            parse_train = ParseMetaQADataset(df_train, max_answers=MAX_ANSWER)
+            parse_dev = ParseMetaQADataset(df_dev, max_answers=MAX_ANSWER)
+        elif dataset in ['mlpq']:
+            validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', lines=True)
+            train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', lines=True)
+
+            parse_train = ParseMLPQDataset(train_dataframe)
+            parse_dev = ParseMLPQDataset(validation_dataframe)
+        else:
+            raise ValueError(f"Unknown Dataset")
+        combined_dataset = ConcatDataset([parse_train])
+    dataloader = DataLoader(combined_dataset, shuffle=False, batch_size=256, num_workers=1)
 
     
 
