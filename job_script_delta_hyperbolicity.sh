@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#SBATCH --partition=A100medium
-#SBATCH --time=4:00:00
+#SBATCH --partition=A40devel
+#SBATCH --time=1:00:00
 #SBATCH --gpus=1
 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --job-name=random_walk_delta_hyperbolicity
-#SBATCH --output=outputs/final_results/random_walk_delta_hyperbolicity%j.txt
-#SBATCH --error=outputs/final_results/random_walk_delta_hyperbolicity%j.txt
+#SBATCH --job-name=delta_hyp
+#SBATCH --output=outputs/metaqa/delta_hyp/parse_delta_hyperbolicity_%j.txt
+#SBATCH --error=outputs/metaqa/delta_hyp/parse_delta_hyperbolicity_%j.txt
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=welz.simon@outlook.de
 
@@ -54,4 +54,8 @@ echo $PATH
 
 echo "Libraries Installed"
 echo "Starting Training Script...."
-python -u compute_delta_hyperbolicity.py --random_walk --tuned
+python -u compute_delta_hyperbolicity.py \
+    --parse \
+    --tuned \
+    --dataset metaqa \
+    --model_checkpoint checkpoints/metaqa/knowledge_integration/Jan04_23-55-58_AdaFactor_0.001_-0.8362570675638017_knowledge_integration_bsize64_lr0.001_max_answers_1/knit5.pth
