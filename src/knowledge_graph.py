@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from tqdm import tqdm
 
-def create_knowledge_graph_mlpq(txt_file_paths : list, from_kb = True):
+def create_knowledge_graph_mlpq(txt_file_paths : list, from_kb = True, hops = 2):
     G = nx.MultiDiGraph()
     if from_kb:
         for txt_file_path in txt_file_paths:
@@ -27,15 +27,17 @@ def create_knowledge_graph_mlpq(txt_file_paths : list, from_kb = True):
                         print(f"Length of line != 3: {line}")
     else:
         for evidence in txt_file_paths['evidences']:
-            first_head = evidence[0]
-            first_relation = evidence[1]
-            first_tail = evidence[2]
-            second_head = evidence[2]
-            second_relation = evidence[3]
-            second_tail = evidence[4]
+            for i in range(hops):
+                head = evidence[2*i]
+                relation = evidence[2*i+1]
+                tail = evidence[2*i+2]
 
-            G.add_edge(first_head, first_tail, key=first_relation, relation=first_relation) 
-            G.add_edge(second_head, second_tail, key=second_relation, relation=second_relation) 
+                #i = 0 --> 0,1,2
+                #i= 1 --> 2,3,4
+                #i=2--> 4,5,6
+
+                G.add_edge(head, tail, key=relation, relation=relation) 
+            
 
     return G
 

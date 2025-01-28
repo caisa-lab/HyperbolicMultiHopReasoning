@@ -47,7 +47,15 @@ def _knowledge_integration_with_c4(dataset, rank = 0, world_size = 0):
         test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json', lines=True)
 
         df_kg = pd.concat([train_dataframe, validation_dataframe, test_dataframe])
-        kg = create_knowledge_graph_mlpq(df_kg, from_kb = False)
+        kg = create_knowledge_graph_mlpq(df_kg, from_kb = False, hops=2)
+        ki_dataset = KnowledgeIntegrationMLPQDataset(kg)
+    elif dataset in ['mlpq-3hop']:
+        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', lines=True)
+        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', lines=True)
+        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json', lines=True)
+
+        df_kg = pd.concat([train_dataframe, validation_dataframe, test_dataframe])
+        kg = create_knowledge_graph_mlpq(df_kg, from_kb = False, hops=3)
         ki_dataset = KnowledgeIntegrationMLPQDataset(kg)
     else:
         raise ValueError("Unknown Dataset")  
