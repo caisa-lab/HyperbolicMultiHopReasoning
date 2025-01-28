@@ -14,7 +14,7 @@ import os
 from math import exp, log
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 config = Config()
-def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, lr = 0.3, curvature = 1.0, knit5_checkpoint_path=None, checkpoint_save_path = None, tboard_logs_save_path = None, epochs = None, batch_size = 128, additional_layer_lr = 0.001, no_soft_prompt = False):
+def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, lr = 0.3, curvature = 1.0, knit5_checkpoint_path=None, checkpoint_save_path = None, tboard_logs_save_path = None, epochs = None, batch_size = 128, additional_layer_lr = 0.001, no_soft_prompt = False, use_scheduler = False, num_layers = 1):
     MAX_ANSWER = None
     GPU_PARALLELIZATION = False if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop'] else True
     WITH_MODEL_STATE_DICT = GPU_PARALLELIZATION
@@ -57,6 +57,16 @@ def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, 
 
         random_walk_train = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=3, type='train')
         random_walk_dev = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=3, type='dev')
+    elif dataset in ['mlpq-3hop']:
+        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_train_question_evidences.json', lines=True)
+        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_dev_question_evidences.json', lines=True)
+        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_test_question_evidences.json', lines=True)
+
+        df_kg = pd.concat([train_dataframe, validation_dataframe, test_dataframe])
+        kg = create_knowledge_graph_mlpq(df_kg, from_kb = False, hops=3)
+
+        random_walk_train = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=4, type='train')
+        random_walk_dev = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=4, type='dev')
     else:
         raise ValueError(f"Unknown Dataset")
     print(f"Number of Random Walks Train: {len(random_walk_train)}")
@@ -114,6 +124,8 @@ def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, 
     print(f"Setting Curvature to {curvature}")
     config.single_hop_training.learning_rate = additional_layer_lr
     print(f"Setting additional layer learning rate to {additional_layer_lr}")
+    config.random_walk_training.use_scheduler = use_scheduler
+    print(f"Setting use scheduler to {use_scheduler}")
 
     print("Loading Model...")
     import torch.nn as nn
@@ -125,10 +137,10 @@ def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, 
         soft_prompt = load_soft_prompt(soft_prompt, config.random_walk_training.hopping_prompt_checkpoint_path)
     else:
         soft_prompt = None
-    if knit5_checkpoint_path is not None:
-        config.random_walk_training.model_checkpoint_path = knit5_checkpoint_path
-        print(f"Setting KNIT5 Checkpoint Load Path to: {knit5_checkpoint_path}")
-    hyperbolic_knit5_model = T5ModelWithAdditionalLayer(layer_type=additional_layer, curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=config.random_walk_training.model_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION, soft_prompt_length=config.random_walk_training.prompt_length)
+    config.random_walk_training.model_checkpoint_path = knit5_checkpoint_path
+    print(f"Setting KNIT5 Checkpoint Load Path to: {knit5_checkpoint_path}")
+    print(f"Number of Layers are {num_layers}")
+    hyperbolic_knit5_model = T5ModelWithAdditionalLayer(layer_type=additional_layer, num_layers=num_layers, curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=config.random_walk_training.model_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION, soft_prompt_length=config.random_walk_training.prompt_length)
     model = SoftPromptModel(curvature=config.random_walk_training.curvature, knit5=hyperbolic_knit5_model, knit5_checkpoint_path=config.random_walk_training.model_checkpoint_path, model_name='hyperbolic_hopping_prompt', soft_prompt=soft_prompt, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION, soft_prompt_length=config.random_walk_training.prompt_length)
     print(f"Train with hyperbolic Soft Prompt Model with additional layer {additional_layer} and curvature {config.random_walk_training.curvature if additional_layer == 'hyperbolic' else 0.0}")
 
@@ -143,9 +155,9 @@ def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, 
         config.random_walk_training.log_dir = tboard_logs_save_path
         print(f"Setting Tensorboard Log save path to: {tboard_logs_save_path}")
     if MAX_ANSWER:
-        config.random_walk_training.additional_log_info=f'{additional_layer}_after_encoder_bsize{config.t5_model.batch_size}_prompt_lenght{config.random_walk_training.prompt_length}_lr{config.random_walk_training.learning_rate}_curvature{config.random_walk_training.curvature}_additional_layer_lr{additional_layer_lr}_max_answer_{MAX_ANSWER}'
+        config.random_walk_training.additional_log_info=f'{additional_layer}_after_encoder_bsize{config.t5_model.batch_size}_prompt_lenght{config.random_walk_training.prompt_length}_lr{config.random_walk_training.learning_rate}_curvature{config.random_walk_training.curvature}_additional_layer_lr{additional_layer_lr}_max_answer_{MAX_ANSWER}_use_prompt_{config.random_walk_training.use_soft_prompt}'
     else:
-        config.random_walk_training.additional_log_info=f'{additional_layer}_after_encoder_bsize{config.t5_model.batch_size}_prompt_lenght{config.random_walk_training.prompt_length}_lr{config.random_walk_training.learning_rate}_curvature{config.random_walk_training.curvature}_additional_layer_lr{additional_layer_lr}'
+        config.random_walk_training.additional_log_info=f'{additional_layer}_after_encoder_bsize{config.t5_model.batch_size}_prompt_lenght{config.random_walk_training.prompt_length}_lr{config.random_walk_training.learning_rate}_curvature{config.random_walk_training.curvature}_additional_layer_lr{additional_layer_lr}_use_prompt_{config.random_walk_training.use_soft_prompt}'
     trainer = SoftPromptTrainer(model,
                       tokenizer,
                       random_walk_dataloader_train,
@@ -186,9 +198,9 @@ def setup_ddp(rank, world_size):
     torch.cuda.set_device(rank)
     set_seed(42)
 
-def train_ddp(rank, world_size, dataset, additional_layer, lr, curvature, knit5_checkpoint_path, checkpoint_save_path, tboard_logs_save_path, epochs, batch_size, additional_layer_lr, no_soft_prompt):
+def train_ddp(rank, world_size, dataset, additional_layer, lr, curvature, knit5_checkpoint_path, checkpoint_save_path, tboard_logs_save_path, epochs, batch_size, additional_layer_lr, no_soft_prompt, use_scheduler, num_layers):
     setup_ddp(rank, world_size)
-    _train_random_walk(additional_layer=additional_layer, dataset=dataset, rank=rank, world_size=world_size, lr=lr, curvature=curvature, knit5_checkpoint_path=knit5_checkpoint_path, checkpoint_save_path=checkpoint_save_path, tboard_logs_save_path=tboard_logs_save_path, epochs = epochs, batch_size = batch_size, additional_layer_lr = additional_layer_lr, no_soft_prompt = no_soft_prompt)  # Call your training method
+    _train_random_walk(additional_layer=additional_layer, dataset=dataset, rank=rank, world_size=world_size, lr=lr, curvature=curvature, knit5_checkpoint_path=knit5_checkpoint_path, checkpoint_save_path=checkpoint_save_path, tboard_logs_save_path=tboard_logs_save_path, epochs = epochs, batch_size = batch_size, additional_layer_lr = additional_layer_lr, no_soft_prompt = no_soft_prompt, use_scheduler = use_scheduler, num_layers = num_layers)  # Call your training method
     dist.destroy_process_group()
 
 if __name__ == '__main__':    
@@ -257,6 +269,17 @@ if __name__ == '__main__':
         help='If set, dont use soft prompt',
         default = False
     )
+    parser.add_argument(
+        '--use_scheduler',
+        action='store_true',
+        help='If set, use scheduler'
+    )
+    parser.add_argument(
+        '--num_layers',
+        type=int,
+        default=1,
+        help='Specify number of layers'
+    )
 
     args = parser.parse_args()
 
@@ -272,5 +295,7 @@ if __name__ == '__main__':
     batch_size = args.batch_size
     additional_layer_lr = args.additional_layer_lr
     no_soft_prompt = args.no_soft_prompt
-    mp.spawn(train_ddp, args=(world_size, dataset, additional_layer, lr, curvature, knit5_checkpoint_path, checkpoint_save_path, tboard_logs_save_path, epochs, batch_size, additional_layer_lr, no_soft_prompt), nprocs=world_size, join=True)
+    use_scheduler = args.use_scheduler
+    num_layers = args.num_layers
+    mp.spawn(train_ddp, args=(world_size, dataset, additional_layer, lr, curvature, knit5_checkpoint_path, checkpoint_save_path, tboard_logs_save_path, epochs, batch_size, additional_layer_lr, no_soft_prompt, use_scheduler, num_layers), nprocs=world_size, join=True)
 
