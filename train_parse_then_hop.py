@@ -1,4 +1,4 @@
-from src.utils.util import load_dataset, load_musique_dataset
+from src.utils.util import load_dataset
 from src.train import *
 from src.datasets import ParseDataset, ParseMetaQADataset, ParseMLPQDataset
 import pandas as pd
@@ -44,6 +44,12 @@ def _train_parse_then_hop(additional_layer : str, dataset : str, rank, world_siz
     elif dataset in ['mlpq']:
         validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', lines=True)
         train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', lines=True)
+
+        parse_train = ParseMLPQDataset(train_dataframe)
+        parse_dev = ParseMLPQDataset(validation_dataframe)
+    elif dataset in ['mlpq-3hop']:
+        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_dev_question_evidences.json', lines=True)
+        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_train_question_evidences.json', lines=True)
 
         parse_train = ParseMLPQDataset(train_dataframe)
         parse_dev = ParseMLPQDataset(validation_dataframe)
