@@ -3,6 +3,7 @@ from src.utils.trainer_utils import load_model_checkpoint
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from src.datasets import RandomWalkDataset, ParseDataset
+from src.models import T5ModelWithAdditionalLayer
 import torch
 from src.config import Config
 from torch.utils.data import DataLoader
@@ -32,7 +33,7 @@ def plot_layer_hyperbolicity(layer_hyperbolicity_dict, title, save_path = None,)
     if save_path is not None:
         plt.savefig(save_path)
     plt.show()
-def _comput_delta_hyperbolicity(dataloader, model, tuned, parse):
+def _comput_delta_hyperbolicity(dataloader, model : T5ModelWithAdditionalLayer, tuned, parse):
     from tqdm import tqdm
     from src.utils.delta import batched_delta_hyp
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -41,35 +42,37 @@ def _comput_delta_hyperbolicity(dataloader, model, tuned, parse):
     layer_embedding_list = []
     with torch.no_grad():
         for idx, (question, answer) in enumerate(tqdm(dataloader, file=sys.stdout)):
+            # labels = tokenizer(answer, padding=True, truncation=True, return_tensors='pt').input_ids.to(device)
+            
             inputs = tokenizer(question, padding=True, truncation=True, return_tensors='pt')
-            labels = tokenizer(answer, padding=True, truncation=True, return_tensors='pt').input_ids.to(device)
             input_ids = inputs.input_ids.to(device)
             attention_mask = inputs.attention_mask.to(device)
-            
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True, labels = labels)
+        
+            outputs = model.encoder(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
 
             # Extract the encoder's output at the desired layer
-            encoder_output = outputs.encoder_hidden_states[24]
+            # encoder_output = outputs.encoder_hidden_states[24]
+            encoder_output = outputs['last_hidden_state']
+            #mask = attention_mask.bool()
+            # print(encoder_output['last_hidden_state'])
+            # print(mask.shape)
 
-            # mask = attention_mask.bool()
-
-            # token_embeddings = encoder_output[mask]
-            # layer_embedding_list.append(token_embeddings.detach().cpu())
-            # if idx <= 2:
-            #     print(f"{token_embeddings.shape = }")
+            #token_embeddings = encoder_output[mask]
+            #layer_embedding_list.append(token_embeddings.detach().cpu())
+                
             
 
             mask = attention_mask.unsqueeze(-1)
-            # Convert mask to float for multiplication
+            # # Convert mask to float for multiplication
             mask = mask.float() 
             masked_encoder_output = encoder_output * mask
             sum_embeddings = masked_encoder_output.sum(dim=1)
             non_padded_tokens = mask.sum(dim=1)
             non_padded_tokens = torch.clamp(non_padded_tokens, min=1e-9)#
-            # Compute the mean by dividing the sum by the number of non-padded tokens
+            # # Compute the mean by dividing the sum by the number of non-padded tokens
             sentence_embedding = sum_embeddings / non_padded_tokens  # Shape: (batch_size, hidden_size)
 
-            #Append to the list
+            # #Append to the list
             layer_embedding_list.append(sentence_embedding.detach().cpu())
 
     output_embeddings = torch.cat(layer_embedding_list, dim=0)
@@ -146,6 +149,7 @@ if __name__ == '__main__':
 
             random_walk_train = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='train')
             random_walk_dev = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='dev')
+            random_walk_test = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='test')
 
 
         elif dataset in ['metaqa']:
@@ -160,6 +164,7 @@ if __name__ == '__main__':
             kg = create_knowledge_graph_metaqa(df_kg, from_kb=False, max_answers=MAX_ANSWER)
             random_walk_train = RandomWalkMetaQADataset(kg, df_dev, df_test, steps=3, type='train')
             random_walk_dev = RandomWalkMetaQADataset(kg, df_dev, df_test, steps=3, type='dev')
+            random_walk_test = RandomWalkMetaQADataset(kg, df_dev, df_test, steps=3, type='test')
         elif dataset in ['mlpq']:
             #txt_file_paths = ['dataset/mlpq/Triples_in_questions/EN_KG', 'dataset/mlpq/Triples_in_questions/FR_KG']
             train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', lines=True)
@@ -171,6 +176,7 @@ if __name__ == '__main__':
 
             random_walk_train = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=3, type='train')
             random_walk_dev = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=3, type='dev')
+            random_walk_test = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=3, type='test')
         else:
             raise ValueError(f"Unknown Dataset")
         
