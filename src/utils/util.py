@@ -93,9 +93,32 @@ def print_datapoint(dataset, idx):
     print(f"context: {dataset['context'][idx]}") # Context can be used to concatonate with question to form input sequence
     print(f"evidences: {dataset['evidences'][idx]}") # e1, r1, e2 For knowledge Graph
     print(f"answer: {dataset['answer'][idx]}") # Label / Answer
+import pickle
+def load_train_test_pql_dataset(file_path : str, test_ratio = 0.1, random_state = 42):
+    data_list = []
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            splitted_line = line.split('\t')
+            question = splitted_line[0]
+            answer = splitted_line[1].split('(')[0]
+            path = splitted_line[2].split('#')
+            if "<end>" in path:
+                end_index = path.index("<end>")
+                path = path[:end_index]
+            data_list.append({
+                'question':question,
+                'answer': answer,
+                'evidences':path
+            })
+    data = pd.DataFrame(data_list)
+    train_dataset, test_dataset = train_test_split(data, test_size=test_ratio, random_state=random_state)
+    return train_dataset, test_dataset
 
-#I only have one more Question in the Training Data the rest is the same
-# They didnt have the 'has part' relation in their set.
+        
+            
+            
+
 def load_dataset(path: str,
                  do_correct_wrong_evidences : bool = False):
     print(f"Loading Datasets...")

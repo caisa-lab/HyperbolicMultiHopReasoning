@@ -2,7 +2,44 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
 from tqdm import tqdm
+import pickle
 
+def create_knowledge_graph_pql(file_path : str, from_kb = False, hops= 2):
+    G = nx.MultiDiGraph()
+    if from_kb:
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                # Remove whitespace at the start and end
+                line = line.strip()
+                
+                # Split the line by tabs
+                parts = line.split('\t')
+                
+                # Check we have at least three parts
+                if len(parts) == 3:
+                    head = parts[0]
+                    relation = parts[1]
+                    tail = parts[2]
+                    G.add_edge(head, tail, key=relation, relation=relation)
+                else:
+                    print(f"Length of line != 3: {line}")
+    else:
+        with open(file_path, "r", encoding="utf-8") as f:  # "rb" mode means "read binary"
+            for line in f:
+                line = line.strip()
+                splitted_line = line.split('\t')
+                path = splitted_line[2]
+                path = path.split('#')
+                for i in range(hops):
+                    head = path[2*i]
+                    relation = path[2*i+1]
+                    tail = path[2*i+2]
+
+                    #i = 0 --> 0,1,2
+                    #i= 1 --> 2,3,4
+                    #i=2--> 4,5,6
+                    G.add_edge(head, tail, key=relation, relation=relation) 
+    return G
 def create_knowledge_graph_mlpq(txt_file_paths : list, from_kb = True, hops = 2):
     G = nx.MultiDiGraph()
     if from_kb:
@@ -20,8 +57,6 @@ def create_knowledge_graph_mlpq(txt_file_paths : list, from_kb = True, hops = 2)
                         head = parts[0].lower()
                         relation = parts[1].lower()
                         tail = parts[2].lower()
-                        if head == 'triumvirate' or head == 'triumvirat':
-                            continue
                         G.add_edge(head, tail, key=relation, relation=relation)
                     else:
                         print(f"Length of line != 3: {line}")
