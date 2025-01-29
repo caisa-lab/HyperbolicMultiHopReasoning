@@ -1,6 +1,5 @@
-from torch.utils.data import Dataset
-
-class KnowledgeIntegrationDataset(Dataset):
+from ..knowledge_integration_dataset import KnowledgeIntegrationDataset
+class KnowledgeIntegrationWikiHopDataset(KnowledgeIntegrationDataset):
     """
     Needs a dataset that has all entries so train + dev + test. 
     """

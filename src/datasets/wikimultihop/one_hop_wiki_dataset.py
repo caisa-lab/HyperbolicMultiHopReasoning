@@ -2,14 +2,7 @@ from torch.utils.data import Dataset
 from .single_hop_dataset import SingleHopDataset
 class OneWikiHopDataset(Dataset):
     """
-    Takes all Datasets and creates the OneWikiHopDataset for the type. Returns 
-    {
-            'question': question,
-            'context': context,
-            'evidences': evidences,
-            'answer': answer
-        }
-    
+
     """
     def __init__(self, train_dataset, dev_dataset, test_dataset, type='train'):
         if type not in ['train', 'test', 'dev']:

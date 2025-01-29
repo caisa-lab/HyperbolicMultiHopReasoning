@@ -1,9 +1,9 @@
 from ..parse_then_hop_dataset import ParseDataset, ParseThenHopDataset
-class ParseMLPQDataset(ParseDataset):
+class ParsePQLDataset(ParseDataset):
     pass
 
 
 
     
-class ParseThenHopMLPQDataset(ParseThenHopDataset):
+class ParseThenHopPQLDataset(ParseThenHopDataset):
     pass
