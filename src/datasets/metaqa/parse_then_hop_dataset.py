@@ -1,20 +1,20 @@
 import pandas as pd
 from ..parse_then_hop_dataset import ParseDataset, ParseThenHopDataset
 class ParseMetaQADataset(ParseDataset):
-    def __init__(self, dataframe: pd.DataFrame, max_answers : int = 3):
-        """
-        Initializes the dataset with the provided DataFrame.
+    # def __init__(self, dataframe: pd.DataFrame, max_answers : int = 3):
+    #     """
+    #     Initializes the dataset with the provided DataFrame.
 
-        Args:
-            dataframe (pd.DataFrame): The input DataFrame containing 'question' and 'evidences' columns.
-        """
-        super().__init__(dataframe)
-        self.dataset = self.dataset[self.dataset['evidences'].apply(lambda x : len(x) <= max_answers)]
+    #     Args:
+    #         dataframe (pd.DataFrame): The input DataFrame containing 'question' and 'evidences' columns.
+    #     """
+    #     super().__init__(dataframe)
+    #     self.dataset = self.dataset[self.dataset['evidences'].apply(lambda x : len(x) <= max_answers)]
 
-        for evidence_list in self.dataset['evidences']:
-            if len(evidence_list) > max_answers:
-                print(f"Found List with more than {max_answers} evidences: {evidence_list}")
-        print(f"No Evidence List found with more than {max_answers}")
+    #     for evidence_list in self.dataset['evidences']:
+    #         if len(evidence_list) > max_answers:
+    #             print(f"Found List with more than {max_answers} evidences: {evidence_list}")
+    #     print(f"No Evidence List found with more than {max_answers}")
 
 
 
@@ -34,9 +34,9 @@ class ParseMetaQADataset(ParseDataset):
 
     
 class ParseThenHopMetaQADataset(ParseThenHopDataset):
-    def __init__(self, dataframe : pd.DataFrame, max_answers : int = 3):
-        super().__init__(dataframe)
-        self.dataset = self.dataset[self.dataset['evidences'].apply(lambda x : len(x) <= max_answers)]
+    # def __init__(self, dataframe : pd.DataFrame, max_answers : int = 3):
+    #     super().__init__(dataframe)
+    #     self.dataset = self.dataset[self.dataset['evidences'].apply(lambda x : len(x) <= max_answers)]
         
     
     def __getitem__ (self, idx):
