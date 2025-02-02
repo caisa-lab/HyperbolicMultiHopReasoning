@@ -6,10 +6,6 @@ class RandomWalkPQLDataset(RandomWalkDataset):
 
     Returns: Random Walk dataset should output an incomplete sequence like "e1 ; r1 ; r2 ; ... ; rn-1;" and a complete sequence "e1 ; r1 ; e2 ; ... ; rn-1 ; en"
     """
-    def __init__(self, all_kg, test_dataset, steps, type = 'train'):
-        if type == 'dev':
-            raise ValueError('PQL has only test and train')
-        super().__init__(all_kg, pd.DataFrame({'evidences': []}), test_dataset, steps, type)
            
     def _get_walks(self, dataset):
         """

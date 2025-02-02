@@ -113,7 +113,8 @@ def load_train_test_pql_dataset(file_path : str, test_ratio = 0.1, random_state 
             })
     data = pd.DataFrame(data_list)
     train_dataset, test_dataset = train_test_split(data, test_size=test_ratio, random_state=random_state)
-    return train_dataset, test_dataset
+    train_dataset, val_dataset = train_test_split(data, test_size=0.11, random_state=0)
+    return train_dataset, val_dataset, test_dataset
 
         
             
