@@ -1,14 +1,13 @@
-from src.utils.util import load_dataset, get_top_token_embeddings
+from src.utils.util import load_dataset, get_top_token_embeddings, load_train_test_pql_dataset
 import pandas as pd
 from src.train.soft_prompt_trainer import SoftPromptTrainer
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from src.datasets import RandomWalkDataset
 import torch
 from src.config import Config
 from torch.utils.data import DataLoader
-from src.knowledge_graph import create_knowledge_graph_wikimultihop, create_knowledge_graph_metaqa, create_knowledge_graph_mlpq
+from src.knowledge_graph import create_knowledge_graph_wikimultihop, create_knowledge_graph_metaqa, create_knowledge_graph_mlpq, create_knowledge_graph_pql
 from src.models import SoftPromptModel, T5ModelWithAdditionalLayer
-from src.datasets import RandomWalkMetaQADataset, RandomWalkMLPQDataset
+from src.datasets import RandomWalkMetaQADataset, RandomWalkMLPQDataset, RandomWalkWikiHopDataset, RandomWalkPQLDataset
 import argparse
 import os
 from math import exp, log
@@ -16,7 +15,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 config = Config()
 def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, lr = 0.3, curvature = 1.0, knit5_checkpoint_path=None, checkpoint_save_path = None, tboard_logs_save_path = None, epochs = None, batch_size = 128, additional_layer_lr = 0.001, no_soft_prompt = False, use_scheduler = False, num_layers = 1):
     MAX_ANSWER = None
-    GPU_PARALLELIZATION = False if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop'] else True
+    GPU_PARALLELIZATION = True#False if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop'] else True
     WITH_MODEL_STATE_DICT = GPU_PARALLELIZATION
     if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop']:
         train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
@@ -30,8 +29,8 @@ def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, 
         print(f"Lenght Dev Data: {len(dev_dataset)}")
         print(f"Lenght Test Data: {len(test_dataset)}")
 
-        random_walk_train = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='train')
-        random_walk_dev = RandomWalkDataset(all_kg, dev_dataset, test_dataset, steps=3, type='dev')
+        random_walk_train = RandomWalkWikiHopDataset(all_kg, dev_dataset, test_dataset, steps=3, type='train')
+        random_walk_dev = RandomWalkWikiHopDataset(all_kg, dev_dataset, test_dataset, steps=3, type='dev')
 
 
     elif dataset in ['metaqa']:
@@ -67,6 +66,14 @@ def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, 
 
         random_walk_train = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=4, type='train')
         random_walk_dev = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=4, type='dev')
+    elif dataset in ['pql']:
+        file_path = "dataset/pathquestion/PQ-2H.txt"
+        train, val, test = load_train_test_pql_dataset(file_path, random_state = 789)
+        file_path_kb = "dataset/pathquestion/2H-kb.txt"
+        kg = create_knowledge_graph_pql(file_path, from_kb=False)
+
+        random_walk_train = RandomWalkPQLDataset(kg, val, test, steps=3, type='train')
+        random_walk_dev = RandomWalkPQLDataset(kg, val, test, steps=3, type='dev')
     else:
         raise ValueError(f"Unknown Dataset")
     print(f"Number of Random Walks Train: {len(random_walk_train)}")
@@ -254,7 +261,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=128,
+        default=64,
         help='Specify path for tensorboard logs'
     )
     parser.add_argument(

@@ -1,11 +1,9 @@
 from src.utils.util import load_dataset, load_c4_dataset
-from src.knowledge_graph import create_knowledge_graph_metaqa, create_knowledge_graph_mlpq
+from src.knowledge_graph import create_knowledge_graph_metaqa, create_knowledge_graph_mlpq, create_knowledge_graph_pql
 
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from src.datasets import KnowledgeIntegrationDataset, C4Dataset
-from src.datasets.metaqa import KnowledgeIntegrationMetaQADataset
-from src.datasets import KnowledgeIntegrationMLPQDataset
+from src.datasets import KnowledgeIntegrationMLPQDataset, KnowledgeIntegrationMetaQADataset, KnowledgeIntegrationPQLDataset, KnowledgeIntegrationWikiHopDataset, C4Dataset
 import torch
 from src.config import Config
 from torch.utils.data import DataLoader
@@ -15,7 +13,7 @@ from src.models import T5ModelWithAdditionalLayer
 import torch.distributed as dist
 
 config = Config()
-def _knowledge_integration_with_c4(dataset, rank = 0, world_size = 0):
+def _knowledge_integration_with_c4(dataset, rank, world_size, learning_rate=0.001, epochs=50, checkpoint_save_path=None, tboard_logs_save_path=None, batch_size=64):
 
     if dataset in ['2wikimultihop', 'wikimultihop']: 
         print("Training on 2WikiMultiHopQA")
@@ -25,7 +23,7 @@ def _knowledge_integration_with_c4(dataset, rank = 0, world_size = 0):
         print("Creating Single Hop Datasets...")
         dataset_with_all_entries = pd.concat([train_dataset, dev_dataset, test_dataset])
 
-        ki_dataset = KnowledgeIntegrationDataset(dataset_with_all_entries)
+        ki_dataset = KnowledgeIntegrationWikiHopDataset(dataset_with_all_entries)
 
     elif dataset in ['metaqa']:
         print("Training on MetaQA")
@@ -57,6 +55,12 @@ def _knowledge_integration_with_c4(dataset, rank = 0, world_size = 0):
         df_kg = pd.concat([train_dataframe, validation_dataframe, test_dataframe])
         kg = create_knowledge_graph_mlpq(df_kg, from_kb = False, hops=3)
         ki_dataset = KnowledgeIntegrationMLPQDataset(kg)
+    elif dataset in ['pql']:
+        # from src.utils.util import load_train_test_pql_dataset
+        file_path_kb = "dataset/pathquestion/PQL-KB.txt"
+        file_path_paths = "dataset/pathquestion/PQ-2H.txt"
+        kg = create_knowledge_graph_pql(file_path_paths, from_kb=False)
+        ki_dataset = KnowledgeIntegrationPQLDataset(kg)
     else:
         raise ValueError("Unknown Dataset")  
 
@@ -73,8 +77,8 @@ def _knowledge_integration_with_c4(dataset, rank = 0, world_size = 0):
     #google/t5-large-lm-adapt
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(config.t5_model.model_name)
-    config.t5_model.tokenizer_max_length = 115
-    tokenizer.model_max_length = 115#config.t5_model.tokenizer_max_length
+    config.t5_model.tokenizer_max_length = 128
+    tokenizer.model_max_length = 128#config.t5_model.tokenizer_max_length
     print(f"Loading Model {config.t5_model.model_name}...")
     #Adjust Dropout
    
@@ -91,7 +95,21 @@ def _knowledge_integration_with_c4(dataset, rank = 0, world_size = 0):
 
     objective = 'prefix_language_modeling'
     c4_train = C4Dataset(c4_dataset ,tokenizer=tokenizer, objective=objective)
-        
+    
+    #Set Variables
+    config.single_hop_training.learning_rate = learning_rate
+    print(f"Setting Learning Rate to {learning_rate}")
+    config.single_hop_training.epochs = epochs
+    print(f"Setting Number of Epochs to {epochs}")
+    config.single_hop_training.model_save_path = checkpoint_save_path
+    print(f"Setting Checkpoint Save Path to {checkpoint_save_path}")
+    config.single_hop_training.log_dir = tboard_logs_save_path
+    print(f"Setting tboard_logs_save_path to {tboard_logs_save_path}")
+    config.t5_model.batch_size = batch_size
+    print(f"Setting Batch Size to {batch_size}")
+
+
+
     if config.single_hop_training.gpu_parallelization:
         from torch.utils.data import DistributedSampler
 
@@ -149,20 +167,55 @@ def setup_ddp(rank, world_size):
     set_seed(42)
     
 
-def train_ddp(rank, world_size, dataset):
+def train_ddp(rank, world_size, dataset, learning_rate, epochs, checkpoint_save_path, tboard_logs_save_path, batch_size):
     setup_ddp(rank, world_size)
-    _knowledge_integration_with_c4(dataset=dataset, rank=rank, world_size=world_size)  # Call your training method
+    _knowledge_integration_with_c4(dataset=dataset, rank=rank, world_size=world_size, learning_rate=learning_rate, epochs=epochs, checkpoint_save_path=checkpoint_save_path, tboard_logs_save_path=tboard_logs_save_path, batch_size=batch_size)  # Call your training method
     dist.destroy_process_group()
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Knowledge Integration Training')
     parser.add_argument('--c4', action='store_true', help='Include C4 dataset in training')
-    parser.add_argument('remainder', type=str, nargs='?', default=None, help='Specify the remainder (e.g., metaqa, 2wikimultihop)')
+    parser.add_argument('--dataset', type=str, default=None, help='Specify the Dataset (e.g., metaqa, 2wikimultihop)')
+    parser.add_argument(
+        '--learning_rate',
+        type=float,
+        default=0.3,  # You can set a different default if needed
+        help='Specify the Learning Rate'
+    )
+    parser.add_argument(
+        '--epochs',
+        type=int,
+        default=100,
+        help='Specify number of epochs'
+    )
+    parser.add_argument(
+        '--checkpoint_save_path',
+        type=str,
+        default=None,
+        help='Specify save path for the checkpoint'
+    )
+    parser.add_argument(
+        '--tboard_logs_save_path',
+        type=str,
+        default=None,
+        help='Specify path for tensorboard logs'
+    )
+    parser.add_argument(
+        '--batch_size',
+        type=int,
+        default=64,
+        help='Specify path for tensorboard logs'
+    )
     args = parser.parse_args()
-    dataset = args.remainder  # Pass the dataset name
+    dataset = args.dataset  # Pass the dataset name
+    learning_rate = args.learning_rate
+    epochs = args.epochs
+    checkpoint_save_path = args.checkpoint_save_path
+    tboard_logs_save_path = args.tboard_logs_save_path
+    batch_size = args.batch_size
     if config.single_hop_training.gpu_parallelization:
         if args.c4:
             world_size = torch.cuda.device_count()
-            mp.spawn(train_ddp, args=(world_size, dataset), nprocs=world_size, join=True)
+            mp.spawn(train_ddp, args=(world_size, dataset, learning_rate, epochs, checkpoint_save_path, tboard_logs_save_path, batch_size), nprocs=world_size, join=True)
     else:
         _knowledge_integration_with_c4(dataset=dataset)
