@@ -100,20 +100,12 @@ def create_knowledge_graph_metaqa(data : pd.DataFrame, iterations = 0, from_kb =
             if iterations > 0:
                 index += 1
     else:
-        max_count = 0
-        for idx, evidences_list in enumerate(tqdm(data['evidences'])):
-            if len(evidences_list) >= max_count:
-                max_count = len(evidences_list)
-            # print(evidences_list)
-            for i in range(max_answers):
-                if i >= len(evidences_list):
-                    break
-                # print(evidences_list[i])
-                entity1, relation1, entity2, relation2, entity3 = evidences_list[i]
-                G.add_edge(entity1, entity2, key=relation1, relation=relation1)
-                G.add_edge(entity2, entity3, key=relation2, relation=relation2)
-            # if len(evidences_list) > 1:
-            #     break
+        for evidences_list in tqdm(data['evidences']):
+            if max_answers is None or len(evidences_list) <= max_answers:
+                for evidence in evidences_list:
+                    entity1, relation1, entity2, relation2, entity3 = evidence
+                    G.add_edge(entity1, entity2, key=relation1, relation=relation1)
+                    G.add_edge(entity2, entity3, key=relation2, relation=relation2)
         
     # print(max_count)    
     return G
