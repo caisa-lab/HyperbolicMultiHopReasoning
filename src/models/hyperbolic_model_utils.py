@@ -59,7 +59,7 @@ class RescaledNormalization(nn.Module):
 
         return scaled_x
 class HyperbolicLayer(nn.Module):
-    def __init__(self, curvature, hidden_dim, in_features=1024, out_features=1024, type="poincare", learnable=False, scaled=True):
+    def __init__(self, curvature, in_features=1024, out_features=1024, type="poincare", learnable=False, scaled=True):
         super(HyperbolicLayer, self).__init__()
 
         if type not in ["lorentz", "poincare"]:
