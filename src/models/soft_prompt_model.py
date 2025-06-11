@@ -2,37 +2,28 @@ import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, T5Model
 from src.utils.util import get_top_token_embeddings
-from src.utils.trainer_utils import load_model_checkpoint
-from config import Config
-from geoopt.manifolds import Lorentz, PoincareBall
-from src.utils.util import expmap0, logmap0
-from .hyperbolic_model_utils import HyperbolicLayer
+# from ..config import Config
 from .hyperbolic_t5_additional_layer import T5ModelWithAdditionalLayer
 from typing import Union
 
 class SoftPromptModel(nn.Module):
     def __init__(self,
                  knit5 : Union[T5Model, T5ModelWithAdditionalLayer],
-                 knit5_checkpoint_path : str,
                  model_name : str = '',
-                 curvature = 1.0, 
                  soft_prompt = None,
-                 with_model_state_dict = True,
-                 gpu_parallelization = False,
                  soft_prompt_length = 100,
                  use_soft_prompt = True):
         super(SoftPromptModel, self).__init__()
         self.knit5 = knit5
         self.model_name = model_name
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        if knit5_checkpoint_path is not None:
-           load_model_checkpoint(knit5, knit5_checkpoint_path, with_model_state_dict=with_model_state_dict, gpu_parallelization=gpu_parallelization)
+#        if knit5_checkpoint_path is not None:
+#           load_model_checkpoint(knit5, knit5_checkpoint_path, with_model_state_dict=with_model_state_dict, gpu_parallelization=gpu_parallelization)
         
-        self.config = Config()
+        # self.config = Config()
         self.soft_prompt_length = soft_prompt_length
         self.use_soft_prompt = use_soft_prompt
         
-        self.curvature = curvature
         if soft_prompt is None:
             self.soft_prompt = self.init_soft_prompt()
         else:
@@ -40,6 +31,8 @@ class SoftPromptModel(nn.Module):
 
         for param in self.knit5.parameters():
             param.requires_grad = False
+            
+        self.knit5.alpha.requires_grad = True
 
         # Remove if no learnable curvature
         if hasattr(self.knit5, 'hyperbolic_layer'):
@@ -55,7 +48,7 @@ class SoftPromptModel(nn.Module):
 
         
     def init_soft_prompt(self):
-        tokenizer = AutoTokenizer.from_pretrained(self.config.t5_model.model_name)
+        tokenizer = AutoTokenizer.from_pretrained(self.knit5.model_name)
         #HP Soft Prompt will be tuned
         pp_length = self.soft_prompt_length
     
