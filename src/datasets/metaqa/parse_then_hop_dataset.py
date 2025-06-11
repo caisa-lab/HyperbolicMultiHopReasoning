@@ -1,34 +1,32 @@
 import pandas as pd
 from ..parse_then_hop_dataset import ParseDataset, ParseThenHopDataset
 class ParseMetaQADataset(ParseDataset):
-    # def __init__(self, dataframe: pd.DataFrame, max_answers : int = 3):
-    #     """
-    #     Initializes the dataset with the provided DataFrame.
+    def __init__(self, dataframe: pd.DataFrame, max_answers : int = 1):
+        """
+        Initializes the dataset with the provided DataFrame.
 
-    #     Args:
-    #         dataframe (pd.DataFrame): The input DataFrame containing 'question' and 'evidences' columns.
-    #     """
-    #     super().__init__(dataframe)
-    #     self.dataset = self.dataset[self.dataset['evidences'].apply(lambda x : len(x) <= max_answers)]
+        Args:
+            dataframe (pd.DataFrame): The input DataFrame containing 'question' and 'evidences' columns.
+        """
+        super().__init__(dataframe)
+        self.dataset = self.dataset[self.dataset['evidences'].apply(lambda x : len(x) <= max_answers)]
 
-    #     for evidence_list in self.dataset['evidences']:
-    #         if len(evidence_list) > max_answers:
-    #             print(f"Found List with more than {max_answers} evidences: {evidence_list}")
-    #     print(f"No Evidence List found with more than {max_answers}")
+        for evidence_list in self.dataset['evidences']:
+            if len(evidence_list) > max_answers:
+                print(f"Found List with more than {max_answers} evidences: {evidence_list}")
+        print(f"No Evidence List found with more than {max_answers}")
 
 
 
     @staticmethod
     def construct_incomplete_paths(evidences):   
         evidence_list = evidences[0]
-        print(evidence_list)
         # Construct incomplete path for the current evidence list
         incomplete_path = f"{evidence_list[0]}"  # Start with the first entity
         for i in range(1, len(evidence_list)):
             if i % 2 != 0:  # Add only relations (odd indices)
                 incomplete_path += f" ; {evidence_list[i]}"
             
-        print(incomplete_path)
         
         return incomplete_path
 
