@@ -1,8 +1,9 @@
-from src.utils.util import load_dataset
+from src.utils.util import load_dataset, load_train_test_pql_dataset
 from src.train import *
-from src.datasets import ParseDataset, ParseMetaQADataset, ParseMLPQDataset
 import pandas as pd
-from src.knowledge_graph import create_knowledge_graph_wikimultihop, create_knowledge_graph_metaqa
+from src.knowledge_graph import create_knowledge_graph_wikimultihop
+from src.datasets import ParseMetaQADataset, ParseMLPQDataset, ParsePQLDataset, ParseWikHopDataset
+
 from src.config import Config
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from torch.utils.data import DataLoader
@@ -14,47 +15,12 @@ import torch.multiprocessing as mp
 import os
 from src.utils.util import set_seed
 from math import exp, log
-  
+from src.datasets import get_parse_dataset
 config = Config()
 def _train_parse_then_hop(additional_layer : str, dataset : str, rank, world_size, lr = 0.3, curvature = 1.0, knit5_checkpoint_path=None, checkpoint_save_path = None, tboard_logs_save_path = None, epochs = None, batch_size = None, additional_layer_lr = 0.001):
-    MAX_ANSWER = None
-    GPU_PARALLELIZATION = False if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop'] else True
+    GPU_PARALLELIZATION = True #if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop'] else True
     WITH_MODEL_STATE_DICT = GPU_PARALLELIZATION
-    if dataset in ['2wikimultihop', 'wikimultihop']:
-        train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
-
-        all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
-        all_kg = create_knowledge_graph_wikimultihop(all_data)
-
-        print(f"Nodes in Data: {len(list(all_kg.nodes()))}")
-
-        print(f"Lenght Train Data: {len(train_dataset)}")
-        print(f"Lenght Dev Data: {len(dev_dataset)}")
-        print(f"Lenght Test Data: {len(test_dataset)}")
-
-        parse_train = ParseDataset(train_dataset)
-        parse_dev = ParseDataset(dev_dataset)
-    elif dataset in ['metaqa']:
-        df_dev = pd.read_json("dataset/metaqa/2hops/qa_dev_evidences.json")
-        df_train = pd.read_json("dataset/metaqa/2hops/qa_train_evidences.json")
-        #df_test = pd.read_json("dataset/metaqa/2hops/qa_test_evidences.json")
-        MAX_ANSWER = 1
-        parse_train = ParseMetaQADataset(df_train, max_answers=MAX_ANSWER)
-        parse_dev = ParseMetaQADataset(df_dev, max_answers=MAX_ANSWER)
-    elif dataset in ['mlpq']:
-        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', lines=True)
-        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', lines=True)
-
-        parse_train = ParseMLPQDataset(train_dataframe)
-        parse_dev = ParseMLPQDataset(validation_dataframe)
-    elif dataset in ['mlpq-3hop']:
-        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_dev_question_evidences.json', lines=True)
-        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_train_question_evidences.json', lines=True)
-
-        parse_train = ParseMLPQDataset(train_dataframe)
-        parse_dev = ParseMLPQDataset(validation_dataframe)
-    else:
-        raise ValueError(f"Unknown Dataset")
+    parse_train, parse_dev, _ = get_parse_dataset(dataset)
     print(f"Number of Parse Questions Train: {len(parse_train)}")
     print(f"Number of Parse Questions Dev: {len(parse_dev)}")
 
@@ -74,33 +40,27 @@ def _train_parse_then_hop(additional_layer : str, dataset : str, rank, world_siz
         parse_sampler_train = DistributedSampler(parse_train, shuffle=True, num_replicas=world_size, rank=rank)
         parse_sampler_dev = DistributedSampler(parse_dev, shuffle=False, num_replicas=world_size, rank=rank)
 
-        parse_dataloader_train = DataLoader(parse_train, sampler=parse_sampler_train, batch_size=config.t5_model.batch_size, num_workers=config.parse_then_hop_training.num_workers)
-        parse_dataloader_dev = DataLoader(parse_dev,  sampler=parse_sampler_dev, batch_size=config.t5_model.batch_size, num_workers=config.parse_then_hop_training.num_workers)
+        parse_dataloader_train = DataLoader(parse_train, sampler=parse_sampler_train, batch_size=config.t5_model.batch_size//world_size, num_workers=config.parse_then_hop_training.num_workers)
+        parse_dataloader_dev = DataLoader(parse_dev,  sampler=parse_sampler_dev, batch_size=config.t5_model.batch_size//world_size, num_workers=config.parse_then_hop_training.num_workers)
     else:
         parse_dataloader_train = DataLoader(parse_train, batch_size=config.t5_model.batch_size, shuffle=True, num_workers=config.parse_then_hop_training.num_workers)
         parse_dataloader_dev = DataLoader(parse_dev, batch_size=config.t5_model.batch_size, shuffle=False, num_workers=config.parse_then_hop_training.num_workers)
     model_name = config.t5_model.model_name
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    
-    if config.parse_then_hop_training.hopping_prompt_checkpoint_path is not None:
-        soft_prompt = nn.Parameter(torch.randn(100, 1024))
-        soft_prompt = load_soft_prompt(soft_prompt, config.parse_then_hop_training.hopping_prompt_checkpoint_path)
-    else:
-        soft_prompt = None
+
     config.parse_then_hop_training.learning_rate = lr
     print(f"Setting learning rate to {lr}")
     config.parse_then_hop_training.curvature = log(exp(curvature) - 1)
     print(f"Setting Curvature to {curvature}")
-    if knit5_checkpoint_path is not None:
-        config.parse_then_hop_training.model_checkpoint_path = knit5_checkpoint_path
-        print(f"Setting KNIT5 Checkpoint Load Path to: {knit5_checkpoint_path}")
+    config.parse_then_hop_training.model_checkpoint_path = knit5_checkpoint_path
+    print(f"Setting KNIT5 Checkpoint Load Path to: {knit5_checkpoint_path}")
     config.single_hop_training.learning_rate = additional_layer_lr
     print(f"Setting additional layer learning rate to {additional_layer_lr}")
 
     print("Loading Model...")
     hyperbolic_knit5_model = T5ModelWithAdditionalLayer(layer_type=additional_layer, curvature=config.parse_then_hop_training.curvature, checkpoint_hyperbolic_knit5=config.parse_then_hop_training.model_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION, soft_prompt_length=config.parse_then_hop_training.prompt_length)
-    model = SoftPromptModel(curvature=config.parse_then_hop_training.curvature, knit5=hyperbolic_knit5_model, knit5_checkpoint_path=config.parse_then_hop_training.model_checkpoint_path, model_name='parsing_prompt', soft_prompt=soft_prompt, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION)
+    model = SoftPromptModel(knit5=hyperbolic_knit5_model, model_name='parsing_prompt')
     print(f"Train with hyperbolic Soft Prompt Model with additional layer {additional_layer} and curvature {config.parse_then_hop_training.curvature if additional_layer == 'hyperbolic' else 0.0}")
 
     if epochs is not None:
@@ -113,10 +73,8 @@ def _train_parse_then_hop(additional_layer : str, dataset : str, rank, world_siz
     if tboard_logs_save_path is not None:
         config.parse_then_hop_training.log_dir = tboard_logs_save_path
         print(f"Setting Tensorboard Log save path to: {tboard_logs_save_path}")
-    if MAX_ANSWER is not None:
-        config.parse_then_hop_training.additional_log_info=f'{additional_layer}_after_encoder_bsize{config.t5_model.batch_size}_prompt_lenght{config.parse_then_hop_training.prompt_length}_lr{config.parse_then_hop_training.learning_rate}_curvature{config.parse_then_hop_training.curvature}_additional_layer_lr0.001_max_answer_{MAX_ANSWER}'
-    else:
-        config.parse_then_hop_training.additional_log_info=f'{additional_layer}_after_encoder_bsize{config.t5_model.batch_size}_prompt_lenght{config.parse_then_hop_training.prompt_length}_lr{config.parse_then_hop_training.learning_rate}_curvature{config.parse_then_hop_training.curvature}_additional_layer_lr0.001'
+
+    config.parse_then_hop_training.additional_log_info=f'{additional_layer}_after_encoder_bsize{config.t5_model.batch_size}_prompt_lenght{config.parse_then_hop_training.prompt_length}_lr{config.parse_then_hop_training.learning_rate}_curvature{curvature}_additional_layer_lr0.001'
     trainer = SoftPromptTrainer(model,
                       tokenizer,
                       parse_dataloader_train,
@@ -208,7 +166,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=128,
+        default=64,
         help='Specify path for tensorboard logs'
     )
     parser.add_argument(
