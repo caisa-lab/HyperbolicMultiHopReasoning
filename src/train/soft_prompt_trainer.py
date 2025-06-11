@@ -75,31 +75,55 @@ class SoftPromptTrainer:
         else:
             print(f"Hyperbolic Layer learnable: {all(param.requires_grad for param in self.model.knit5.hyperbolic_layer.parameters()) if self.model.knit5.additional_layer_type != 'identity' else False}")
         # optimizer_params = []
+        # if self.training_config.use_soft_prompt:
+        #     self.optimizer_soft_prompt = get_optimizer([{
+        #         'params': self.model.module.soft_prompt if self.gpu_parallelization else self.model.soft_prompt,
+        #         'lr': self.training_config.learning_rate
+        #     }], self.training_config)
+        # # Always add the hyperbolic layer
+        # self.optimizer_hyperbolic_layer = get_optimizer([{
+        #     'params': self.model.module.knit5.hyperbolic_layer.parameters() if self.gpu_parallelization else self.model.knit5.hyperbolic_layer.parameters(),
+        #     'lr': config.single_hop_training.learning_rate
+        # }], self.training_config)
+        optimizer_params = []
         if self.training_config.use_soft_prompt:
-            self.optimizer_soft_prompt = get_optimizer([{
+            optimizer_params.append({
                 'params': self.model.module.soft_prompt if self.gpu_parallelization else self.model.soft_prompt,
                 'lr': self.training_config.learning_rate
-            }], self.training_config)
-        # Always add the hyperbolic layer
-        self.optimizer_hyperbolic_layer = get_optimizer([{
+            })
+
+        optimizer_params.append({
             'params': self.model.module.knit5.hyperbolic_layer.parameters() if self.gpu_parallelization else self.model.knit5.hyperbolic_layer.parameters(),
             'lr': config.single_hop_training.learning_rate
-        }], self.training_config)
+        })
+        optimizer_params.append({
+            'params': self.model.module.knit5.alpha if self.gpu_parallelization else self.model.knit5.alpha,
+            'lr': config.single_hop_training.learning_rate
+        })
 
+        self.optimizer = get_optimizer(optimizer_params, self.training_config)
 
         # Finally, create the optimizer
         # self.optimizer = get_optimizer(optimizer_params, self.training_config)
         if self.training_config.use_scheduler:
             self.scheduler = CosineAnnealingWarmUpRestarts(self.optimizer_hyperbolic_layer, T_0=150, T_mult=1, eta_max=0.001, T_up=10, gamma=0.5 )
             print(f"Using Scheduler!")
+        from math import log, exp
+        if hasattr(self.model.module.knit5.hyperbolic_layer, 'manifold') and hasattr(self.model.module.knit5.hyperbolic_layer.manifold, 'c'):
+            c = self.model.module.knit5.hyperbolic_layer.manifold.c.item()
+            c = log(exp(c) + 1)
+        else:
+            c = 0.0
+        self.training_config.curvature = c
         self.log_dir, self.model_dir = setup_directories(self.training_config, self.config.t5_model)
         if self.tboard_checkpoint_path is not None:
             self.log_dir = tboard_checkpoint_path
             print(f"Continue writing to {tboard_checkpoint_path}")
         self.writer = SummaryWriter(log_dir=self.log_dir)
+        print(f"{self.checkpoint_path = }")
         if self.checkpoint_path is not None and retrain:
-            self.model.soft_prompt = load_soft_prompt(self.model.soft_prompt, checkpoint_path)
-            self.optimizer, self.start_epoch = load_optimizer_and_start_epoch(self.optimizer, checkpoint_path)
+            load_soft_prompt_and_additional_layer(self.model, checkpoint_path, gpu_parallelization=gpu_parallelization)
+            self.optimizer_hyperbolic_layer, self.optimizer_soft_prompt, self.start_epoch = load_optimizer_and_start_epoch(self.optimizer_hyperbolic_layer, self.optimizer_soft_prompt, checkpoint_path)
 
 
         
@@ -125,7 +149,6 @@ class SoftPromptTrainer:
                 self.model.knit5.eval()
                 self.model.knit5.hyperbolic_layer.train()
             
-            # If using DDP + DistributedSampler, set the epoch for shuffling.
             if self.gpu_parallelization:
                 self.train_dataloader.sampler.set_epoch(epoch)
             
@@ -140,9 +163,10 @@ class SoftPromptTrainer:
             total_loss = 0.0
             
             for batch_idx, batch in enumerate(progress_bar):
-                self.optimizer_hyperbolic_layer.zero_grad()
-                if self.training_config.use_soft_prompt:
-                    self.optimizer_soft_prompt.zero_grad()
+                # self.optimizer_hyperbolic_layer.zero_grad()
+                # if self.training_config.use_soft_prompt:
+                #     self.optimizer_soft_prompt.zero_grad()
+                self.optimizer.zero_grad()
                 
                 input_batch, label_batch = batch
                 inputs = self.tokenizer(
@@ -165,9 +189,10 @@ class SoftPromptTrainer:
                 loss = outputs.loss  # typically averaged over the local batch
                 
                 loss.backward()
-                self.optimizer_hyperbolic_layer.step()
-                if self.training_config.use_soft_prompt:
-                    self.optimizer_soft_prompt.step()
+                # self.optimizer_hyperbolic_layer.step()
+                # if self.training_config.use_soft_prompt:
+                #     self.optimizer_soft_prompt.step()
+                self.optimizer.step()
                 
                 # For debugging/logging
                 if batch_idx <= 5:
@@ -227,7 +252,12 @@ class SoftPromptTrainer:
                         vram_reserved,
                         epoch * len(self.train_dataloader) + batch_idx
                     )
-                    
+                    alpha = self.model.module.knit5.alpha.item() if self.gpu_parallelization else self.model.knit5.alpha.item()
+                    self.writer.add_scalar(
+                                    f'Training/Alpha',
+                                    alpha,
+                                    epoch * len(self.train_dataloader) + batch_idx
+                                )
                     # If there's a curvature attribute
                     if isinstance(self.model.module.knit5.hyperbolic_layer, nn.Sequential) and len(self.model.module.knit5.hyperbolic_layer) > 1:
                         # Iterate through each layer in the Sequential container
@@ -422,14 +452,16 @@ class SoftPromptTrainer:
                     savings = {
                         'soft_prompt_state_dict': self.model.module.soft_prompt,
                         'additional_linear_layer': self.model.module.knit5.hyperbolic_layer.state_dict(),
+                        'alpha': self.model.module.knit5.alpha,
                         'curvature': (self.model.module.knit5.curvature
                                     if hasattr(self.model.module.knit5.hyperbolic_layer, 'manifold')
                                     else 0.0),
-                        'optimizer_hyperbolic_state_dict': self.optimizer_hyperbolic_layer.state_dict(),
+                        # 'optimizer_hyperbolic_state_dict': self.optimizer_hyperbolic_layer.state_dict(),
+                        'optimizer_state_dict': self.optimizer.state_dict(),
                         'epoch': epoch
                     }
-                    if self.training_config.use_soft_prompt:
-                        savings["optimizer_softprompt_state_dict"] = self.optimizer_soft_prompt.state_dict()
+                    # if self.training_config.use_soft_prompt:
+                    #     savings["optimizer_softprompt_state_dict"] = self.optimizer_soft_prompt.state_dict()
                     torch.save(savings, soft_prompt_path)
                     print(f"New best model Saved with EM {avg_em_perc:2f} at {soft_prompt_path}")
 
@@ -467,14 +499,16 @@ class SoftPromptTrainer:
                 savings = {
                     'soft_prompt_state_dict': self.model.soft_prompt,
                     'additional_linear_layer': self.model.knit5.hyperbolic_layer.state_dict(),
+                    'alpha': self.model.knit5.alpha,
                     'curvature': (self.model.knit5.curvature
                                 if hasattr(self.model.knit5.hyperbolic_layer, 'manifold')
                                 else 0.0),
-                    'optimizer_hyperbolic_state_dict': self.optimizer_hyperbolic_layer.state_dict(),
+                    # 'optimizer_hyperbolic_state_dict': self.optimizer_hyperbolic_layer.state_dict(),
+                    'optimizer_state_dict': self.optimizer.state_dict(),
                     'epoch': epoch
                 }
-                if self.training_config.use_soft_prompt:
-                        savings["optimizer_softprompt_state_dict"] = self.optimizer_soft_prompt.state_dict()
+                # if self.training_config.use_soft_prompt:
+                #         savings["optimizer_softprompt_state_dict"] = self.optimizer_soft_prompt.state_dict()
                 torch.save(savings, soft_prompt_path)
                 print(f"New best model Saved with EM {avg_em_perc:2f} at {soft_prompt_path}")
             # Early stopping check
