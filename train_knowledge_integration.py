@@ -11,11 +11,12 @@ from src.train import *
 import argparse
 from src.models import T5ModelWithAdditionalLayer
 import torch.distributed as dist
+from math import log,exp
 
 config = Config()
-def _knowledge_integration_with_c4(dataset, rank, world_size, learning_rate=0.001, epochs=50, checkpoint_save_path=None, tboard_logs_save_path=None, batch_size=64):
+def _knowledge_integration_with_c4(dataset, rank, world_size, learning_rate=0.001, epochs=50, checkpoint_save_path=None, tboard_logs_save_path=None, batch_size=64, additional_layer = 'identity', curvature = 1.0):
 
-    if dataset in ['2wikimultihop', 'wikimultihop']: 
+    if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop']: 
         print("Training on 2WikiMultiHopQA")
         train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=True)
 
@@ -48,9 +49,9 @@ def _knowledge_integration_with_c4(dataset, rank, world_size, learning_rate=0.00
         kg = create_knowledge_graph_mlpq(df_kg, from_kb = False, hops=2)
         ki_dataset = KnowledgeIntegrationMLPQDataset(kg)
     elif dataset in ['mlpq-3hop']:
-        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', lines=True)
-        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', lines=True)
-        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json', lines=True)
+        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_train_question_evidences.json', lines=True)
+        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_dev_question_evidences.json', lines=True)
+        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_test_question_evidences.json', lines=True)
 
         df_kg = pd.concat([train_dataframe, validation_dataframe, test_dataframe])
         kg = create_knowledge_graph_mlpq(df_kg, from_kb = False, hops=3)
@@ -59,6 +60,12 @@ def _knowledge_integration_with_c4(dataset, rank, world_size, learning_rate=0.00
         # from src.utils.util import load_train_test_pql_dataset
         file_path_kb = "dataset/pathquestion/PQL-KB.txt"
         file_path_paths = "dataset/pathquestion/PQ-2H.txt"
+        kg = create_knowledge_graph_pql(file_path_paths, from_kb=False)
+        ki_dataset = KnowledgeIntegrationPQLDataset(kg)
+    elif dataset in ['pql-3hop']:
+        # from src.utils.util import load_train_test_pql_dataset
+        # file_path_kb = "dataset/pathquestion/PQL-KB.txt"
+        file_path_paths = "dataset/pathquestion/PQ-3H.txt"
         kg = create_knowledge_graph_pql(file_path_paths, from_kb=False)
         ki_dataset = KnowledgeIntegrationPQLDataset(kg)
     else:
@@ -81,9 +88,10 @@ def _knowledge_integration_with_c4(dataset, rank, world_size, learning_rate=0.00
     tokenizer.model_max_length = 128#config.t5_model.tokenizer_max_length
     print(f"Loading Model {config.t5_model.model_name}...")
     #Adjust Dropout
-   
+    config.single_hop_training.curvature = log(exp(curvature) - 1)
+    print(f"Setting Curvature to {config.single_hop_training.curvature}")
+
     print(f"Train Euclidean T5 Model")
-    additional_layer = "identity"
     model = T5ModelWithAdditionalLayer(layer_type=additional_layer, curvature=config.single_hop_training.curvature, checkpoint_hyperbolic_knit5=config.single_hop_training.model_checkpoint_path, with_model_state_dict=True, gpu_parallelization=True)
     model.config.dropout_rate = 0.1
     model.config.hidden_dropout_prob = 0.1
@@ -92,6 +100,9 @@ def _knowledge_integration_with_c4(dataset, rank, world_size, learning_rate=0.00
 
     base_path = 'c4/en/c4-train.{:05d}-of-01024.json'
     c4_dataset = load_c4_dataset(base_path, number_of_files=3)
+
+
+    c4_dataset = c4_dataset[:len(ki_train)]
 
     objective = 'prefix_language_modeling'
     c4_train = C4Dataset(c4_dataset ,tokenizer=tokenizer, objective=objective)
@@ -109,6 +120,8 @@ def _knowledge_integration_with_c4(dataset, rank, world_size, learning_rate=0.00
     print(f"Setting Batch Size to {batch_size}")
 
 
+    from torch.utils.data import ConcatDataset
+    
 
     if config.single_hop_training.gpu_parallelization:
         from torch.utils.data import DistributedSampler
@@ -119,14 +132,16 @@ def _knowledge_integration_with_c4(dataset, rank, world_size, learning_rate=0.00
         ki_dev_sampler = DistributedSampler(ki_train, shuffle=False, num_replicas=world_size, rank=rank)
 
         # Create DataLoaders using these samplers
-        single_hop_dataloader_train = DataLoader(ki_train, sampler=ki_train_sampler, batch_size=config.t5_model.batch_size)
-        c4_dataloader_train = DataLoader(c4_train, sampler=c4_sampler, batch_size=config.t5_model.batch_size)
-        single_hop_dataloader_dev = DataLoader(ki_train, sampler=ki_dev_sampler, batch_size=config.t5_model.batch_size)
+        single_hop_dataloader_train = DataLoader(ki_train, sampler=ki_train_sampler, batch_size=config.t5_model.batch_size//world_size)
+        c4_dataloader_train = DataLoader(c4_train, sampler=c4_sampler, batch_size=config.t5_model.batch_size//world_size)
+        single_hop_dataloader_dev = DataLoader(ki_train, sampler=ki_dev_sampler, batch_size=config.t5_model.batch_size//world_size)
     else:
         c4_dataloader_train = DataLoader(c4_train, batch_size=config.t5_model.batch_size, shuffle=True, num_workers=config.single_hop_training.num_workers)
         single_hop_dataloader_train = DataLoader(ki_train, batch_size=config.t5_model.batch_size, shuffle=True, num_workers=config.single_hop_training.num_workers)
         single_hop_dataloader_dev = DataLoader(ki_train,  batch_size=config.t5_model.batch_size, shuffle=False, num_workers=config.single_hop_training.num_workers)
 
+
+    config.single_hop_training.additional_log_info = config.single_hop_training.additional_log_info + f"_{additional_layer}_c{curvature}" 
     trainer = ModelTrainer(model,
                         tokenizer,
                         [single_hop_dataloader_train, c4_dataloader_train],
@@ -149,7 +164,6 @@ def _knowledge_integration_with_c4(dataset, rank, world_size, learning_rate=0.00
     print(f'With C4')
 
     print(f'Training with {len(ki_train)} Triples for Knowledge Integration.')
-
     trainer.train(epochs=config.single_hop_training.epochs)
 
 
@@ -167,20 +181,25 @@ def setup_ddp(rank, world_size):
     set_seed(42)
     
 
-def train_ddp(rank, world_size, dataset, learning_rate, epochs, checkpoint_save_path, tboard_logs_save_path, batch_size):
+def train_ddp(rank, world_size, dataset, learning_rate, epochs, checkpoint_save_path, tboard_logs_save_path, batch_size, additional_layer, curvature):
     setup_ddp(rank, world_size)
-    _knowledge_integration_with_c4(dataset=dataset, rank=rank, world_size=world_size, learning_rate=learning_rate, epochs=epochs, checkpoint_save_path=checkpoint_save_path, tboard_logs_save_path=tboard_logs_save_path, batch_size=batch_size)  # Call your training method
+    _knowledge_integration_with_c4(dataset=dataset, rank=rank, world_size=world_size, learning_rate=learning_rate, epochs=epochs, checkpoint_save_path=checkpoint_save_path, tboard_logs_save_path=tboard_logs_save_path, batch_size=batch_size, additional_layer = additional_layer, curvature = curvature)  # Call your training method
     dist.destroy_process_group()
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Knowledge Integration Training')
-    parser.add_argument('--c4', action='store_true', help='Include C4 dataset in training')
     parser.add_argument('--dataset', type=str, default=None, help='Specify the Dataset (e.g., metaqa, 2wikimultihop)')
     parser.add_argument(
         '--learning_rate',
         type=float,
         default=0.3,  # You can set a different default if needed
         help='Specify the Learning Rate'
+    )  
+    parser.add_argument(
+        '--curvature',
+        type=float,
+        default=1.0,  # You can set a different default if needed
+        help='Specify the Curvature'
     )
     parser.add_argument(
         '--epochs',
@@ -190,6 +209,12 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--checkpoint_save_path',
+        type=str,
+        default=None,
+        help='Specify save path for the checkpoint'
+    )
+    parser.add_argument(
+        '--additional_layer',
         type=str,
         default=None,
         help='Specify save path for the checkpoint'
@@ -213,9 +238,10 @@ if __name__ == '__main__':
     checkpoint_save_path = args.checkpoint_save_path
     tboard_logs_save_path = args.tboard_logs_save_path
     batch_size = args.batch_size
+    additional_layer = args.additional_layer
+    curvature = args.curvature
     if config.single_hop_training.gpu_parallelization:
-        if args.c4:
-            world_size = torch.cuda.device_count()
-            mp.spawn(train_ddp, args=(world_size, dataset, learning_rate, epochs, checkpoint_save_path, tboard_logs_save_path, batch_size), nprocs=world_size, join=True)
+        world_size = torch.cuda.device_count()
+        mp.spawn(train_ddp, args=(world_size, dataset, learning_rate, epochs, checkpoint_save_path, tboard_logs_save_path, batch_size, additional_layer, curvature), nprocs=world_size, join=True)
     else:
         _knowledge_integration_with_c4(dataset=dataset)
