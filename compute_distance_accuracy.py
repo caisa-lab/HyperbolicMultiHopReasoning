@@ -341,8 +341,8 @@ def compute_distance_acc(dataset, prompt_checkpoint_euclidean, prompt_checkpoint
     #     print(f"\nExample {i+1}:")
     #     print(f"Input: {inp}")
     #     print(f"True Label: {lbl}")
-    #     print(f"Hyperbolic Prediction: {hyp_pred} ✅")
-    #     print(f"Euclidean Prediction: {euc_pred} ❌")
+    #     print(f"Hyperbolic Prediction: {hyp_pred}")
+    #     print(f"Euclidean Prediction: {euc_pred}")
 
 
 
