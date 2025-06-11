@@ -9,6 +9,7 @@ import os
 import sys
 import math
 from geoopt.optim import RiemannianAdam
+from src.models import SoftPromptModel
 
 # Get the current directory (train)
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -122,10 +123,8 @@ def get_optimizer(parameters, trainer_config : BaseTrainingConfig):
 
 def setup_directories(trainer_config : BaseTrainingConfig, t5_config):
     current_time = datetime.now().strftime('%b%d_%H-%M-%S')
-    learning_rate = trainer_config.learning_rate
-    curvature = trainer_config.curvature
     optimizer = trainer_config.optimizer
-    final_string = f"{current_time}_{optimizer}_{learning_rate}_{curvature}_{trainer_config.additional_log_info}"
+    final_string = f"{current_time}_{optimizer}_{trainer_config.additional_log_info}"
     log_dir = os.path.join(trainer_config.log_dir, final_string)
     model_dir = os.path.join(trainer_config.model_save_path, final_string) 
     os.makedirs(log_dir, exist_ok=True)
@@ -166,27 +165,37 @@ def log_tensorboard(writer : SummaryWriter,
     else:
         writer.add_scalar(f'{phase}/{eval_metric}', value, idx)
         
-def load_soft_prompt(soft_prompt : nn.Embedding,
+def load_soft_prompt_and_additional_layer(model : SoftPromptModel,
                     soft_prompt_path : str,
+                    gpu_parallelization : bool,
                     device = 'cuda' if torch.cuda.is_available() else 'cpu'):
     checkpoint = torch.load(soft_prompt_path, map_location=device) 
-    if soft_prompt is not None:  
-        soft_prompt = checkpoint['soft_prompt_state_dict']
-        soft_prompt.to(device)
-        print(f'Loading Soft Prompt Checkpoint from {soft_prompt_path}')
-    return soft_prompt
+    soft_prompt = checkpoint['soft_prompt_state_dict']
+    additional_layer = checkpoint['additional_linear_layer']
 
-def load_optimizer_and_start_epoch(optimizer : optim.Optimizer,
+    if gpu_parallelization:
+        model.module.soft_prompt = soft_prompt
+        model.module.knit5.hyperbolic_layer.load_state_dict(additional_layer)
+    else:
+        model.soft_prompt = soft_prompt
+        model.knit5.hyperbolic_layer.load_state_dict(additional_layer)
+
+    model.to(device)
+
+    print(f'Loading Soft Prompt and Additional Layer Checkpoint from {soft_prompt_path}')
+def load_optimizer_and_start_epoch(optimizer_hyperbolic : optim.Optimizer,
+                                   optimizer_soft_prompt : optim.Optimizer,
                                    checkpoint_path):
     checkpoint = torch.load(checkpoint_path) 
     if 'optimizer_state_dict' in checkpoint:
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        optimizer_hyperbolic.load_state_dict(checkpoint['optimizer_hyperbolic_state_dict'])
+        optimizer_soft_prompt.load_state_dict(checkpoint['optimizer_softprompt_state_dict'])
         print(f'Loading Optimizer Checkpoint from {checkpoint_path}')
         start_epoch = checkpoint['epoch']
     
-        return optimizer, start_epoch
+        return optimizer_hyperbolic, optimizer_soft_prompt, start_epoch
     else:
-        return optimizer, 0
+        return optimizer_hyperbolic,optimizer_soft_prompt, 0
     
     
 def geodesic_distance(u, v, c=1.0):
