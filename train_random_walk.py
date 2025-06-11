@@ -14,7 +14,7 @@ from math import exp, log
 from src.datasets.dataloader import get_random_walk_dataset
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 config = Config()
-def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, lr = 0.3, curvature = 1.0, knit5_checkpoint_path=None, checkpoint_save_path = None, tboard_logs_save_path = None, epochs = None, batch_size = 128, additional_layer_lr = 0.001, no_soft_prompt = False, use_scheduler = False, num_layers = 1, map_decoder = False, checkpoint_load_path = None, tboard_logs_load_path = None):
+def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, lr = 0.3, curvature = 1.0, knit5_checkpoint_path=None, checkpoint_save_path = None, tboard_logs_save_path = None, epochs = None, batch_size = 128, additional_layer_lr = 0.001, no_soft_prompt = False, use_scheduler = False, num_layers = 1, checkpoint_load_path = None, tboard_logs_load_path = None):
     GPU_PARALLELIZATION = True #if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop'] else True
     WITH_MODEL_STATE_DICT = GPU_PARALLELIZATION
     random_walk_train, random_walk_dev, _ = get_random_walk_dataset(dataset)
@@ -84,7 +84,7 @@ def _train_random_walk(additional_layer : str, dataset : str, rank, world_size, 
     config.random_walk_training.model_checkpoint_path = knit5_checkpoint_path
     print(f"Setting KNIT5 Checkpoint Load Path to: {knit5_checkpoint_path}")
     print(f"Number of Layers are {num_layers}")
-    hyperbolic_knit5_model = T5ModelWithAdditionalLayer(layer_type=additional_layer, num_layers=num_layers, curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=config.random_walk_training.model_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION, soft_prompt_length=config.random_walk_training.prompt_length, map_after_encoder=(not map_decoder))
+    hyperbolic_knit5_model = T5ModelWithAdditionalLayer(layer_type=additional_layer, num_layers=num_layers, curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=config.random_walk_training.model_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION, soft_prompt_length=config.random_walk_training.prompt_length)
     model = SoftPromptModel(knit5=hyperbolic_knit5_model, model_name='hyperbolic_hopping_prompt', soft_prompt_length=config.random_walk_training.prompt_length)
     print(f"Train with hyperbolic Soft Prompt Model with additional layer {additional_layer} and curvature {config.random_walk_training.curvature if additional_layer == 'hyperbolic' else 0.0}")
     # Count trainable parameters
@@ -142,9 +142,9 @@ def setup_ddp(rank, world_size):
     torch.cuda.set_device(rank)
     set_seed(42)
 
-def train_ddp(rank, world_size, dataset, additional_layer, lr, curvature, knit5_checkpoint_path, checkpoint_save_path, tboard_logs_save_path, epochs, batch_size, additional_layer_lr, no_soft_prompt, use_scheduler, num_layers, map_decoder, checkpoint_load_path, tboard_logs_load_path):
+def train_ddp(rank, world_size, dataset, additional_layer, lr, curvature, knit5_checkpoint_path, checkpoint_save_path, tboard_logs_save_path, epochs, batch_size, additional_layer_lr, no_soft_prompt, use_scheduler, num_layers, checkpoint_load_path, tboard_logs_load_path):
     setup_ddp(rank, world_size)
-    _train_random_walk(additional_layer=additional_layer, dataset=dataset, rank=rank, world_size=world_size, lr=lr, curvature=curvature, knit5_checkpoint_path=knit5_checkpoint_path, checkpoint_save_path=checkpoint_save_path, tboard_logs_save_path=tboard_logs_save_path, epochs = epochs, batch_size = batch_size, additional_layer_lr = additional_layer_lr, no_soft_prompt = no_soft_prompt, use_scheduler = use_scheduler, num_layers = num_layers, map_decoder = map_decoder, checkpoint_load_path = checkpoint_load_path, tboard_logs_load_path = tboard_logs_load_path)  # Call your training method
+    _train_random_walk(additional_layer=additional_layer, dataset=dataset, rank=rank, world_size=world_size, lr=lr, curvature=curvature, knit5_checkpoint_path=knit5_checkpoint_path, checkpoint_save_path=checkpoint_save_path, tboard_logs_save_path=tboard_logs_save_path, epochs = epochs, batch_size = batch_size, additional_layer_lr = additional_layer_lr, no_soft_prompt = no_soft_prompt, use_scheduler = use_scheduler, num_layers = num_layers, checkpoint_load_path = checkpoint_load_path, tboard_logs_load_path = tboard_logs_load_path)  # Call your training method
     dist.destroy_process_group()
 
 if __name__ == '__main__':    
@@ -236,11 +236,6 @@ if __name__ == '__main__':
         default=1,
         help='Specify number of layers'
     )
-    parser.add_argument(
-        '--map_decoder',
-        action='store_true',
-        help='If set, dont map decoder instead of encoder',
-    )
     
 
     args = parser.parse_args()
@@ -259,8 +254,7 @@ if __name__ == '__main__':
     no_soft_prompt = args.no_soft_prompt
     use_scheduler = args.use_scheduler
     num_layers = args.num_layers
-    map_decoder = args.map_decoder
     checkpoint_load_path = args.checkpoint_load_path
     tboard_logs_load_path = args.tboard_logs_load_path
-    mp.spawn(train_ddp, args=(world_size, dataset, additional_layer, lr, curvature, knit5_checkpoint_path, checkpoint_save_path, tboard_logs_save_path, epochs, batch_size, additional_layer_lr, no_soft_prompt, use_scheduler, num_layers, map_decoder, checkpoint_load_path, tboard_logs_load_path), nprocs=world_size, join=True)
+    mp.spawn(train_ddp, args=(world_size, dataset, additional_layer, lr, curvature, knit5_checkpoint_path, checkpoint_save_path, tboard_logs_save_path, epochs, batch_size, additional_layer_lr, no_soft_prompt, use_scheduler, num_layers, checkpoint_load_path, tboard_logs_load_path), nprocs=world_size, join=True)
 

@@ -32,7 +32,6 @@ class SoftPromptModel(nn.Module):
         for param in self.knit5.parameters():
             param.requires_grad = False
             
-        self.knit5.alpha.requires_grad = True
 
         # Remove if no learnable curvature
         if hasattr(self.knit5, 'hyperbolic_layer'):

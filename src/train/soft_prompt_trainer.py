@@ -96,10 +96,6 @@ class SoftPromptTrainer:
             'params': self.model.module.knit5.hyperbolic_layer.parameters() if self.gpu_parallelization else self.model.knit5.hyperbolic_layer.parameters(),
             'lr': config.single_hop_training.learning_rate
         })
-        optimizer_params.append({
-            'params': self.model.module.knit5.alpha if self.gpu_parallelization else self.model.knit5.alpha,
-            'lr': config.single_hop_training.learning_rate
-        })
 
         self.optimizer = get_optimizer(optimizer_params, self.training_config)
 
@@ -161,7 +157,7 @@ class SoftPromptTrainer:
             )
             
             total_loss = 0.0
-            
+
             for batch_idx, batch in enumerate(progress_bar):
                 # self.optimizer_hyperbolic_layer.zero_grad()
                 # if self.training_config.use_soft_prompt:
@@ -252,12 +248,6 @@ class SoftPromptTrainer:
                         vram_reserved,
                         epoch * len(self.train_dataloader) + batch_idx
                     )
-                    alpha = self.model.module.knit5.alpha.item() if self.gpu_parallelization else self.model.knit5.alpha.item()
-                    self.writer.add_scalar(
-                                    f'Training/Alpha',
-                                    alpha,
-                                    epoch * len(self.train_dataloader) + batch_idx
-                                )
                     # If there's a curvature attribute
                     if isinstance(self.model.module.knit5.hyperbolic_layer, nn.Sequential) and len(self.model.module.knit5.hyperbolic_layer) > 1:
                         # Iterate through each layer in the Sequential container
@@ -452,7 +442,6 @@ class SoftPromptTrainer:
                     savings = {
                         'soft_prompt_state_dict': self.model.module.soft_prompt,
                         'additional_linear_layer': self.model.module.knit5.hyperbolic_layer.state_dict(),
-                        'alpha': self.model.module.knit5.alpha,
                         'curvature': (self.model.module.knit5.curvature
                                     if hasattr(self.model.module.knit5.hyperbolic_layer, 'manifold')
                                     else 0.0),
@@ -499,7 +488,6 @@ class SoftPromptTrainer:
                 savings = {
                     'soft_prompt_state_dict': self.model.soft_prompt,
                     'additional_linear_layer': self.model.knit5.hyperbolic_layer.state_dict(),
-                    'alpha': self.model.knit5.alpha,
                     'curvature': (self.model.knit5.curvature
                                 if hasattr(self.model.knit5.hyperbolic_layer, 'manifold')
                                 else 0.0),
