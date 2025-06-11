@@ -3,19 +3,6 @@
 We used this Paper as our Base Method:
 [Triggering Multi-Hop Reasoning for Question Answering in Language Models using Soft Prompts and Random Walks](https://arxiv.org/pdf/2306.04009)
 
-## Datasets
-
-All datasets live under the `datasets/` directory.  
-
-### Example: 2WikiMultiHopQA
-1. **Download**
-Download the 2WikiMultiHopQA Dataset from here: [2WikiMultiHopQADataset](https://www.dropbox.com/scl/fi/32t7pv1dyf3o2pp0dl25u/data_ids_april7.zip?rlkey=u868q6h0jojw4djjg7ea65j46&e=1).
-2. **Extract**
-Make sure you have:
-- `datasets/2wikimultihop/train.json`
-- `datasets/2wikimultihop/dev.json`
-- `datasets/2wikimultihop/test.json`
-
 ## Content
 ### [src](./src)
 
