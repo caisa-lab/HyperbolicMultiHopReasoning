@@ -1,21 +1,10 @@
-import warnings
-#rom src.utils.util import expmap0, logmap0
-from src.utils.trainer_utils import load_model_checkpoint
-from src.utils.util import get_top_token_embeddings
-from geoopt.manifolds import Lorentz, PoincareBall
 from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
-from transformers import T5ForConditionalGeneration, T5PreTrainedModel, AutoTokenizer, T5Config
-from transformers.models.t5.modeling_t5 import T5Block, T5LayerNorm
-from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
-from transformers.utils.model_parallel_utils import get_device_map, assert_device_map
+from transformers import T5ForConditionalGeneration,  T5Config
+
 from typing import Tuple, Optional
 import torch.nn as nn
 import torch
 from torch.nn import CrossEntropyLoss
-import copy
-from src.config import Config
-import geoopt
-from torch.utils.checkpoint import checkpoint
 
 from .hyperbolic_model_utils import *
 class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
@@ -24,7 +13,8 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
                  model_name : str = 'google/t5-large-lm-adapt',
                  checkpoint_hyperbolic_knit5 : str = None,
                  with_model_state_dict = True,
-                 curvature : Optional[float] = 1.0,
+                 curvature : Optional[float] = 0.3,
+                 num_layers : int = 1,
                  gpu_parallelization = False, 
                  soft_prompt_length = 100,
                  only_map_soft_prompt = False):
@@ -42,6 +32,8 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
         self.soft_prompt_length = soft_prompt_length
         in_features = config.d_model
         self.only_map_soft_prompt = only_map_soft_prompt
+        self.model_name = model_name
+        
         if self.only_map_soft_prompt:
             print(f"Passing only soft prompts through hyperbolic")
         else:
@@ -49,15 +41,37 @@ class T5ModelWithAdditionalLayer(T5ForConditionalGeneration):
         self.additional_layer_type = layer_type
         if layer_type not in ['linear', 'hyperbolic', 'identity']:
             raise ValueError(f"{layer_type} not supported. Only 'hyperbolic' or 'euclidean'")
-        if layer_type == 'linear':
-            self.hyperbolic_layer = nn.Linear(in_features, in_features)
-            print("Using Euclidean Additional Layer")
-        elif layer_type == 'hyperbolic':
-            self.hyperbolic_layer = HyperbolicLayer(curvature=self.curvature, type='poincare', scaled=False, learnable=True, in_features=in_features, out_features=in_features, hidden_dim=in_features)
-            print("Using Hyperbolic Additional Layer")
-        elif layer_type == 'identity':
-            self.hyperbolic_layer = nn.Identity()
-            print("Using Identity (No Extra Layer)")
+        if num_layers > 1:
+            if layer_type in ['linear', 'hyperbolic']:
+                layers = []
+                
+                for i in range(num_layers):
+                    input_features = in_features if i == 0 else 1024*6
+                    hidden_features = in_features if i == (num_layers - 1) else 1024*6
+                    layers.append(nn.Linear(in_features=input_features, out_features=hidden_features) if layer_type == 'linear' else HyperbolicLayer(curvature=self.curvature, type='poincare', scaled=False, learnable=True, in_features=input_features, out_features=hidden_features))
+                    
+                    layers.append(nn.ReLU())
+                print(f"{layers = }")
+            if layer_type == 'linear':
+                self.hyperbolic_layer = nn.Sequential(*layers)
+                print("Using Euclidean Additional Layer")
+            elif layer_type == 'hyperbolic':
+                self.hyperbolic_layer = nn.Sequential(*layers)
+                print("Using Hyperbolic Additional Layer")
+            elif layer_type == 'identity':
+                self.hyperbolic_layer = nn.Identity()
+                print("Using Identity (No Extra Layer)")
+        else:
+            if layer_type == 'linear':
+                self.hyperbolic_layer = nn.Linear(in_features=in_features, out_features=in_features)
+                print("Using Euclidean Additional Layer")
+            elif layer_type == 'hyperbolic':
+                self.hyperbolic_layer = HyperbolicLayer(curvature=self.curvature, type='poincare', scaled=False, learnable=True, in_features=in_features, out_features=in_features)
+                print("Using Hyperbolic Additional Layer")
+
+            elif layer_type == 'identity':
+                self.hyperbolic_layer = nn.Identity()
+                print("Using Identity (No Extra Layer)")
 
         
         if checkpoint_hyperbolic_knit5 is None:
