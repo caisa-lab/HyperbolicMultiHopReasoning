@@ -40,11 +40,11 @@ class Config:
                              tboard_checkpoint_path=None,
                              scheduler=None,
                              num_workers=16,
-                             curvature=log(exp(0.36) - 1),
+                             curvature=log(exp(0.1) - 1),
                              gpu_parallelization=True,
                              learning_rate=0.001,
                              epochs=50)
-            self.additional_log_info=f'knowledge_integration_bsize64_lr0.001_max_answers_1'
+            self.additional_log_info=f'knowledge_integration_bsize64_lr0.001'
 
                 
     class OneHopWikiTraining(BaseTrainingConfig):
@@ -69,6 +69,7 @@ class Config:
                              curvature=log(exp(0.32) - 1),
                              gpu_parallelization=True
                              )
+            self.use_scheduler = False
             self.use_soft_prompt = True
             self.prompt_length = 100
             self.additional_log_info=f'identity_after_encoder_bsize64_prompt_lenght{self.prompt_length}_lr{self.learning_rate}_curvature{self.curvature}_additional_layer_lr0.001_max_answer_2'
@@ -86,6 +87,7 @@ class Config:
                              curvature=log(exp(1.0) - 1),
                              gpu_parallelization=True
                              )
+            self.use_scheduler = False
             self.use_soft_prompt = True
             self.prompt_length = 100
             self.additional_log_info=f'parse_training_gt_not_replaced_euclidean_linear_layer_lr{self.learning_rate}_bsize16'
