@@ -45,7 +45,7 @@ class ModelTrainer:
         self.tokenizer = tokenizer
         self.tokenizer.model_max_length = config.t5_model.tokenizer_max_length
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
-        self.train_dataloader = None
+        self.train_dataloader = list_train_dataloader
         if len(list_train_dataloader) == 1:
             self.train_dataloader = list_train_dataloader[0]
         elif len(list_train_dataloader) > 1:
@@ -86,7 +86,7 @@ class ModelTrainer:
         self.best_model_path = None
 
         from transformers import get_linear_schedule_with_warmup
-        num_steps = len(self.single_hop_train_dataloader) * self.training_config.epochs * 2
+        num_steps = len(self.train_dataloader) * self.training_config.epochs
         if self.training_config.scheduler is not None:
             self.scheduler = get_linear_schedule_with_warmup(self.optimizer, num_training_steps=num_steps, num_warmup_steps=int(0.1 * num_steps))
         else:
@@ -106,20 +106,22 @@ class ModelTrainer:
             epochs : int):
         """Trains Knowledge Integration part. Given 'e1 ; r1' predict 'e2'
         """
-        
+        self.model.module.gradient_checkpointing_enable()
         if self.start_epoch != 0:
             print(f'Starting training from epoch {self.start_epoch}')
 
 
-        if self.train_dataloader is not None:
-            print(f"Training without C4...")
-            self._train_without_c4(epochs)
-        else:
-            print(f"Training with C4...")
-            self._train_with_c4(epochs)
+        # if self.train_dataloader is not None:
+        #     print(f"Training without C4...")
+        #     self._train_without_c4(epochs)
+        # else:
+        print(f"Training with C4...")
+        self._train_with_c4(epochs)
                 
                     
     def _train_with_c4(self, epochs : int):
+        min_len = min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))
+        num_iterations = 2 * min_len
         for epoch in range(epochs):
             self.model.train()
             if self.gpu_parallelization:
@@ -133,7 +135,9 @@ class ModelTrainer:
             single_hop_iter = iter(self.single_hop_train_dataloader)
             c4_iter = iter(self.c4_train_dataloader)
             progress_bar = tqdm(range(2*min(len(self.single_hop_train_dataloader), len(self.c4_train_dataloader))), leave=True, desc=f"Epoch {epoch} - Training - {self.method}", file=sys.stdout, dynamic_ncols=True)
+            # progress_bar = tqdm(self.train_dataloader, leave=True, desc=f"Epoch {epoch} - Training - {self.method}", file=sys.stdout, dynamic_ncols=True)
             for batch_idx in progress_bar:
+                #dataset type either: knowledge_integration or c4
                 #Train in 50:50 Mixture
                 if batch_idx % 2 == 0:
                     try:
@@ -149,7 +153,7 @@ class ModelTrainer:
                         batch = next(c4_iter)
                 
                         
-                input_str, label = batch[0], batch[1]
+                input_str, label = batch
                 
                 tokenized_inputs = self.tokenizer(input_str, padding=True, truncation=True, return_tensors='pt')
                 tokenized_labels = self.tokenizer(label, padding=True, truncation=True, return_tensors='pt')
@@ -160,7 +164,8 @@ class ModelTrainer:
                 
                 self.optimizer.zero_grad()
              
-                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels)
+                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels, use_cache=False)
+                # outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels = labels, use_cache=True)
                 loss = outputs.loss   
 
                 
@@ -172,7 +177,7 @@ class ModelTrainer:
                 # if batch_idx <= 10 and batch_idx % 2 == 0:
                 #     print(f"{input_str = }")
                 #     print(f"{label = }")
-                len_trainloader = len(self.single_hop_train_dataloader)
+                global_step = epoch* num_iterations + batch_idx
                 if self.gpu_parallelization:
                     # After loss.backward() and self.optimizer.step()
                     loss_tensor = torch.tensor([loss.item()], device=self.device)
@@ -183,17 +188,17 @@ class ModelTrainer:
                         # Log only from rank 0
                         if batch_idx % 2 == 0:
                             total_single_hop_loss += global_loss
-                            log_tensorboard(self.writer, global_loss, epoch*len_trainloader + batch_idx//2, 'Training/SingleHop', eval_metric='loss')
+                            log_tensorboard(self.writer, global_loss, global_step, 'Training/SingleHop', eval_metric='loss')
                         else:
                             total_c4_loss += global_loss
-                            log_tensorboard(self.writer, global_loss, epoch*len_trainloader + batch_idx//2, 'Training/C4', eval_metric='loss')
+                            log_tensorboard(self.writer, global_loss, global_step, 'Training/C4', eval_metric='loss')
                 else:
                     if batch_idx % 2 == 0:
                         total_single_hop_loss += loss.item()
-                        log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx//2, 'Training/SingleHop', eval_metric='loss')
+                        log_tensorboard(self.writer, loss.item(), global_step, 'Training/SingleHop', eval_metric='loss')
                     else:
                         total_c4_loss += loss.item()
-                        log_tensorboard(self.writer, loss.item(), epoch*len_trainloader + batch_idx//2, 'Training/C4', eval_metric='loss')
+                        log_tensorboard(self.writer, loss.item(), global_step, 'Training/C4', eval_metric='loss')
                 
                 progress_bar.set_description(f"Epoch {epoch} - Training - {self.method} - Loss: {loss.item():.4f}")
                 
@@ -201,16 +206,16 @@ class ModelTrainer:
                 if self.rank == 0:
                     vram_allocated = torch.cuda.memory_allocated(self.device) / (1024 ** 2)
                     vram_reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)
-                    self.writer.add_scalar('VRAM/Training/Allocated', vram_allocated, epoch * len_trainloader + batch_idx)
-                    self.writer.add_scalar('VRAM/Training/Reserved', vram_reserved, epoch * len_trainloader + batch_idx)
+                    self.writer.add_scalar('VRAM/Training/Allocated', vram_allocated, global_step)
+                    self.writer.add_scalar('VRAM/Training/Reserved', vram_reserved, global_step)
                     if self.model.module.additional_layer_type == 'hyperbolic':
                         c = self.model.module.hyperbolic_layer.manifold.c.item()
                     else:
                         c = 0.0
-                    self.writer.add_scalar('Training/Curvature', c, epoch*len_trainloader + batch_idx)
+                    self.writer.add_scalar('Training/Curvature', c, global_step)
 
-            avg_single_hop_loss = total_single_hop_loss / len_trainloader
-            avg_c4_loss = total_c4_loss / len_trainloader
+            avg_single_hop_loss = total_single_hop_loss / min_len
+            avg_c4_loss = total_c4_loss / min_len
             print(f"Epoch {epoch} - Training - AVGLoss for SingleHop: {avg_single_hop_loss:.4f} | AVGLoss for C4: {avg_c4_loss:.4f}")
             
             if (self.val_dataloader is not None) and (epoch % self.validation_step == 0):
