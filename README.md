@@ -5,8 +5,16 @@ We used this Paper as our Base Method:
 
 ## Datasets
 
-You need to download the Dataset from here: [2WikiMultiHopQADataset](https://www.dropbox.com/scl/fi/32t7pv1dyf3o2pp0dl25u/data_ids_april7.zip?rlkey=u868q6h0jojw4djjg7ea65j46&e=1).
-You need to have a directory dataset/2wikimultihop/ where the dev.json, test.json, train.json lies.
+All datasets live under the `datasets/` directory.  
+
+### Example: 2WikiMultiHopQA
+1. **Download**
+Download the 2WikiMultiHopQA Dataset from here: [2WikiMultiHopQADataset](https://www.dropbox.com/scl/fi/32t7pv1dyf3o2pp0dl25u/data_ids_april7.zip?rlkey=u868q6h0jojw4djjg7ea65j46&e=1).
+2. **Extract**
+Make sure you have:
+- `datasets/2wikimultihop/train.json`
+- `datasets/2wikimultihop/dev.json`
+- `datasets/2wikimultihop/test.json`
 
 ## Content
 ### [src](./src)
@@ -79,7 +87,7 @@ python train_parse_then_hop.py \
 ### [test_parse_then_hop](./test_parse_then_hop.py)
 Testing Script for Parse Then Hop Method.
 ```bash
-python -u test_parse_then_hop.py \
+python test_parse_then_hop.py \
     --additional_layer_parse hyperbolic \
     --additional_layer_hop hyperbolic \
     --dataset metaqa \
