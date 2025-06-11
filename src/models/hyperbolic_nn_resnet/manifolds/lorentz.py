@@ -5,7 +5,7 @@ import geoopt
 from geoopt import Manifold
 from geoopt import Lorentz as LorentzOri
 from geoopt.utils import size2shape
-from models.hyperbolic_nn_resnet.manifolds.math import lmath as math
+from .math import lmath as math
 
 
 
