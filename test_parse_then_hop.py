@@ -1,59 +1,19 @@
-from src.utils.util import load_dataset, get_top_token_embeddings
-import pandas as pd
-from src.train.soft_prompt_trainer import SoftPromptTrainer
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-from src.datasets import ParseThenHopDataset, ParseThenHopMLPQDataset, ParseThenHopMetaQADataset
+
+from transformers import AutoTokenizer
 import torch
 from src.config import Config
 from torch.utils.data import DataLoader
-from src.knowledge_graph import create_knowledge_graph_wikimultihop, create_knowledge_graph_metaqa, create_knowledge_graph_mlpq
 from src.models import SoftPromptModel, T5ModelWithAdditionalLayer
 from src.eval import evaluate_parse_then_hop_training
+from src.utils.util import load_train_test_pql_dataset
 import argparse
-import optuna
-import os
+from src.datasets import get_parse_then_hop_test_dataset
+import pandas as pd
 
-def test_path(dataset, additional_layer, batch_size, knit5_checkpoint_path, hopping_prompt_checkpoint_path, parsing_prompt_checkpoint_path):
-    MAX_ANSWER = None
-    GPU_PARALLELIZATION = False if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop'] else True
+def test_path(dataset, additional_layer_parse, additional_layer_hop, batch_size, knit5_checkpoint_path, hopping_prompt_checkpoint_path, parsing_prompt_checkpoint_path):
+    GPU_PARALLELIZATION = True# if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop'] else True
     WITH_MODEL_STATE_DICT = GPU_PARALLELIZATION
-    if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop']:
-        train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
-
-        all_data = pd.concat([train_dataset, dev_dataset, test_dataset])
-        all_kg = create_knowledge_graph_wikimultihop(all_data)
-
-        print(f"Nodes in Data: {len(list(all_kg.nodes()))}")
-
-        print(f"Lenght Train Data: {len(train_dataset)}")
-        print(f"Lenght Dev Data: {len(dev_dataset)}")
-        print(f"Lenght Test Data: {len(test_dataset)}")
-        parse_then_hop_test = ParseThenHopDataset(test_dataset)
-
-
-    elif dataset in ['metaqa']:
-        # df_kg = pd.read_csv("dataset/metaqa/kb.txt", sep="|")
-        # kg = create_knowledge_graph_metaqa(df_kg, from_kb=True)
-
-        df_dev = pd.read_json("dataset/metaqa/2hops/qa_dev_evidences.json")
-        df_train = pd.read_json("dataset/metaqa/2hops/qa_train_evidences.json")
-        df_test = pd.read_json("dataset/metaqa/2hops/qa_test_evidences.json")
-        MAX_ANSWER = 1
-        #df_kg = pd.concat([df_dev, df_train, df_test])
-        #kg = create_knowledge_graph_metaqa(df_kg, from_kb=False, max_answers=MAX_ANSWER)
-        parse_then_hop_test = ParseThenHopMetaQADataset(df_test, max_answers=MAX_ANSWER)
-    elif dataset in ['mlpq']:
-        #txt_file_paths = ['dataset/mlpq/Triples_in_questions/EN_KG', 'dataset/mlpq/Triples_in_questions/FR_KG']
-        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', lines=True)
-        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', lines=True)
-        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json', lines=True)
-
-        #df_kg = pd.concat([train_dataframe, validation_dataframe, test_dataframe])
-        #kg = create_knowledge_graph_mlpq(df_kg, from_kb = False)
-
-        parse_then_hop_test = ParseThenHopMLPQDataset(test_dataframe)
-    else:
-        raise ValueError(f"Unknown Dataset")
+    parse_then_hop_test = get_parse_then_hop_test_dataset(dataset)
 
     #Specify Hyperparameters via config file
     config = Config()
@@ -68,14 +28,17 @@ def test_path(dataset, additional_layer, batch_size, knit5_checkpoint_path, hopp
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")
-    parsring_knit5_model = T5ModelWithAdditionalLayer(layer_type='linear', curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=knit5_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION, soft_prompt_length=config.random_walk_training.prompt_length)
-    hopping_knit5_model = T5ModelWithAdditionalLayer(layer_type='hyperbolic', curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=knit5_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION, soft_prompt_length=config.random_walk_training.prompt_length)
+    #checkpoints/2wikihop/knowledge_integration/hyperbolic/Mar08_00-10-57_AdaFactor_knowledge_integration_bsize64_lr0.001_hyperbolic_c0.26544060202928016/knit5.pth 
+    parsring_knit5_model = T5ModelWithAdditionalLayer(layer_type=additional_layer_parse, curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=knit5_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION, soft_prompt_length=config.random_walk_training.prompt_length)
+    hopping_knit5_model = T5ModelWithAdditionalLayer(num_layers=1,layer_type=additional_layer_hop, curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=knit5_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION, soft_prompt_length=config.random_walk_training.prompt_length)
     import torch.nn as nn
 
     checkpoint = torch.load(parsing_prompt_checkpoint_path, map_location=device)
     parsing_prompt = nn.Parameter(checkpoint['soft_prompt_state_dict'], requires_grad=False)
+    # print(f"{checkpoint = }")
     additional_parsing_linear_layer = checkpoint['additional_linear_layer']
     checkpoint = torch.load(hopping_prompt_checkpoint_path, map_location=device)
+    # print(f"{checkpoint = }")
     hopping_prompt = nn.Parameter(checkpoint['soft_prompt_state_dict'], requires_grad=False)
     additional_hopping_linear_layer = checkpoint['additional_linear_layer']
 
@@ -83,19 +46,26 @@ def test_path(dataset, additional_layer, batch_size, knit5_checkpoint_path, hopp
     hopping_knit5_model.hyperbolic_layer.load_state_dict(additional_hopping_linear_layer)
     parsring_knit5_model.hyperbolic_layer.load_state_dict(additional_parsing_linear_layer)
     print("Loaded Soft Prompts and Additional Linear Layer")
+    print(f"Loaded Parsing Soft Prompt from {parsing_prompt_checkpoint_path}")
+    print(f"Loaded Hopping Soft Prompt from {hopping_prompt_checkpoint_path}")
 
     print(f"{parsing_prompt.shape = }")
     print(f"{hopping_prompt.shape = }")
-    parsing_model = SoftPromptModel(knit5=parsring_knit5_model, knit5_checkpoint_path=None, soft_prompt=parsing_prompt,  with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION)
-    hopping_model = SoftPromptModel(knit5=hopping_knit5_model, knit5_checkpoint_path=None, soft_prompt=hopping_prompt, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION)
+    parsing_model = SoftPromptModel(knit5=parsring_knit5_model, soft_prompt=parsing_prompt)
+    hopping_model = SoftPromptModel(knit5=hopping_knit5_model, soft_prompt=hopping_prompt)
 
 
 
 
-    evaluate_parse_then_hop_training(parsing_model=parsing_model,
+    pred_vs_label = evaluate_parse_then_hop_training(parsing_model=parsing_model,
                                      hopping_model=hopping_model,
                                      tokenizer=tokenizer,
-                                     test_dataloader=path_test)
+                                     test_dataloader=path_test,
+                                     do_extract_answer = False)
+    print(pred_vs_label)
+    df = pd.DataFrame(pred_vs_label)
+    df.to_csv('pred_vs_label_path.csv', sep=';')
+    
 
 
   
@@ -107,7 +77,14 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, nargs='?', default=None, help='Specify the dataset (e.g., metaqa, 2wikimultihop)')
     # New argument: --additional_layer
     parser.add_argument(
-        '--additional_layer',
+        '--additional_layer_parse',
+        type=str,
+        choices=['identity', 'hyperbolic', 'linear'],
+        default='identity',  # You can set a different default if needed
+        help='Specify the type of additional layer to use: identity, hyperbolic, or linear'
+    )
+    parser.add_argument(
+        '--additional_layer_hop',
         type=str,
         choices=['identity', 'hyperbolic', 'linear'],
         default='identity',  # You can set a different default if needed
@@ -141,10 +118,11 @@ if __name__ == '__main__':
 
     world_size = torch.cuda.device_count()
     dataset = args.dataset 
-    additional_layer = args.additional_layer
+    additional_layer_parse = args.additional_layer_parse
+    additional_layer_hop = args.additional_layer_hop
     knit5_checkpoint_path = args.knit5_checkpoint_path
     parsing_prompt_checkpoint_path = args.parsing_prompt_checkpoint_path
     hopping_prompt_checkpoint_path = args.hopping_prompt_checkpoint_path
     batch_size = args.batch_size
 
-    test_path(dataset, additional_layer, batch_size, knit5_checkpoint_path, hopping_prompt_checkpoint_path, parsing_prompt_checkpoint_path)
+    test_path(dataset, additional_layer_parse, additional_layer_hop, batch_size, knit5_checkpoint_path, hopping_prompt_checkpoint_path, parsing_prompt_checkpoint_path)
