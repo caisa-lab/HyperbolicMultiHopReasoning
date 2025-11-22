@@ -30,7 +30,7 @@ Make sure you have the following files after preprocessing:
 
 ### MLPQ
 1. **Download**:
-Download the MetaQA Dataset from here: [MLPQ](https://github.com/seu-kse/MLPQ/tree/master)
+Download the MLPQ Dataset from here: [MLPQ](https://github.com/seu-kse/MLPQ/tree/master)
 2. **Preprocess**
 Use the mlpq_preprocess.py file to preprocess the MLPQ dataset. For example like this: \
     ```bash 
