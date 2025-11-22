@@ -27,10 +27,9 @@ def get_random_walk_dataset(dataset):
     elif dataset in ['metaqa']:
         # df_kg = pd.read_csv("dataset/metaqa/kb.txt", sep="|")
         # kg = create_knowledge_graph_metaqa(df_kg, from_kb=True)
-
-        df_dev = pd.read_json("dataset/metaqa/2hops/qa_dev_evidences.json")
-        df_train = pd.read_json("dataset/metaqa/2hops/qa_train_evidences.json")
-        df_test = pd.read_json("dataset/metaqa/2hops/qa_test_evidences.json")
+        df_dev = pd.read_json("dataset/metaqa/vanilla/metaqa_dev_evidences.json")
+        df_train = pd.read_json("dataset/metaqa/vanilla/metaqa_train_evidences.json")
+        df_test = pd.read_json("dataset/metaqa/vanilla/metaqa_test_evidences.json")
         MAX_ANSWER = 1
         df_kg = pd.concat([df_dev, df_train, df_test])
         kg = create_knowledge_graph_metaqa(df_kg, from_kb=False, max_answers=MAX_ANSWER)
@@ -39,9 +38,9 @@ def get_random_walk_dataset(dataset):
         random_walk_test = RandomWalkMetaQADataset(kg, df_dev, df_test, steps=3, type='test')
     elif dataset in ['mlpq']:
         #txt_file_paths = ['dataset/mlpq/Triples_in_questions/EN_KG', 'dataset/mlpq/Triples_in_questions/FR_KG']
-        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', lines=True)
-        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', lines=True)
-        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json', lines=True)
+        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json')
+        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json')
+        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json')
 
         df_kg = pd.concat([train_dataframe, validation_dataframe, test_dataframe])
         kg = create_knowledge_graph_mlpq(df_kg, from_kb = False)
@@ -60,7 +59,7 @@ def get_random_walk_dataset(dataset):
         random_walk_train = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=4, type='train')
         random_walk_dev = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=4, type='dev')
         random_walk_test = RandomWalkMLPQDataset(kg, validation_dataframe, test_dataframe, steps=4, type='test')
-    elif dataset in ['pql']:
+    elif dataset in ['pq']:
         file_path = "dataset/pathquestion/PQ-2H.txt"
         train, val, test = load_train_test_pql_dataset(file_path, random_state = 789)
         file_path_kb = "dataset/pathquestion/2H-kb.txt"
@@ -89,10 +88,8 @@ def get_random_walk_dataset(dataset):
         #random_walk_dev = ConcatDataset([random_walk_dataloader_dev, random_walk_test])
     else:
         raise ValueError(f"Unknown Dataset")
-    print(f"#Train Random Walks: {random_walk_train}")
-    print(f"#Dev Random Walks: {random_walk_dev}")
-    print(f"#Test Random Walks: {random_walk_test}")
     return random_walk_train, random_walk_dev, random_walk_test
+
 def get_parse_dataset(dataset):
     if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop']:
         train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset('dataset/2wikimultihop', do_correct_wrong_evidences=True)
@@ -110,17 +107,17 @@ def get_parse_dataset(dataset):
         parse_dev = ParseWikHopDataset(dev_dataset)
         parse_test = ParseWikHopDataset(test_dataset)
     elif dataset in ['metaqa']:
-        df_dev = pd.read_json("dataset/metaqa/2hops/qa_dev_evidences.json")
-        df_train = pd.read_json("dataset/metaqa/2hops/qa_train_evidences.json")
-        df_test = pd.read_json("dataset/metaqa/2hops/qa_test_evidences.json")
+        df_dev = pd.read_json("dataset/metaqa/vanilla/metaqa_dev_evidences.json")
+        df_train = pd.read_json("dataset/metaqa/vanilla/metaqa_train_evidences.json")
+        df_test = pd.read_json("dataset/metaqa/vanilla/metaqa_test_evidences.json")
         MAX_ANSWER = 1
         parse_train = ParseMetaQADataset(df_train, max_answers=MAX_ANSWER)
         parse_dev = ParseMetaQADataset(df_dev, max_answers=MAX_ANSWER)
         parse_test = ParseMetaQADataset(df_test, max_answers=MAX_ANSWER)
     elif dataset in ['mlpq']:
-        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json', lines=True)
-        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json', lines=True)
-        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json', lines=True)
+        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json')
+        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json')
+        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json')
 
         parse_train = ParseMLPQDataset(train_dataframe)
         parse_dev = ParseMLPQDataset(validation_dataframe)
@@ -133,7 +130,7 @@ def get_parse_dataset(dataset):
         parse_train = ParseMLPQDataset(train_dataframe)
         parse_dev = ParseMLPQDataset(validation_dataframe)
         parse_test = ParseMLPQDataset(test_dataframe)
-    elif dataset in ['pql']:
+    elif dataset in ['pq']:
         file_path = "dataset/pathquestion/PQ-2H.txt"
         train, val, test = load_train_test_pql_dataset(file_path, random_state = 789)
 
@@ -174,9 +171,9 @@ def get_parse_then_hop_test_dataset(dataset):
         # df_kg = pd.read_csv("dataset/metaqa/kb.txt", sep="|")
         # kg = create_knowledge_graph_metaqa(df_kg, from_kb=True)
 
-        df_dev = pd.read_json("dataset/metaqa/2hops/qa_dev_evidences.json")
-        df_train = pd.read_json("dataset/metaqa/2hops/qa_train_evidences.json")
-        df_test = pd.read_json("dataset/metaqa/2hops/qa_test_evidences.json")
+        df_dev = pd.read_json("dataset/metaqa/vanilla/metaqa_dev_evidences.json")
+        df_train = pd.read_json("dataset/metaqa/vanilla/metaqa_train_evidences.json")
+        df_test = pd.read_json("dataset/metaqa/vanilla/metaqa_test_evidences.json")
         MAX_ANSWER = 1
         #df_kg = pd.concat([df_dev, df_train, df_test])
         #kg = create_knowledge_graph_metaqa(df_kg, from_kb=False, max_answers=MAX_ANSWER)
@@ -191,7 +188,7 @@ def get_parse_then_hop_test_dataset(dataset):
         #kg = create_knowledge_graph_mlpq(df_kg, from_kb = False)
 
         parse_then_hop_test = ParseThenHopMLPQDataset(test_dataframe)
-    elif dataset in ['pql']:
+    elif dataset in ['pq']:
         file_path = "dataset/pathquestion/PQ-2H.txt"
         train, val, test = load_train_test_pql_dataset(file_path, random_state = 789)
 
@@ -205,4 +202,58 @@ def get_parse_then_hop_test_dataset(dataset):
         raise ValueError(f"Unknown Dataset")
     return parse_then_hop_test
 def get_knowledge_integration_dataset(dataset):
-    pass
+    if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop']: 
+        print("Training on 2WikiMultiHopQA")
+        train_dataset, dev_dataset, test_dataset, kg_train, kg_dev, kg_test = load_dataset("dataset/2wikimultihop", do_correct_wrong_evidences=True)
+
+
+        print("Creating Single Hop Datasets...")
+        dataset_with_all_entries = pd.concat([train_dataset, dev_dataset, test_dataset])
+
+        ki_dataset = KnowledgeIntegrationWikiHopDataset(dataset_with_all_entries)
+
+    elif dataset in ['metaqa']:
+        print("Training on MetaQA")
+        #metaqa_kg_data = pd.read_csv('dataset/metaqa/kb.txt', sep="|")
+
+        #Comment Out if we want to use the whole kb. This used only the kb for questions with a single answer
+        df_dev = pd.read_json("dataset/metaqa/vanilla/metaqa_dev_evidences.json")
+        df_train = pd.read_json("dataset/metaqa/vanilla/metaqa_train_evidences.json")
+        df_test = pd.read_json("dataset/metaqa/vanilla/metaqa_test_evidences.json")
+        max_answers = 1
+        df_kg = pd.concat([df_dev, df_train, df_test])
+        kg = create_knowledge_graph_metaqa(df_kg, from_kb=False, max_answers=max_answers)
+
+        ki_dataset = KnowledgeIntegrationMetaQADataset(kg)
+    elif dataset in ['mlpq']:
+        #txt_file_paths = ['dataset/mlpq/Triples_in_questions/EN_KG', 'dataset/mlpq/Triples_in_questions/FR_KG']
+        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_train_question_evidences.json')
+        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_dev_question_evidences.json')
+        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/2-hop/2hop_test_question_evidences.json')
+
+        df_kg = pd.concat([train_dataframe, validation_dataframe, test_dataframe])
+        kg = create_knowledge_graph_mlpq(df_kg, from_kb = False, hops=2)
+        ki_dataset = KnowledgeIntegrationMLPQDataset(kg)
+    elif dataset in ['mlpq-3hop']:
+        train_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_train_question_evidences.json', lines=True)
+        validation_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_dev_question_evidences.json', lines=True)
+        test_dataframe = pd.read_json('dataset/mlpq/Questions/fr-en/3-hop/3hop_test_question_evidences.json', lines=True)
+
+        df_kg = pd.concat([train_dataframe, validation_dataframe, test_dataframe])
+        kg = create_knowledge_graph_mlpq(df_kg, from_kb = False, hops=3)
+        ki_dataset = KnowledgeIntegrationMLPQDataset(kg)
+    elif dataset in ['pq']:
+        # from src.utils.util import load_train_test_pql_dataset
+        # file_path_kb = "dataset/pathquestion/PQL-KB.txt"
+        file_path_paths = "dataset/pathquestion/PQ-2H.txt"
+        kg = create_knowledge_graph_pql(file_path_paths, from_kb=False)
+        ki_dataset = KnowledgeIntegrationPQLDataset(kg)
+    elif dataset in ['pq-3hop']:
+        # from src.utils.util import load_train_test_pql_dataset
+        # file_path_kb = "dataset/pathquestion/PQL-KB.txt"
+        file_path_paths = "dataset/pathquestion/PQ-3H.txt"
+        kg = create_knowledge_graph_pql(file_path_paths, from_kb=False)
+        ki_dataset = KnowledgeIntegrationPQLDataset(kg)
+    else:
+        raise ValueError("Unknown Dataset")  
+    return ki_dataset

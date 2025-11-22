@@ -215,10 +215,10 @@ if __name__ == '__main__':
     import torch.nn as nn
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     knit5_model.to(device)
-    GPU_PARALLELIZATION = False if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop'] else True
-    WITH_MODEL_STATE_DICT = GPU_PARALLELIZATION
     if tuned:
-        load_model_checkpoint(knit5_model, model_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION)
+        from src.utils.trainer_utils import load_model_checkpoint
+
+        knit5_model, _ = load_model_checkpoint(knit5_model, model_checkpoint_path)
 
     from src.knowledge_graph import create_knowledge_graph_metaqa, create_knowledge_graph_wikimultihop, create_knowledge_graph_pql
     from src.utils.util import load_train_test_pql_dataset

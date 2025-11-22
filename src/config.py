@@ -41,7 +41,7 @@ class Config:
                              scheduler=None,
                              num_workers=16,
                              curvature=log(exp(0.1) - 1),
-                             gpu_parallelization=True,
+                            #  gpu_parallelization=True,
                              learning_rate=0.001,
                              epochs=50)
             self.additional_log_info=f'knowledge_integration_bsize64_lr0.001'
@@ -67,7 +67,7 @@ class Config:
                              num_workers=1,
                              optimizer='AdaFactor',
                              curvature=log(exp(0.32) - 1),
-                             gpu_parallelization=True
+                            #  gpu_parallelization=True
                              )
             self.use_scheduler = False
             self.use_soft_prompt = True
@@ -85,7 +85,7 @@ class Config:
                              tboard_checkpoint_path=None,
                              num_workers=1,
                              curvature=log(exp(1.0) - 1),
-                             gpu_parallelization=True
+                            #  gpu_parallelization=True
                              )
             self.use_scheduler = False
             self.use_soft_prompt = True
@@ -97,8 +97,8 @@ class Config:
                 
     class T5_Model:
         def __init__(self):
-            self.batch_size = 64
-            self.model_name = "google/t5-large-lm-adapt"            
+            self.batch_size = 1
+            self.model_name = "google/t5-small-lm-adapt"            
             self.tokenizer_max_length = 512
             self.map_encoder_layers = []
             self.map_decoder_layers = []

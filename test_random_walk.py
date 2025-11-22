@@ -10,8 +10,6 @@ import argparse
 from src.datasets import get_random_walk_dataset
 import pandas as pd
 def test_random_walk(dataset, additional_layer, batch_size, knit5_checkpoint_path, prompt_tuning_checkpoint_path):
-    GPU_PARALLELIZATION = True# if dataset in ['2wikimultihop', 'wikimultihop', '2wikihop', 'wikihop'] else True
-    WITH_MODEL_STATE_DICT = GPU_PARALLELIZATION
     _, _, random_walk_test = get_random_walk_dataset(dataset)
 
     #Specify Hyperparameters via config file
@@ -27,14 +25,19 @@ def test_random_walk(dataset, additional_layer, batch_size, knit5_checkpoint_pat
     print("Loading Tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     print("Loading Model...")
-    hyperbolic_knit5_model = T5ModelWithAdditionalLayer(num_layers=1, layer_type=additional_layer, curvature=config.random_walk_training.curvature, checkpoint_hyperbolic_knit5=knit5_checkpoint_path, with_model_state_dict=WITH_MODEL_STATE_DICT, gpu_parallelization=GPU_PARALLELIZATION, soft_prompt_length=config.random_walk_training.prompt_length)
+    hyperbolic_knit5_model = T5ModelWithAdditionalLayer(
+                                layer_type=additional_layer,
+                                curvature=config.random_walk_training.curvature,
+                                checkpoint_hyperbolic_knit5=knit5_checkpoint_path,
+                                with_model_state_dict=True
+                            )
     import torch.nn as nn
 
     checkpoint = torch.load(prompt_tuning_checkpoint_path, map_location=device)
     hopping_prompt = nn.Parameter(checkpoint['soft_prompt_state_dict'], requires_grad=False)
     additional_linear_layer = checkpoint['additional_linear_layer']
 
-    hyperbolic_knit5_model.hyperbolic_layer.load_state_dict(additional_linear_layer)
+    hyperbolic_knit5_model.additional_layer.load_state_dict(additional_linear_layer)
     print("Loaded Soft Prompts and Additional Linear Layer")
     print(f"Loaded Soft Prompt and Additional Layer from: {prompt_tuning_checkpoint_path}")
 
@@ -61,9 +64,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '--additional_layer',
         type=str,
-        choices=['identity', 'hyperbolic', 'linear'],
+        choices=['identity', 'hyperbolic', 'euclidean'],
         default='identity',  # You can set a different default if needed
-        help='Specify the type of additional layer to use: identity, hyperbolic, or linear'
+        help='Specify the type of additional layer to use: identity, hyperbolic, or euclidean'
     )
     parser.add_argument(
         '--knit5_checkpoint_path',

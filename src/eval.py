@@ -95,7 +95,7 @@ def evaluate_one_hop_wiki(model : Union[nn.Module],
         avg_f1_perc = total_f1 / len(test_dataloader.dataset)
     print(f"Test - AvgEM: {avg_em_perc:.4f} | AvgF1: {avg_f1_perc:.4f}")
     return prediction_vs_label
-from models import SoftPromptModel
+from src.models import SoftPromptModel
 
 def extract_answer(sequence):
     """Extract the e3 component from a sequence string."""

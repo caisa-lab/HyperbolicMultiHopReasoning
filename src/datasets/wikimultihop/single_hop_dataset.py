@@ -67,7 +67,7 @@ class SingleHopDataset(Dataset):
                 'type': 'single_hop_question',
                 'question': random_question, # Random Question from the Dictionary
                 'answer': e2, # Label
-                'context': 0, # TODO Need to add the context. Take the relevant context parts of the Multi Hop Question.
+                'context': 0, 
                 'evidences': triple # Single Hop has only one evidence
             })
             
